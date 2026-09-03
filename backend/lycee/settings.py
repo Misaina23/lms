@@ -117,7 +117,7 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.environ.get(
         'CORS_ALLOWED_ORIGINS',
-        'http://localhost:3000,http://localhost:8081,http://localhost:19006,http://localhost:5173'
+        'https://lyceemidongysud.vercel.app/,http://localhost:3000,http://localhost:8081,http://localhost:19006,http://localhost:5173'
     ).split(',') if o.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True
