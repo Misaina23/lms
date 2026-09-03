@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0F1F1D"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -23,9 +23,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0F1F1D"
       },
-      "package": "com.lycee.horizon"
+      "package": "com.lycee.horizon",
+      "navigationBarColor": "#0F1F1D"
     },
     "web": {
       "bundler": "metro",

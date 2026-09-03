@@ -2,6 +2,7 @@ import '@/lib/polyfills';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BlinkProvider, createTamagui, tamaguiDefaultConfig, Theme, BlinkToastProvider } from '@blinkdotnew/mobile-ui';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -34,21 +35,23 @@ export default function RootLayout() {
   useFrameworkReady();
 
   return (
-    <BlinkProvider config={config} defaultTheme="dark">
-      <ThemeProvider>
-        <Theme name="dark">
-          <QueryClientProvider client={queryClient}>
-            <BlinkToastProvider>
-              <WebStyleReset />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="light" />
-            </BlinkToastProvider>
-          </QueryClientProvider>
-        </Theme>
-      </ThemeProvider>
-    </BlinkProvider>
+    <SafeAreaProvider>
+      <BlinkProvider config={config} defaultTheme="dark">
+        <ThemeProvider>
+          <Theme name="dark">
+            <QueryClientProvider client={queryClient}>
+              <BlinkToastProvider>
+                <WebStyleReset />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="light" />
+              </BlinkToastProvider>
+            </QueryClientProvider>
+          </Theme>
+        </ThemeProvider>
+      </BlinkProvider>
+    </SafeAreaProvider>
   );
 }

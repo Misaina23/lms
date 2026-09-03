@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
 import { blink } from '@/lib/blink';
@@ -831,10 +832,12 @@ export default function Home() {
       <PlaceholderScreen tab={activeTab} />
     );
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <YStack flex={1} backgroundColor={colors.background}>
+    <YStack flex={1} backgroundColor={colors.background} paddingTop={insets.top}>
       {/* Theme Toggle */}
-      <XStack position="absolute" top="$4" right="$4" zIndex={100} gap="$2">
+      <XStack position="absolute" top={insets.top + 8} right="$4" zIndex={100} gap="$2">
         <Button
           size="$3"
           backgroundColor={colors.card}
@@ -868,7 +871,7 @@ export default function Home() {
         borderColor={colors.border}
         paddingHorizontal="$1"
         paddingTop="$2"
-        paddingBottom="$2"
+        paddingBottom={insets.bottom + 8}
         justifyContent="space-around"
       >
         {navItems.map(({ label, icon: Icon }) => {
@@ -895,7 +898,7 @@ export default function Home() {
       </XStack>
 
       {/* Footer */}
-      <XStack justifyContent="center" padding="$3" borderTopWidth={1} borderColor={colors.border} backgroundColor={colors.card}>
+      <XStack justifyContent="center" padding="$3" borderTopWidth={1} borderColor={colors.border} backgroundColor={colors.card} paddingBottom={insets.bottom > 0 ? 4 : 12}>
         <SizableText color={colors.mutedForeground} size="$2">Développé par DevMisaina</SizableText>
       </XStack>
     </YStack>

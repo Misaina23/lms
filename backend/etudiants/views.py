@@ -132,7 +132,7 @@ class StudentOrientationViewSet(viewsets.ModelViewSet):
         }
         orientation = StudentOrientation(
             student=etudiant,
-            recommended_stream=StudentOrientation.Stream(b'', best_stream),
+            recommended_stream=StudentOrientation.Stream(best_stream),
             ai_confidence_score=confidence,
             ai_explanation=explanations.get(best_stream, f"Recommandation pour la filière {best_stream}."),
             ai_model_version='1.0.0',

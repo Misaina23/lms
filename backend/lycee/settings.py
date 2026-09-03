@@ -71,6 +71,9 @@ DATABASES = {
         conn_max_age=600,
     )
 }
+DATABASES['default']['OPTIONS'] = {
+    'client_encoding': 'UTF8',
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -86,6 +89,9 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+DEFAULT_CHARSET = 'utf-8'
+DEFAULT_CONTENT_TYPE = 'text/html'
 
 LANGUAGE_CODE = 'fr-fr'
 TIME_ZONE = 'Africa/Niamey'

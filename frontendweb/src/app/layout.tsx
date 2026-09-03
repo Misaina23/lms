@@ -1,4 +1,5 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import './globals.css'
 import { Providers } from './providers'
 
@@ -18,6 +19,13 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#0F1F1D',
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -25,11 +33,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <head>
-        {/* MUST be first: sets the theme class before paint (no flash). */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
       <body className="antialiased">
+        <Script id="theme-init" strategy="beforeInline">{themeInitScript}</Script>
         <Providers>{children}</Providers>
       </body>
     </html>
