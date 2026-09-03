@@ -1,5 +1,5 @@
-// Polyfill DOMException for React Native (Android JavaScriptCore doesn't have it)
-if (typeof globalThis.DOMException === 'undefined') {
+// Keep the browser-only DOM fallback out of Hermes native bundles.
+if (typeof document !== 'undefined' && typeof globalThis.DOMException === 'undefined') {
   globalThis.DOMException = class DOMExceptionPolyfill extends Error {
     name: string;
     code: number;

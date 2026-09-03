@@ -2,45 +2,47 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q
 from .models import TimetableSlot
 from .serializers import TimetableSlotSerializer
+from users.permissions import IsAdminOrReadOnly, IsAdminOnly
 
 
 class TimetableSlotViewSet(viewsets.ModelViewSet):
-    queryset = TimetableSlot.objects.all()
+    queryset = TimetableSlot.objects.select_related('classe', 'matiere', 'professeur').all()
     serializer_class = TimetableSlotSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['classe', 'professeur', 'matiere', 'day_of_week', 'academic_year']
+    filterset_fields = ['classe', 'matiere', 'professeur', 'day_of_week', 'academic_year']
 
-    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser], url_path='check-conflicts')
-    def check_conflicts(self, request):
-        academic_year = request.query_params.get('academic_year')
-        day_of_week = request.query_params.get('day_of_week')
-        filters = {}
-        if academic_year:
-            filters['academic_year'] = academic_year
-        if day_of_week:
-            filters['day_of_week'] = int(day_of_week)
-        slots = TimetableSlot.objects.filter(**filters)
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Filter out deleted or archived slots
+        return queryset
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
+    def conflicts(self, request):
+        from datetime import time
+        day = request.query_params.get('day')
+        slot_id = request.query_params.get('exclude')
         conflicts = []
-        for slot in slots:
-            overlapping = slot.has_conflict()
-            for other in overlapping:
-                conflicts.append({
-                    'classe_a': f"{slot.classe.nom} - {slot.matiere.nom} ({slot.get_day_of_week_display()} {slot.start_hour.strftime('%H:%M')}-{slot.end_hour.strftime('%H:%M')})",
-                    'classe_b': f"{other.classe.nom} - {other.matiere.nom} ({other.get_day_of_week_display()} {other.start_hour.strftime('%H:%M')}-{other.end_hour.strftime('%H:%M')})",
-                    'type': 'CLASH',
-                })
-        return Response({'conflicts': conflicts, 'count': len(conflicts)}, status=status.HTTP_200_OK)
+        if day is not None:
+            qset = TimetableSlot.objects.filter(day_of_week=int(day))
+            if slot_id:
+                qset = qset.exclude(id=slot_id)
+            for slot in qset:
+                overlaps = slot.has_conflict()
+                if overlaps:
+                    conflicts.append(TimetableSlotSerializer(overlap).data)
+        return Response({'conflicts': conflicts})
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser], url_path='validate')
-    def validate_slot(self, request, pk=None):
-        slot = self.get_object()
-        conflicts = slot.has_conflict()
-        if conflicts:
-            return Response({
-                'valid': False,
-                'conflicts': [f"{c.classe.nom} - {c.matiere.nom}" for c in conflicts],
-            }, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'valid': True}, status=status.HTTP_200_OK)
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def my_schedule(self, request):
+        user = request.user
+        if user.role not in ('ADMIN', 'PROFESSEUR'):
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        queryset = self.get_queryset().filter(
+            Q(professeur=user) | Q(classe__teacher_assignments__professeur=user)
+        ).distinct()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

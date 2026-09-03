@@ -25,8 +25,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0F1F1D"
       },
-      "package": "com.lycee.horizon",
-      "navigationBarColor": "#0F1F1D"
+      "package": "com.lycee.horizon"
     },
     "web": {
       "bundler": "metro",
