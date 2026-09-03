@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/', include('notes.urls')),
     path('api/', include('absences.urls')),
     path('api/', include('timetable.urls')),
+    path('api/', include('messaging.urls')),
 ]

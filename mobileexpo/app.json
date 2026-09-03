@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "lycee-horizon",
-    "slug": "lycee-horizon",
+    "name": "lyceems",
+    "slug": "lyceems",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "lyceehorizon",
+    "scheme": "lyceems",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -46,7 +46,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "77106a02-51c1-462c-bd8a-62a0449080c3"
       }
     }
   }
