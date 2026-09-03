@@ -7,6 +7,7 @@ class AbsenceSerializer(serializers.ModelSerializer):
         model = Absence
         fields = [
             'id', 'etudiant', 'professeur', 'date_absence',
-            'heure_debut', 'heure_fin', 'motif', 'justifiee', 'created_at',
+            'heure_debut', 'heure_fin', 'statut', 'motif', 'justifiee',
+            'recorded_at', 'sync_source', 'client_uuid', 'created_at',
         ]
-        read_only_fields = ['created_at']
+        read_only_fields = ['created_at', 'recorded_at', 'client_uuid']

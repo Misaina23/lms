@@ -4,7 +4,7 @@ from rest_framework.authtoken.models import Token
 from users.models import CustomUser
 from classes.models import Classe
 from etudiants.models import Etudiant
-from matieres.models import Matiere
+from matieres.models import Matiere, ExamPeriod
 from .models import Note
 
 
@@ -47,11 +47,19 @@ class NoteViewSetTests(APITestCase):
             actif=True,
         )
         cls.matiere = Matiere.objects.create(nom='Mathématiques', code='MATH')
+        cls.exam_period = ExamPeriod.objects.create(
+            code='T1',
+            label='Trimestre 1',
+            period_type=ExamPeriod.PeriodType.TRIMESTRE_1,
+            start_date='2024-10-01',
+            end_date='2024-12-31',
+        )
         cls.note = Note.objects.create(
             etudiant=cls.etudiant,
             matiere=cls.matiere,
             professeur=cls.professeur,
-            note=14.50,
+            exam_period=cls.exam_period,
+            score_1=14.50,
             coefficient=2.00,
             date_evaluation='2024-10-01',
         )
@@ -67,11 +75,19 @@ class NoteViewSetTests(APITestCase):
 
     def test_create_note(self):
         url = reverse('note-list')
+        second_period = ExamPeriod.objects.create(
+            code='T2',
+            label='Trimestre 2',
+            period_type=ExamPeriod.PeriodType.TRIMESTRE_2,
+            start_date='2025-01-01',
+            end_date='2025-03-31',
+        )
         data = {
             'etudiant': self.etudiant.id,
             'matiere': self.matiere.id,
             'professeur': self.professeur.id,
-            'note': 16.00,
+            'exam_period': second_period.id,
+            'score_1': 16.00,
             'coefficient': 1.00,
             'date_evaluation': '2024-10-05',
         }
@@ -83,4 +99,4 @@ class NoteViewSetTests(APITestCase):
         url = reverse('note-detail', args=[self.note.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['note'], '14.50')
+        self.assertEqual(response.data['score_1'], '14.50')

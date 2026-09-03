@@ -6,8 +6,8 @@ from .models import CustomUser
 class CustomUserAdmin(admin.ModelAdmin):
     list_display = [
         'matricule', 'get_full_name', 'email', 'role',
-        'phone', 'is_active', 'created_at',
+        'teacher_type', 'status', 'phone', 'is_active', 'created_at',
     ]
     search_fields = ['matricule', 'first_name', 'last_name', 'email']
-    list_filter = ['role', 'is_active', 'date_of_birth']
+    list_filter = ['role', 'teacher_type', 'status', 'is_active', 'date_of_birth']
     ordering = ['-created_at']

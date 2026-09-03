@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'etudiants.apps.EtudiantsConfig',
     'notes.apps.NotesConfig',
     'absences.apps.AbsencesConfig',
+    'timetable.apps.TimetableConfig',
 ]
 
 MIDDLEWARE = [

@@ -7,7 +7,8 @@ class CustomUserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
-            'email', 'phone', 'role', 'date_of_birth', 'address',
+            'email', 'phone', 'role', 'teacher_type', 'status',
+            'date_of_birth', 'address',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']
