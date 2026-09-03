@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { blink } from '@/lib/blink';
 import {
   YStack,
@@ -853,10 +855,21 @@ export default function Home() {
           backgroundColor={colors.card}
           borderColor={colors.border}
           borderWidth={1}
-          onPress={() => {}}
+          onPress={async () => {
+            const token = await AsyncStorage.getItem('auth_token');
+            if (token) {
+              await AsyncStorage.multiRemove(['auth_token', 'auth_user']);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } else {
+              router.push('/login');
+            }
+          }}
           aria-label="Connexion"
         >
-          <SizableText color={colors.foreground} size="$2">Connexion</SizableText>
+          <SizableText color={colors.foreground} size="$2">
+            {typeof window !== 'undefined' ? '' : ''}
+            Connexion
+          </SizableText>
         </Button>
       </XStack>
 
