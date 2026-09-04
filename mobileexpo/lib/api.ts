@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:8000/api';
 
 export type PaginatedResponse<T> = {
@@ -7,8 +9,16 @@ export type PaginatedResponse<T> = {
   results: T[]
 }
 
+async function getAuthToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem('auth_token');
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = await getAuthToken();
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -31,12 +41,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      return {
-        count: 0,
-        next: null,
-        previous: null,
-        results: [],
-      } as T;
+      throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion.');
     }
     throw error;
   }
@@ -53,6 +58,7 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
+// Types
 export type User = {
   id: number;
   username: string;
@@ -189,4 +195,114 @@ export type TimetableSlot = {
   academic_year: string;
   created_at: string;
   updated_at: string;
+};
+
+// Teacher Assignment Types
+export type TeacherAssignment = {
+  id: number;
+  professeur: number;
+  classe: number;
+  matiere: number;
+  academic_year: string;
+  is_main_teacher: boolean;
+  created_at: string;
+  professeur_detail: {
+    id: number;
+    matricule: string;
+    name: string;
+  };
+  classe_detail: {
+    id: number;
+    nom: string;
+    niveau: string;
+  };
+  matiere_detail: {
+    id: number;
+    nom: string;
+    code: string;
+  };
+};
+
+// Room Types
+export type Room = {
+  id: number;
+  nom: string;
+  capacite: number;
+  batiment: string;
+  equipement: string;
+  created_at: string;
+};
+
+// School Config Types
+export type SchoolConfig = {
+  id: number;
+  academic_year: string;
+  school_name: string;
+  school_address: string;
+  school_phone: string;
+  school_email: string;
+  devise: string;
+  frais_inscription_defaut: string | null;
+  ecolage_annuel_defaut: string | null;
+  tolerance_retard_minutes: number;
+  heure_debut_cours: string | null;
+  heure_fin_cours: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+// Matiere Coefficient Types
+export type MatiereCoefficient = {
+  id: number;
+  matiere: number;
+  matiere_detail: {
+    id: number;
+    nom: string;
+    code: string;
+  };
+  niveau: string;
+  stream: string | null;
+  coefficient: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// Chat Types
+export type ChatGroup = {
+  id: string;
+  name: string;
+  group_type: string;
+  classe: number | null;
+  matiere: number | null;
+  is_readonly: boolean;
+  members: ChatGroupMember[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChatGroupMember = {
+  id: number;
+  group: string;
+  user: number;
+  is_admin: boolean;
+  joined_at: string;
+  user_detail: {
+    id: number;
+    matricule: string;
+    name: string;
+  };
+};
+
+export type ChatMessage = {
+  id: string;
+  group: string;
+  sender: number | null;
+  sender_name: string;
+  content: string;
+  attachment: string | null;
+  mentions: number[];
+  is_deleted: boolean;
+  deleted_by: number | null;
+  created_at: string;
 };

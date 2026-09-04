@@ -6,47 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { blink } from '@/lib/blink';
-import {
-  YStack,
-  XStack,
-  ScrollView,
-  Card,
-  Button,
-  Input,
-  H1,
-  H2,
-  H3,
-  Paragraph,
-  SizableText,
-  Home as HomeIcon,
-  ClipboardCheck,
-  CalendarDays,
-  MessageCircle,
-  UserRound,
-  Bell,
-  ChevronRight,
-  CheckCircle2,
-  Clock3,
-  UsersRound,
-  Wifi,
-  Send,
-  Search,
-  MoreHorizontal,
-  ShieldCheck,
-  Settings2,
-  GraduationCap,
-  BookOpen,
-  FileText,
-  Building2,
-  CircleDollarSign,
-  Download,
-  Printer,
-  ArrowUpRight,
-  ArrowDownRight,
-  Menu,
-  X,
-  ChevronDown,
-} from '@blinkdotnew/mobile-ui';
+import { LogOut } from '@blinkdotnew/mobile-ui'
 import { useTheme } from '@/lib/theme';
 
 type Tab = 'Accueil' | 'Mes classes' | 'Notes' | 'Pointage' | 'Emploi du temps' | 'Messages' | 'Profil';
@@ -850,27 +810,7 @@ export default function Home() {
         >
           {isDark ? '☀️' : '🌙'}
         </Button>
-        <Button
-          size="$3"
-          backgroundColor={colors.card}
-          borderColor={colors.border}
-          borderWidth={1}
-          onPress={async () => {
-            const token = await AsyncStorage.getItem('auth_token');
-            if (token) {
-              await AsyncStorage.multiRemove(['auth_token', 'auth_user']);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } else {
-              router.push('/login');
-            }
-          }}
-          aria-label="Connexion"
-        >
-          <SizableText color={colors.foreground} size="$2">
-            {typeof window !== 'undefined' ? '' : ''}
-            Connexion
-          </SizableText>
-        </Button>
+          <LogOut size={18} color={colors.foreground} />
       </XStack>
 
       <YStack flex={1}>
