@@ -2,18 +2,39 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Avg, F
+from django.db.models import Avg, F, Q
+import datetime
 from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification
 from .serializers import EtudiantSerializer, EnrollmentSerializer, StudentOrientationSerializer, AuditLogSerializer, NotificationSerializer
-from users.permissions import IsAdminOrReadOnly
+from users.permissions import IsAdminOrReadOnly, CanManageAttendance, CanManageEnrollment, CanViewSchedule
+from classes.models import TeacherAssignment
 
 
 class EtudiantViewSet(viewsets.ModelViewSet):
-    queryset = Etudiant.objects.all()
     serializer_class = EtudiantSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [CanViewSchedule]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['classe', 'actif', 'statut', 'date_inscription']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return Etudiant.objects.all()
+        elif user.role == 'SURVEILLANT':
+            # Surveillants can see all students
+            return Etudiant.objects.all()
+        elif user.role == 'PROFESSEUR':
+            # Teachers can only see students in their classes
+            classe_ids = TeacherAssignment.objects.filter(
+                professeur=user
+            ).values_list('classe_id', flat=True)
+            return Etudiant.objects.filter(classe_id__in=classe_ids)
+        return Etudiant.objects.none()
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'change_statut']:
+            return [IsAdminOrReadOnly()]
+        return super().get_permissions()
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def change_statut(self, request, pk=None):
@@ -38,11 +59,23 @@ class EtudiantViewSet(viewsets.ModelViewSet):
 
 
 class EnrollmentViewSet(viewsets.ModelViewSet):
-    queryset = Enrollment.objects.all()
     serializer_class = EnrollmentSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [CanManageEnrollment]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['classe', 'payment_status', 'academic_year']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return Enrollment.objects.all()
+        elif user.role == 'SURVEILLANT':
+            return Enrollment.objects.all()
+        elif user.role == 'PROFESSEUR':
+            classe_ids = TeacherAssignment.objects.filter(
+                professeur=user
+            ).values_list('classe_id', flat=True)
+            return Enrollment.objects.filter(classe_id__in=classe_ids)
+        return Enrollment.objects.none()
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser], url_path='confirm-payment')
     def confirm_payment(self, request, pk=None):
@@ -53,6 +86,31 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         if request.data.get('devise'):
             enrollment.devise = request.data['devise']
         enrollment.save()
+
+        # Create budget item for tuition revenue
+        from budget.models import BudgetItem, BudgetCategory, BudgetSummary
+        tuition_category = BudgetCategory.objects.filter(name='Scolarité élèves', category_type='REVENUE').first()
+        if tuition_category and enrollment.frais_verses:
+            BudgetItem.objects.create(
+                item_type=BudgetItem.ItemType.REVENUE,
+                category=tuition_category,
+                academic_year=enrollment.academic_year,
+                date=datetime.date.today(),
+                amount=enrollment.frais_verses,
+                devise=enrollment.devise,
+                description=f"Paiement scolarité - {enrollment.student.user.get_full_name()} - {enrollment.receipt_number}",
+                designation="Scolarité élève",
+                reference_number=enrollment.receipt_number,
+                revenue_source=BudgetItem.RevenueSource.TUITION,
+                related_enrollment=enrollment,
+                created_by=request.user,
+                is_validated=True,
+                validated_by=request.user,
+            )
+            # Update budget summary
+            summary, _ = BudgetSummary.objects.get_or_create(academic_year=enrollment.academic_year)
+            summary.recalculate()
+
         AuditLog.objects.create(
             actor=request.user,
             entity_type='Enrollment',

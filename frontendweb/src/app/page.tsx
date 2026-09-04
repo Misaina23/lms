@@ -19,6 +19,9 @@ import {
   ShieldCheck,
   Users,
   X,
+  Wallet,
+  TrendingUp,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,7 +29,12 @@ import { api, type PaginatedResponse, type User, type Classe, type Matiere, type
 import { useAdminData, type ScreenKey } from '@/lib/admin-data'
 import { StudentsScreen } from '@/components/screens/students'
 import { EnrollmentsScreen } from '@/components/screens/enrollments'
-import { TeachersScreen, ClassesScreen, GradesScreen, AttendanceScreen, BulletinsScreen, TimetableScreen, ReportsScreen, AuditScreen, ChatScreen } from '@/components/screens/modules'
+import { TeachersScreen, ClassesScreen, GradesScreen, AttendanceScreen, ReportsScreen } from '@/components/screens/modules'
+import { BudgetScreen } from '@/components/screens/budget'
+import { TimetableScreen } from '@/components/screens/timetable'
+import { BulletinsScreen } from '@/components/screens/bulletins'
+import { ChatScreen } from '@/components/screens/chat'
+import { AuditScreen } from '@/components/screens/audit'
 
 const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
   { key: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
@@ -42,6 +50,7 @@ const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
   { key: 'chat', label: 'Messagerie', icon: MessageSquare },
   { key: 'audit', label: 'Audit', icon: ShieldCheck },
   { key: 'reports', label: 'Rapports', icon: Building2 },
+  { key: 'budget', label: 'Budget', icon: Wallet },
 ]
 
 function StatCard({ label, value, detail, trend, icon: Icon, accent }: { label: string; value: string; detail: string; trend: string; icon: typeof Users; accent: string }) {
@@ -113,11 +122,12 @@ export default function Home() {
       case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} />
       case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} />
-      case 'timetable': return <TimetableScreen />
-      case 'bulletins': return <BulletinsScreen />
+      case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} />
+      case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} users={data.users} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes as any} matieres={data.matieres} notes={data.notes} />
-      case 'chat': return <ChatScreen />
-      case 'audit': return <AuditScreen />
+      case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} />
+      case 'chat': return <ChatScreen users={data.users} />
+      case 'audit': return <AuditScreen logs={data.auditLogs} />
     }
   }
 

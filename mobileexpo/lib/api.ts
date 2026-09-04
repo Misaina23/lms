@@ -69,6 +69,7 @@ export type User = {
   phone: string;
   role: string;
   teacher_type: string | null;
+  surveillant_type: string | null;
   status: string;
   date_of_birth: string | null;
   address: string;
@@ -114,7 +115,22 @@ export type ExamPeriod = {
 export type Etudiant = {
   id: number;
   user: number;
+  user_detail?: {
+    id: number;
+    matricule: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    email: string;
+    phone: string;
+  };
   classe: number | null;
+  classe_detail?: {
+    id: number;
+    nom: string;
+    niveau: string;
+    stream: string | null;
+  };
   date_inscription: string;
   statut: string;
   actif: boolean;
@@ -125,7 +141,14 @@ export type Etudiant = {
 export type Enrollment = {
   id: string;
   student: number;
+  student_detail?: Etudiant;
   classe: number | null;
+  classe_detail?: {
+    id: number;
+    nom: string;
+    niveau: string;
+    stream: string | null;
+  };
   academic_year: string;
   receipt_number: string;
   payment_status: string;
@@ -139,9 +162,42 @@ export type Enrollment = {
 export type Note = {
   id: number;
   etudiant: number;
+  etudiant_detail?: {
+    user_detail: {
+      id: number;
+      matricule: string;
+      first_name: string;
+      last_name: string;
+      full_name: string;
+      email: string;
+      phone: string;
+    };
+    classe_detail: {
+      id: number;
+      nom: string;
+      niveau: string;
+      stream: string | null;
+    };
+  };
   matiere: number;
+  matiere_detail?: {
+    id: number;
+    nom: string;
+    code: string;
+  };
   professeur: number;
   exam_period: number | null;
+  exam_period_detail?: {
+    id: number;
+    code: string;
+    label: string;
+    period_type: string;
+    start_date: string;
+    end_date: string;
+    weight_note_1: string;
+    weight_note_2: string;
+    is_locked: boolean;
+  };
   score_1: string;
   score_2: string | null;
   note: string;
@@ -186,8 +242,11 @@ export type StudentOrientation = {
 export type TimetableSlot = {
   id: string;
   classe: number;
+  classe_name?: string;
   matiere: number;
+  matiere_name?: string;
   professeur: number | null;
+  professeur_name?: string;
   day_of_week: number;
   start_hour: string;
   end_hour: string;
@@ -277,6 +336,7 @@ export type ChatGroup = {
   matiere: number | null;
   is_readonly: boolean;
   members: ChatGroupMember[];
+  messages?: ChatMessage[];
   created_at: string;
   updated_at: string;
 };
@@ -298,11 +358,58 @@ export type ChatMessage = {
   id: string;
   group: string;
   sender: number | null;
-  sender_name: string;
+  sender_name?: string;
   content: string;
   attachment: string | null;
   mentions: number[];
   is_deleted: boolean;
   deleted_by: number | null;
   created_at: string;
+};
+
+// Budget Types
+export type BudgetCategory = {
+  id: number;
+  name: string;
+  category_type: 'REVENUE' | 'EXPENSE';
+  description: string;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetItem = {
+  id: string;
+  item_type: 'REVENUE' | 'EXPENSE';
+  category: number;
+  category_detail: BudgetCategory;
+  academic_year: string;
+  date: string;
+  amount: string;
+  devise: string;
+  description: string;
+  designation: string;
+  reference_number: string;
+  revenue_source: string | null;
+  expense_type: string | null;
+  related_enrollment: string | null;
+  created_by: number;
+  validated_by: number | null;
+  is_validated: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetReport = {
+  id: string;
+  academic_year: string;
+  period_type: 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+  period_start: string;
+  period_end: string;
+  status: 'GENERATING' | 'READY' | 'FAILED';
+  file: string | null;
+  data_json: Record<string, unknown> | null;
+  generated_by: number;
+  created_at: string;
+  completed_at: string | null;
 };

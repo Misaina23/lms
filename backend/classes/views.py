@@ -1,20 +1,25 @@
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
+from users.permissions import IsAdminOrReadOnly, IsAdminOnly, CanViewSchedule
 
 from .models import Classe, Room, TeacherAssignment, MatiereCoefficient, SchoolConfig
 from .serializers import (
     ClasseSerializer, RoomSerializer, TeacherAssignmentSerializer,
     MatiereCoefficientSerializer, SchoolConfigSerializer,
 )
-from users.permissions import IsAdminOrReadOnly, IsAdminOnly
 
 
 class ClasseViewSet(viewsets.ModelViewSet):
     queryset = Classe.objects.all().order_by('niveau', 'nom')
     serializer_class = ClasseSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [CanViewSchedule]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['niveau', 'stream', 'academic_year', 'capacite']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminOnly()]
+        return super().get_permissions()
 
 
 class RoomViewSet(viewsets.ModelViewSet):

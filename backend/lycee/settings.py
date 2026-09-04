@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'absences.apps.AbsencesConfig',
     'timetable.apps.TimetableConfig',
     'messaging.apps.MessagingConfig',
+    'budget.apps.BudgetConfig',
 ]
 
 MIDDLEWARE = [

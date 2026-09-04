@@ -12,10 +12,10 @@ import {
   Input,
   Button,
   ScrollView,
-  useTheme,
 } from '@blinkdotnew/mobile-ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMutation } from '@tanstack/react-query';
+import { useTheme } from '@/lib/theme';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:8000/api';
 

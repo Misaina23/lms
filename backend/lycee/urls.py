@@ -11,4 +11,5 @@ urlpatterns = [
     path('api/', include('absences.urls')),
     path('api/', include('timetable.urls')),
     path('api/', include('messaging.urls')),
+    path('api/', include('budget.urls')),
 ]

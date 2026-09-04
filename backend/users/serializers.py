@@ -9,7 +9,7 @@ class UserListSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
-            'email', 'phone', 'role', 'teacher_type', 'status',
+            'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status',
         ]
 
 
@@ -20,7 +20,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
-            'email', 'phone', 'role', 'teacher_type', 'status',
+            'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status',
             'date_of_birth', 'address', 'password',
             'created_at', 'updated_at',
         ]
@@ -30,7 +30,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password', None) or 'changeme123'
         user = CustomUser(**validated_data)
         user.set_password(password)
-        if user.role == CustomUser.Role.PROFESSEUR:
+        if user.role in [CustomUser.Role.PROFESSEUR, CustomUser.Role.SURVEILLANT]:
             user.status = CustomUser.Status.PENDING_VERIFICATION
             user.is_active = False
         user.save()

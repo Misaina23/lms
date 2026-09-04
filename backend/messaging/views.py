@@ -5,20 +5,12 @@ from rest_framework.response import Response
 
 from .models import ChatGroup, ChatGroupMember, ChatMessage
 from .serializers import ChatGroupSerializer, ChatMessageSerializer, ChatGroupMemberSerializer
-
-
-class IsTeacherOrAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.role in ('ADMIN', 'PROFESSEUR')
-        )
+from users.permissions import CanParticipateInChat, IsAdminOnly
 
 
 class ChatGroupViewSet(viewsets.ModelViewSet):
     serializer_class = ChatGroupSerializer
-    permission_classes = [IsTeacherOrAdmin]
+    permission_classes = [CanParticipateInChat]
 
     def get_queryset(self):
         user = self.request.user
@@ -62,7 +54,7 @@ class ChatGroupViewSet(viewsets.ModelViewSet):
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
     serializer_class = ChatMessageSerializer
-    permission_classes = [IsTeacherOrAdmin]
+    permission_classes = [CanParticipateInChat]
 
     def get_queryset(self):
         user = self.request.user
@@ -70,7 +62,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
             return ChatMessage.objects.all()
         return ChatMessage.objects.filter(group__members=user)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly])
     def moderate(self, request, pk=None):
         message = self.get_object()
         message.is_deleted = True

@@ -34,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className="antialiased">
-        <Script id="theme-init" strategy="beforeInline">{themeInitScript}</Script>
+        <Script id="theme-init" strategy="beforeInteractive">{themeInitScript}</Script>
         <Providers>{children}</Providers>
       </body>
     </html>

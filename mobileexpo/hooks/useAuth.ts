@@ -12,6 +12,7 @@ interface User {
   phone: string;
   role: string;
   teacher_type: string | null;
+  surveillant_type: string | null;
   status: string;
   date_of_birth: string | null;
   address: string;
@@ -93,6 +94,10 @@ export function useAuth() {
   const isAuthenticated = !!token && !!user;
   const isTeacher = user?.role === 'PROFESSEUR';
   const isAdmin = user?.role === 'ADMIN';
+  const isSurveillant = user?.role === 'SURVEILLANT';
+  const canAccessGrades = user?.role === 'PROFESSEUR';
+  const canManageAttendance = user?.role === 'PROFESSEUR';
+  const canViewReports = ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'].includes(user?.role || '');
 
   return {
     user,
@@ -101,6 +106,10 @@ export function useAuth() {
     isAuthenticated,
     isTeacher,
     isAdmin,
+    isSurveillant,
+    canAccessGrades,
+    canManageAttendance,
+    canViewReports,
     login,
     logout,
     refresh: loadAuth,

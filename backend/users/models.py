@@ -8,10 +8,17 @@ class CustomUser(AbstractUser):
         PROFESSEUR = 'PROFESSEUR', 'Professeur'
         ELEVE = 'ELEVE', 'Élève'
         PARENT = 'PARENT', 'Parent'
+        SURVEILLANT = 'SURVEILLANT', 'Surveillant'
 
     class TeacherType(models.TextChoices):
         FONCTIONNAIRE = 'FONCTIONNAIRE', 'Fonctionnaire'
         SUPPLEANT = 'SUPPLEANT', 'Suppléant'
+
+    class SurveillantType(models.TextChoices):
+        GENERAL = 'GENERAL', 'Surveillant général'
+        ETAGE = 'ETAGE', 'Surveillant d\'étage'
+        PORTE = 'PORTE', 'Surveillant de porte'
+        AUTRE = 'AUTRE', 'Autre'
 
     class Status(models.TextChoices):
         ACTIVE = 'ACTIVE', 'Actif'
@@ -28,6 +35,12 @@ class CustomUser(AbstractUser):
     teacher_type = models.CharField(
         max_length=20,
         choices=TeacherType.choices,
+        null=True,
+        blank=True,
+    )
+    surveillant_type = models.CharField(
+        max_length=20,
+        choices=SurveillantType.choices,
         null=True,
         blank=True,
     )

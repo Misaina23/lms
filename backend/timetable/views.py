@@ -5,20 +5,29 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from .models import TimetableSlot
 from .serializers import TimetableSlotSerializer
-from users.permissions import IsAdminOrReadOnly, IsAdminOnly
+from users.permissions import IsAdminOrReadOnly, IsAdminOnly, CanViewSchedule
 
 
 class TimetableSlotViewSet(viewsets.ModelViewSet):
     queryset = TimetableSlot.objects.select_related('classe', 'matiere', 'professeur').all()
     serializer_class = TimetableSlotSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [CanViewSchedule]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['classe', 'matiere', 'professeur', 'day_of_week', 'academic_year']
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        # Filter out deleted or archived slots
-        return queryset
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return TimetableSlot.objects.select_related('classe', 'matiere', 'professeur').all()
+        elif user.role in ('PROFESSEUR', 'SURVEILLANT'):
+            # Teachers and surveillants can see all schedules for coordination
+            return TimetableSlot.objects.select_related('classe', 'matiere', 'professeur').all()
+        return TimetableSlot.objects.none()
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminOnly()]
+        return super().get_permissions()
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
     def conflicts(self, request):
@@ -39,7 +48,7 @@ class TimetableSlotViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def my_schedule(self, request):
         user = request.user
-        if user.role not in ('ADMIN', 'PROFESSEUR'):
+        if user.role not in ('ADMIN', 'PROFESSEUR', 'SURVEILLANT'):
             return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         queryset = self.get_queryset().filter(
             Q(professeur=user) | Q(classe__teacher_assignments__professeur=user)

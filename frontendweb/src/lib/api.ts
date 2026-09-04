@@ -114,6 +114,7 @@ export type Etudiant = {
   date_inscription: string;
   statut: string;
   actif: boolean;
+  moyenne_generale: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -127,6 +128,7 @@ export type Enrollment = {
   payment_status: string;
   frais_total: string | null;
   frais_verses: string | null;
+  reste_a_payer: number | null;
   devise: string;
   created_at: string;
   updated_at: string;
@@ -205,6 +207,38 @@ export type Notification = {
   created_at: string;
 };
 
+export type ChatGroup = {
+  id: string;
+  name: string;
+  group_type: string;
+  classe: number | null;
+  matiere: number | null;
+  is_readonly: boolean;
+  members: Array<{
+    id: number;
+    group: string;
+    user: number;
+    is_admin: boolean;
+    joined_at: string;
+    user_detail: { id: number; matricule: string; name: string };
+  }>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  group: string;
+  sender: number | null;
+  sender_name?: string;
+  content: string;
+  attachment: string | null;
+  mentions: number[];
+  is_deleted: boolean;
+  deleted_by: number | null;
+  created_at: string;
+};
+
 export type TimetableSlot = {
   id: string;
   classe: number;
@@ -217,4 +251,63 @@ export type TimetableSlot = {
   academic_year: string;
   created_at: string;
   updated_at: string;
+};
+
+export type BudgetCategory = {
+  id: number;
+  name: string;
+  category_type: 'REVENUE' | 'EXPENSE';
+  description: string;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetItem = {
+  id: string;
+  item_type: 'REVENUE' | 'EXPENSE';
+  category: number;
+  category_detail: BudgetCategory;
+  academic_year: string;
+  date: string;
+  amount: string;
+  devise: string;
+  description: string;
+  designation: string;
+  reference_number: string;
+  revenue_source: string | null;
+  expense_type: string | null;
+  related_enrollment: string | null;
+  created_by: number;
+  validated_by: number | null;
+  is_validated: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetReport = {
+  id: string;
+  academic_year: string;
+  period_type: 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+  period_start: string;
+  period_end: string;
+  status: 'GENERATING' | 'READY' | 'FAILED';
+  file: string | null;
+  data_json: Record<string, unknown> | null;
+  generated_by: number;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type BudgetStats = {
+  academic_year: string;
+  total_revenue: string;
+  total_expense: string;
+  balance: string;
+  revenue_by_category: Array<{ category__name: string; total: string; count: number }>;
+  expense_by_category: Array<{ category__name: string; total: string; count: number }>;
+  revenue_by_month: Array<{ month: string; total: string }>;
+  expense_by_month: Array<{ month: string; total: string }>;
+  revenue_by_source: Array<{ revenue_source: string; total: string; count: number }>;
+  expense_by_type: Array<{ expense_type: string; total: string; count: number }>;
 };
