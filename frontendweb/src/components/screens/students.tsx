@@ -124,41 +124,6 @@ export function StudentsScreen({ users, etudiants, classes, onReload }: {
           </CardContent>
         </Card>
       )}
-  const pageSize = 5
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const safePage = Math.min(page, totalPages - 1)
-  const pageItems = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize)
-
-  const statutBadge = (s: string) => {
-    const map: Record<string, string> = {
-      ENROLLED: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-      APPLICANT: 'bg-amber-500/10 text-amber-700',
-      SUSPENDED: 'bg-rose-500/10 text-rose-700',
-      GRADUATED: 'bg-sky-500/10 text-sky-700',
-    }
-    return map[s] || 'bg-muted text-muted-foreground'
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Élèves</h2>
-          <p className="text-sm text-muted-foreground">{etudiants.length} élèves inscrits · {classes.length} classes</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); setPage(0) }}
-              placeholder="Rechercher un élève..."
-              className="h-10 w-56 pl-9"
-            />
-          </div>
-          <Button onClick={onReload} variant="outline" size="sm">Actualiser</Button>
-        </div>
-      </div>
 
       <Card className="border-border/70 bg-card/80">
         <CardHeader className="flex-row items-center justify-between space-y-0">
