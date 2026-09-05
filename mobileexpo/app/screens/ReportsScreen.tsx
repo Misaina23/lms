@@ -16,12 +16,11 @@ import {
   SizableText,
   CheckCircle2,
   ChevronRight,
-  Users,
+  UsersRound,
   BookOpen,
   BarChart2,
-  Calendar,
+  CalendarDays,
   Download,
-  Filter,
 } from '@blinkdotnew/mobile-ui';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -53,7 +52,7 @@ interface ReportStats {
 function StatCard({ label, value, icon: Icon, accentColor, detail }: {
   label: string;
   value: string | number;
-  icon: typeof Users;
+  icon: typeof UsersRound;
   accentColor: string;
   detail?: string;
 }) {
@@ -368,7 +367,7 @@ export default function ReportsScreen() {
         {/* Overview Stats */}
         <YStack gap="$3">
           <XStack gap="$3" flexWrap="wrap">
-            <StatCard label="Classes" value={stats.totalClasses} icon={Users} accentColor={colors.accent} />
+            <StatCard label="Classes" value={stats.totalClasses} icon={UsersRound} accentColor={colors.accent} />
             <StatCard label="Matières" value={stats.totalSubjects} icon={BookOpen} accentColor={colors.warning} />
             <StatCard label="Moy. générale" value={`${stats.averageGrade.toFixed(1)}/20`} icon={BarChart2} accentColor={colors.info} />
             <StatCard label="Présence" value={`${stats.attendanceRate.toFixed(0)}%`} icon={CheckCircle2} accentColor={colors.success} />

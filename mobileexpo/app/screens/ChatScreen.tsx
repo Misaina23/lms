@@ -15,7 +15,7 @@ import {
   SizableText,
   Input,
   ChevronRight,
-  Users,
+  UsersRound,
   MessageCircle,
   Send,
 } from '@blinkdotnew/mobile-ui';
@@ -130,7 +130,7 @@ export default function ChatScreen() {
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [draft, setDraft] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
 
   const { data: groups, isLoading: groupsLoading, refetch: refetchGroups } = useQuery({
     queryKey: ['chat-groups', user?.id],

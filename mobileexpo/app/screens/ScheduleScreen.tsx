@@ -15,8 +15,8 @@ import {
   SizableText,
   CalendarDays,
   ChevronRight,
-  Clock,
-  Users,
+  Clock3,
+  UsersRound,
   BookOpen,
   MapPin,
 } from '@blinkdotnew/mobile-ui';
@@ -54,7 +54,7 @@ function TimeSlot({ slot, isCurrent }: { slot: TimetableSlot; isCurrent: boolean
           </XStack>
           <XStack gap="$3" alignItems="center" flexWrap="wrap">
             <XStack gap="$1" alignItems="center">
-              <Clock size={14} color={colors.mutedForeground} />
+              <Clock3 size={14} color={colors.mutedForeground} />
               <SizableText color={colors.mutedForeground} size="$2">{slot.start_hour} - {slot.end_hour}</SizableText>
             </XStack>
             {slot.room && (

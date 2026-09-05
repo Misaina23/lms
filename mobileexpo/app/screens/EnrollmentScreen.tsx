@@ -16,9 +16,8 @@ import {
   Input,
   CheckCircle2,
   ChevronRight,
-  Users,
+  UsersRound,
   Search,
-  Filter,
 } from '@blinkdotnew/mobile-ui';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -305,7 +304,7 @@ export default function EnrollmentScreen() {
             </YStack>
           ) : filteredEnrollments.length === 0 ? (
             <YStack alignItems="center" justifyContent="center" padding="$6" gap="$2">
-              <Users size={48} color={colors.mutedForeground} />
+              <UsersRound size={48} color={colors.mutedForeground} />
               <SizableText color={colors.mutedForeground} textAlign="center" size="$3">
                 {searchQuery ? 'Aucun résultat' : 'Aucune inscription dans vos classes'}
               </SizableText>

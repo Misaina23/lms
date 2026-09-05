@@ -318,7 +318,7 @@ export default function Home() {
 
     switch (activeTab) {
       case 'Accueil':
-        return <DashboardScreen onNavigate={(tab) => setActiveTab(tab as Tab)} />;
+        return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as Tab)} />;
       case 'Mes classes':
         return <EnrollmentScreen />;
       case 'Notes':
@@ -334,7 +334,7 @@ export default function Home() {
       case 'Inscriptions':
         return <EnrollmentScreen />;
       default:
-        return <DashboardScreen onNavigate={(tab) => setActiveTab(tab as Tab)} />;
+        return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as Tab)} />;
     }
   };
 

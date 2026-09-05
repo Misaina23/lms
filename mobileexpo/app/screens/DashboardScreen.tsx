@@ -15,17 +15,18 @@ import {
   SizableText,
   Avatar,
   ClipboardCheck,
-  Users,
+  UsersRound,
   BookOpen,
   CheckCircle2,
   CalendarDays,
   MessageCircle,
   BarChart2,
   Search,
-  Filter,
   ChevronRight,
   Bell,
   Menu,
+  X,
+  Input,
 } from '@blinkdotnew/mobile-ui';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,7 +74,7 @@ function tapFeedback() {
 function StatCard({ label, value, icon: Icon, accentColor, trend }: {
   label: string;
   value: string | number;
-  icon: typeof Users;
+  icon: typeof UsersRound;
   accentColor: string;
   trend?: string;
 }) {
@@ -234,8 +235,8 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
             <YStack gap="$3">
               <SectionTitle title="Vue d'ensemble" />
               <XStack gap="$3" flexWrap="wrap">
-                <StatCard label="Mes classes" value={stats.myClasses} icon={Users} accentColor={colors.accent} />
-                <StatCard label="Mes élèves" value={stats.myStudents} icon={Users} accentColor={colors.success} />
+                <StatCard label="Mes classes" value={stats.myClasses} icon={UsersRound} accentColor={colors.accent} />
+                <StatCard label="Mes élèves" value={stats.myStudents} icon={UsersRound} accentColor={colors.success} />
               </XStack>
               <XStack gap="$3" flexWrap="wrap">
                 <StatCard label="Mes matières" value={stats.mySubjects} icon={BookOpen} accentColor={colors.warning} />
@@ -324,7 +325,7 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
           <SectionTitle title="Accès rapide" />
           <XStack gap="$3" flexWrap="wrap">
             {[
-              { label: 'Mes classes', icon: Users, color: colors.accent, screen: 'Classes' },
+              { label: 'Mes classes', icon: UsersRound, color: colors.accent, screen: 'Classes' },
               { label: 'Emploi du temps', icon: CalendarDays, color: colors.info, screen: 'Emploi du temps' },
               { label: 'Pointage', icon: CheckCircle2, color: colors.success, screen: 'Pointage' },
               { label: 'Notes', icon: ClipboardCheck, color: colors.warning, screen: 'Notes' },

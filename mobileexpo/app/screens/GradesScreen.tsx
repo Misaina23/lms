@@ -16,10 +16,9 @@ import {
   Input,
   CheckCircle2,
   ChevronRight,
-  Users,
+  UsersRound,
   BookOpen,
   ClipboardCheck,
-  Filter,
 } from '@blinkdotnew/mobile-ui';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';

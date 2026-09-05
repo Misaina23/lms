@@ -15,13 +15,12 @@ import {
   SizableText,
   Input,
   CheckCircle2,
-  Clock,
-  XCircle,
+  Clock3,
+  X,
   Search,
-  Filter,
   ChevronRight,
-  Calendar,
-  Users,
+  CalendarDays,
+  UsersRound,
 } from '@blinkdotnew/mobile-ui';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,8 +33,8 @@ function tapFeedback() {
 
 const STATUS_CONFIG = {
   PRESENT: { label: 'Présent', color: 'success', icon: CheckCircle2, bg: 'success' },
-  LATE: { label: 'Retard', color: 'warning', icon: Clock, bg: 'warning' },
-  ABSENT: { label: 'Absent', color: 'destructive', icon: XCircle, bg: 'destructive' },
+  LATE: { label: 'Retard', color: 'warning', icon: Clock3, bg: 'warning' },
+  ABSENT: { label: 'Absent', color: 'destructive', icon: X, bg: 'destructive' },
 };
 
 function StatusPill({ status, size = 'md' }: { status: string; size?: 'sm' | 'md' }) {
@@ -288,7 +287,7 @@ export default function AttendanceScreen() {
               circular
               size="$5"
               backgroundColor={colors.secondary}
-              icon={<Calendar size={20} color={colors.accent} />}
+              icon={<CalendarDays size={20} color={colors.accent} />}
               onPress={() => { }}
               aria-label="Changer la date"
             />
@@ -313,7 +312,7 @@ export default function AttendanceScreen() {
             />
           ) : (
             <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$4" padding="$4" alignItems="center">
-              <Users size={32} color={colors.mutedForeground} />
+              <UsersRound size={32} color={colors.mutedForeground} />
               <SizableText color={colors.mutedForeground} marginTop="$2" textAlign="center">
                 Aucune classe affectée
               </SizableText>
@@ -364,7 +363,7 @@ export default function AttendanceScreen() {
                 </YStack>
               ) : filteredStudents.length === 0 ? (
                 <YStack alignItems="center" justifyContent="center" padding="$6" gap="$2">
-                  <Users size={48} color={colors.mutedForeground} />
+                  <UsersRound size={48} color={colors.mutedForeground} />
                   <SizableText color={colors.mutedForeground} textAlign="center" size="$3">
                     Aucun élève dans cette classe
                   </SizableText>
