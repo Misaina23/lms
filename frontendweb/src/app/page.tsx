@@ -22,6 +22,7 @@ import {
   Wallet,
   TrendingUp,
   Download,
+  LogOut,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,7 +41,6 @@ const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
   { key: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
   { key: 'students', label: 'Élèves', icon: GraduationCap },
   { key: 'enrollments', label: 'Inscriptions', icon: CheckCircle2 },
-  { key: 'payments', label: 'Paiements', icon: CircleDollarSign },
   { key: 'classes', label: 'Classes & matières', icon: BookOpen },
   { key: 'teachers', label: 'Enseignants', icon: Users },
   { key: 'timetable', label: 'Emploi du temps', icon: CalendarDays },
@@ -182,9 +182,11 @@ export default function Home() {
                 </div>
                 <button className="relative flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted sm:size-10" aria-label="Notifications"><Bell className="size-[18px]" /></button>
                 <button onClick={toggleTheme} className="hidden size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted xs:flex sm:size-10" aria-label={isDark ? 'Mode clair' : 'Mode sombre'}>{isDark ? '☀️' : '🌙'}</button>
-                {!isLoggedIn
-                  ? <Button onClick={handleLogin} variant="outline" size="sm" className="shrink-0 px-2 sm:px-3">Connexion</Button>
-                  : <Button onClick={handleLogout} variant="outline" size="sm" className="shrink-0 px-2 sm:px-3">Déconnexion</Button>}
+                {isLoggedIn && (
+                  <button onClick={handleLogout} className="flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted sm:size-10" aria-label="Déconnexion">
+                    <LogOut className="size-[18px]" />
+                  </button>
+                )}
               </div>
             </header>
 
@@ -228,7 +230,7 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
         <StatCard label="Élèves actifs" value={elevesActifs.toString()} detail={`${data.users.filter((u) => u.role === 'ELEVE').length} élèves inscrits`} trend="4,8 %" icon={GraduationCap} accent="bg-primary/10 text-primary" />
         <StatCard label="Enseignants" value={enseignantsActifs.toString()} detail="Personnel actif" trend="2,1 %" icon={Users} accent="bg-sky-500/10 text-sky-700 dark:text-sky-300" />
         <StatCard label="Classes" value={data.classes.length.toString()} detail={`${data.matieres.length} matières`} trend="0,0 %" icon={BookOpen} accent="bg-amber-500/10 text-amber-700 dark:text-amber-300" />
-        <StatCard label="Encaissé" value={new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalEncaisse) + ' XOF'} detail={`sur ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalDu)} XOF attendus`} trend="7,2 %" icon={CheckCircle2} accent="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" />
+        <StatCard label="Encaissé" value={new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalEncaisse) + ' Ar'} detail={`sur ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalDu)} Ar attendus`} trend="7,2 %" icon={CheckCircle2} accent="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" />
       </div>
 
       <div className="mt-2 grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">

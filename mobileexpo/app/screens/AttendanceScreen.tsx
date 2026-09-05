@@ -162,7 +162,7 @@ function ClassSelector({
   );
 }
 
-export function AttendanceScreen() {
+export default function AttendanceScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();

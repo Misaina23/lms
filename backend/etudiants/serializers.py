@@ -33,10 +33,14 @@ class EtudiantSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'moyenne_generale']
 
     def get_moyenne_generale(self, obj):
-        from django.db.models import Avg
-        from notes.models import Note
-        agg = obj.notes.aggregate(m=Avg('note'))['m']
-        return round(float(agg), 2) if agg else None
+        notes = obj.notes.all()
+        if not notes:
+            return None
+        total_weighted = sum(float(n.note) * float(n.coefficient) for n in notes)
+        total_coefficient = sum(float(n.coefficient) for n in notes)
+        if total_coefficient == 0:
+            return None
+        return round(total_weighted / total_coefficient, 2)
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):

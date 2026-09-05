@@ -139,10 +139,11 @@ function StatusPill({ label, tone = 'green' }: { label: string; tone?: 'green' |
 }
 
 // Dashboard Screen
-export function DashboardScreen({ onNavigate }: { onNavigate: (tab: string) => void }) {
+export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
+  const [showAddStudent, setShowAddStudent] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats', user?.id],
@@ -360,6 +361,56 @@ export function DashboardScreen({ onNavigate }: { onNavigate: (tab: string) => v
           </XStack>
         </YStack>
       </YStack>
+
+      {showAddStudent && (
+        <YStack
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          backgroundColor="rgba(0,0,0,0.5)"
+          justifyContent="center"
+          alignItems="center"
+          padding="$4"
+          zIndex={100}
+        >
+          <Card backgroundColor={colors.card} borderRadius="$5" padding="$5" gap="$4" width="100%" maxWidth={400}>
+            <XStack justifyContent="space-between" alignItems="center">
+              <H3 color={colors.foreground} fontWeight="700">Nouvel élève</H3>
+              <Button circular size="$3" backgroundColor={colors.secondary} onPress={() => setShowAddStudent(false)}>
+                <X size={16} color={colors.foreground} />
+              </Button>
+            </XStack>
+            <YStack gap="$3">
+              <YStack gap="$1">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Nom</SizableText>
+                <Input placeholder="Nom" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
+              </YStack>
+              <YStack gap="$1">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Prénom</SizableText>
+                <Input placeholder="Prénom" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
+              </YStack>
+              <YStack gap="$1">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Email</SizableText>
+                <Input placeholder="email@exemple.com" keyboardType="email-address" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
+              </YStack>
+              <YStack gap="$1">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Classe</SizableText>
+                <Input placeholder="Classe" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
+              </YStack>
+            </YStack>
+            <XStack gap="$3">
+              <Button flex={1} variant="outline" backgroundColor={colors.card} borderColor={colors.border} onPress={() => setShowAddStudent(false)}>
+                Annuler
+              </Button>
+              <Button flex={1} backgroundColor={colors.accent} color={colors.accentForeground} onPress={() => { alert('Formulaire élève: à connecter au backend'); setShowAddStudent(false); }}>
+                Enregistrer
+              </Button>
+            </XStack>
+          </Card>
+        </YStack>
+      )}
     </ScrollView>
   );
 }

@@ -119,7 +119,7 @@ export function initials(name: string) {
   return name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()
 }
 
-export function formatCurrency(value: number | string | null | undefined, devise = 'XOF') {
+export function formatCurrency(value: number | string | null | undefined, devise = 'MGA') {
   if (value == null) return '—'
   const num = typeof value === 'string' ? parseFloat(value) : value
   if (isNaN(num)) return '—'

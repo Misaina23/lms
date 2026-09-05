@@ -71,7 +71,7 @@ class Enrollment(models.Model):
     )
     devise = models.CharField(
         max_length=3,
-        default='XOF',
+        default='MGA',
         help_text="Devise des paiements",
     )
     receipt_file = models.FileField(

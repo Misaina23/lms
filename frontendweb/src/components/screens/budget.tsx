@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import type { BudgetItem, BudgetCategory, BudgetReport, BudgetStats } from '@/lib/api'
 
-function formatCurrency(value: string | number | null | undefined, devise = 'XOF') {
+function formatCurrency(value: string | number | null | undefined, devise = 'MGA') {
   if (value == null) return '—'
   const num = typeof value === 'string' ? parseFloat(value) : value
   if (isNaN(num)) return '—'
@@ -304,7 +304,7 @@ export function BudgetScreen({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.slice(0, 50).map((item) => (
+                  {filteredItems.slice(0, 5).map((item) => (
                     <tr key={item.id} className="border-b border-border/60 hover:bg-muted/25">
                       <td className="px-3 py-3 sm:px-6 sm:py-4">{item.date}</td>
                       <td className="px-3 py-3 sm:px-4 sm:py-4">
@@ -332,6 +332,15 @@ export function BudgetScreen({
                 </tbody>
               </table>
             </div>
+            {filteredItems.length > 5 && (
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">5 / {filteredItems.length} lignes</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled>Précédent</Button>
+                  <Button variant="outline" size="sm" disabled>Suivant</Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

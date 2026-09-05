@@ -55,7 +55,7 @@ class BudgetItem(models.Model):
     academic_year = models.CharField(max_length=9, help_text="Format: YYYY-YYYY (ex: 2024-2025)")
     date = models.DateField()
     amount = models.DecimalField(max_digits=14, decimal_places=2)
-    devise = models.CharField(max_length=3, default='XOF')
+    devise = models.CharField(max_length=3, default='MGA')
     description = models.TextField(blank=True)
     designation = models.CharField(max_length=200, blank=True, help_text="Désignation pour subventions/dons")
     reference_number = models.CharField(max_length=100, blank=True, help_text="Numéro de pièce justificative")

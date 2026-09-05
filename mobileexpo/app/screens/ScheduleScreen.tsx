@@ -122,7 +122,7 @@ function DayColumn({ dayIndex, slots, currentDay, currentTime }: { dayIndex: num
   );
 }
 
-export function ScheduleScreen() {
+export default function ScheduleScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();

@@ -24,8 +24,7 @@ class NoteViewSet(viewsets.ModelViewSet):
             # Teachers can only see grades for their assigned classes/subjects
             from classes.models import TeacherAssignment
             assignments = TeacherAssignment.objects.filter(
-                professeur=user,
-                academic_year__in=ExamPeriod.objects.values_list('academic_year', flat=True).distinct()
+                professeur=user
             ).values_list('classe_id', 'matiere_id')
             classe_matiere_pairs = list(assignments)
             q_objects = Q()

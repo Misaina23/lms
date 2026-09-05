@@ -124,7 +124,7 @@ function MessageBubble({ message, isOwn }: { message: any; isOwn: boolean }) {
   );
 }
 
-export function ChatScreen() {
+export default function ChatScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [selectedGroup, setSelectedGroup] = useState<any>(null);

@@ -141,7 +141,7 @@ function StudentRow({ name, average, classe, isLow }: { name: string; average: n
   );
 }
 
-export function ReportsScreen() {
+export default function ReportsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();

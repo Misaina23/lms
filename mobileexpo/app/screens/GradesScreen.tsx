@@ -169,7 +169,7 @@ function GradeRowComponent({
   );
 }
 
-export function GradesScreen() {
+export default function GradesScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();

@@ -5,10 +5,10 @@ from .views import (
 )
 
 router = DefaultRouter()
-router.register(r'categories', BudgetCategoryViewSet, basename='budget-category')
-router.register(r'items', BudgetItemViewSet, basename='budget-item')
-router.register(r'summaries', BudgetSummaryViewSet, basename='budget-summary')
-router.register(r'reports', BudgetReportViewSet, basename='budget-report')
+router.register(r'budget/categories', BudgetCategoryViewSet, basename='budget-category')
+router.register(r'budget/items', BudgetItemViewSet, basename='budget-item')
+router.register(r'budget/summaries', BudgetSummaryViewSet, basename='budget-summary')
+router.register(r'budget/reports', BudgetReportViewSet, basename='budget-report')
 
 urlpatterns = [
     path('', include(router.urls)),

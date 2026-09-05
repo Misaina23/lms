@@ -137,6 +137,9 @@ CSRF_TRUSTED_ORIGINS = [
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+CURRENCY = 'MGA'
+CURRENCY_SYMBOL = 'Ar'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

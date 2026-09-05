@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -12,6 +13,7 @@ from .serializers import (
     BudgetCategorySerializer, BudgetItemSerializer, BudgetItemCreateSerializer,
     BudgetSummarySerializer, BudgetReportSerializer, BudgetStatsSerializer
 )
+from .exports import export_budget_to_pdf, export_budget_to_excel, export_budget_to_csv
 from users.permissions import IsAdminOrReadOnly, IsAdminOnly
 
 
@@ -144,7 +146,58 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
         }
         return Response(BudgetStatsSerializer(data).data)
 
-    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly])
+    def export_pdf(self, request):
+        academic_year = request.query_params.get('academic_year')
+        if not academic_year:
+            return Response({'detail': 'academic_year required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        items = BudgetItem.objects.filter(academic_year=academic_year).select_related('category')
+        categories_map = {cat.id: {'name': cat.name} for cat in BudgetCategory.objects.all()}
+        
+        try:
+            buffer = export_budget_to_pdf(items, categories_map, academic_year=academic_year)
+            response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="budget_{academic_year}.pdf"'
+            return response
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly])
+    def export_excel(self, request):
+        academic_year = request.query_params.get('academic_year')
+        if not academic_year:
+            return Response({'detail': 'academic_year required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        items = BudgetItem.objects.filter(academic_year=academic_year).select_related('category')
+        categories_map = {cat.id: {'name': cat.name} for cat in BudgetCategory.objects.all()}
+        
+        try:
+            buffer = export_budget_to_excel(items, categories_map, academic_year=academic_year)
+            response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = f'attachment; filename="budget_{academic_year}.xlsx"'
+            return response
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly])
+    def export_csv(self, request):
+        academic_year = request.query_params.get('academic_year')
+        if not academic_year:
+            return Response({'detail': 'academic_year required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        items = BudgetItem.objects.filter(academic_year=academic_year).select_related('category')
+        categories_map = {cat.id: {'name': cat.name} for cat in BudgetCategory.objects.all()}
+        
+        try:
+            buffer = export_budget_to_csv(items, categories_map, academic_year=academic_year)
+            response = HttpResponse(buffer.getvalue(), content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="budget_{academic_year}.csv"'
+            return response
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminOnly])
     def generate_report(self, request):
         academic_year = request.data.get('academic_year')
         period_type = request.data.get('period_type', BudgetReport.Period.MONTHLY)

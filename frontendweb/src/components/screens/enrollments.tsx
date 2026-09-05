@@ -13,10 +13,15 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
   classes: Classe[]
 }) {
   const [filter, setFilter] = useState<'ALL' | 'PAID' | 'PARTIAL' | 'UNPAID'>('ALL')
+  const [page, setPage] = useState(0)
   const filtered = useMemo(
     () => enrollments.filter((e) => filter === 'ALL' || e.payment_status === filter),
     [enrollments, filter]
   )
+  const pageSize = 5
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const safePage = Math.min(page, totalPages - 1)
+  const pageItems = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize)
 
   const stats = useMemo(() => {
     const total = enrollments.reduce((sum, e) => sum + Number(e.frais_total || 0), 0)
@@ -56,7 +61,7 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
 
       <div className="flex flex-wrap items-center gap-2">
         {(['ALL', 'PAID', 'PARTIAL', 'UNPAID'] as const).map((f) => (
-          <Button key={f} variant={filter === f ? 'default' : 'outline'} size="sm" onClick={() => setFilter(f)}>
+          <Button key={f} variant={filter === f ? 'default' : 'outline'} size="sm" onClick={() => { setFilter(f); setPage(0) }}>
             {f === 'ALL' ? 'Tous' : f}
           </Button>
         ))}
@@ -80,7 +85,7 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 30).map((en) => {
+                {pageItems.map((en) => {
                   const etudiant = etudiants.find((e) => e.id === en.student)
                   const user = etudiant && users.find((u) => u.id === etudiant.user)
                   const classe = classes.find((c) => c.id === en.classe)
@@ -112,11 +117,18 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
                     </tr>
                   )
                 })}
-                {filtered.length === 0 && (
+                {pageItems.length === 0 && (
                   <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucun dossier.</td></tr>
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Page {safePage + 1} / {totalPages}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Précédent</Button>
+              <Button variant="outline" size="sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}>Suivant</Button>
+            </div>
           </div>
         </CardContent>
       </Card>

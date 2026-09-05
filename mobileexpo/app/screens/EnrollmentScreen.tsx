@@ -104,20 +104,20 @@ function EnrollmentCard({
             <YStack gap="$1">
               <SizableText color={colors.mutedForeground} size="$1">Total</SizableText>
               <SizableText color={colors.foreground} fontWeight="700" size="$3">
-                {enrollment.frais_total ? `${parseFloat(enrollment.frais_total).toLocaleString('fr-FR')} XOF` : '—'}
+                {enrollment.frais_total ? `${parseFloat(enrollment.frais_total).toLocaleString('fr-FR')} Ar` : '—'}
               </SizableText>
             </YStack>
             <YStack gap="$1">
               <SizableText color={colors.mutedForeground} size="$1">Versé</SizableText>
               <SizableText color={colors.success} fontWeight="700" size="$3">
-                {enrollment.frais_verses ? `${parseFloat(enrollment.frais_verses).toLocaleString('fr-FR')} XOF` : '0 XOF'}
+                {enrollment.frais_verses ? `${parseFloat(enrollment.frais_verses).toLocaleString('fr-FR')} Ar` : '0 Ar'}
               </SizableText>
             </YStack>
             {enrollment.frais_total && enrollment.frais_verses && (
               <YStack gap="$1">
                 <SizableText color={colors.mutedForeground} size="$1">Reste</SizableText>
                 <SizableText color={colors.warning} fontWeight="700" size="$3">
-                  {(parseFloat(enrollment.frais_total) - parseFloat(enrollment.frais_verses)).toLocaleString('fr-FR')} XOF
+                  {(parseFloat(enrollment.frais_total) - parseFloat(enrollment.frais_verses)).toLocaleString('fr-FR')} Ar
                 </SizableText>
               </YStack>
             )}
@@ -132,7 +132,7 @@ function EnrollmentCard({
   );
 }
 
-export function EnrollmentScreen() {
+export default function EnrollmentScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();

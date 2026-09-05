@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
@@ -43,6 +43,8 @@ import {
   X,
   ChevronDown,
   LogOut,
+  Sun,
+  Moon,
   BarChart2,
 } from '@blinkdotnew/mobile-ui';
 import { useTheme } from '@/lib/theme';
@@ -50,13 +52,13 @@ import { useAuth } from '@/hooks/useAuth';
 import * as Haptics from 'expo-haptics';
 
 // Import screens
-import { DashboardScreen } from '@/app/screens/DashboardScreen';
-import { ScheduleScreen } from '@/app/screens/ScheduleScreen';
-import { AttendanceScreen } from '@/app/screens/AttendanceScreen';
-import { GradesScreen } from '@/app/screens/GradesScreen';
-import { EnrollmentScreen } from '@/app/screens/EnrollmentScreen';
-import { ChatScreen } from '@/app/screens/ChatScreen';
-import { ReportsScreen } from '@/app/screens/ReportsScreen';
+import DashboardScreen from '@/app/screens/DashboardScreen';
+import ScheduleScreen from '@/app/screens/ScheduleScreen';
+import AttendanceScreen from '@/app/screens/AttendanceScreen';
+import GradesScreen from '@/app/screens/GradesScreen';
+import EnrollmentScreen from '@/app/screens/EnrollmentScreen';
+import ChatScreen from '@/app/screens/ChatScreen';
+import ReportsScreen from '@/app/screens/ReportsScreen';
 
 function tapFeedback() {
   if (typeof Haptics !== 'undefined') Haptics.selectionAsync();
@@ -80,7 +82,7 @@ function getNavItemsForRole(role: string | undefined) {
 }
 
 function ProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, toggleTheme, mode } = useTheme();
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -88,6 +90,7 @@ function ProfileScreen() {
   if (!user) {
     return (
       <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" padding="$6">
+        <ActivityIndicator size="large" color={colors.accent} />
         <SizableText color={colors.mutedForeground}>Chargement...</SizableText>
       </YStack>
     );
@@ -122,17 +125,22 @@ function ProfileScreen() {
       }}
     >
       <YStack gap="$6" maxWidth={520} alignSelf="center" width="100%">
-        {/* Header */}
+        {/* Header avec avatar */}
         <YStack gap="$3" alignItems="center">
           <YStack
-            width={80}
-            height={80}
+            width={88}
+            height={88}
             borderRadius="$6"
-            backgroundColor={colors.accent}
+            backgroundColor={colors.primary}
             alignItems="center"
             justifyContent="center"
+            shadowColor={colors.primary}
+            shadowOffset={{ width: 0, height: 4 }}
+            shadowOpacity={0.3}
+            shadowRadius={8}
+            elevation={8}
           >
-            <SizableText color={colors.accentForeground} size="$6" fontWeight="800">
+            <SizableText color={colors.primaryForeground} size="$7" fontWeight="800">
               {user.first_name?.[0]}{user.last_name?.[0]}
             </SizableText>
           </YStack>
@@ -140,7 +148,7 @@ function ProfileScreen() {
             <H2 color={colors.foreground} fontWeight="800" textAlign="center">
               {user.first_name} {user.last_name}
             </H2>
-            <SizableText color={colors.mutedForeground} size="$3" textAlign="center">
+            <SizableText color={colors.primary} size="$3" fontWeight="600" textAlign="center">
               {roleLabels[user.role] || user.role}
             </SizableText>
             <SizableText color={colors.mutedForeground} size="$2" textAlign="center">
@@ -149,11 +157,11 @@ function ProfileScreen() {
           </YStack>
         </YStack>
 
-        {/* Info Card */}
-        <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$5" padding="$5" gap="$4">
+        {/* Informations personnelles */}
+        <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$6" padding="$5" gap="$4" shadowColor={colors.primary} shadowOffset={{ width: 0, height: 2 }} shadowOpacity={0.1} shadowRadius={8} elevation={4}>
           <H3 color={colors.foreground} fontWeight="700">Informations personnelles</H3>
           
-          <YStack gap="$3">
+          <YStack gap="$2">
             {[
               { label: 'Email', value: user.email },
               { label: 'Téléphone', value: user.phone || 'Non renseigné' },
@@ -162,7 +170,7 @@ function ProfileScreen() {
               ...(user.surveillant_type ? [{ label: 'Type', value: user.surveillant_type }] : []),
               { label: 'Statut', value: user.status === 'ACTIVE' ? 'Actif' : user.status === 'PENDING_VERIFICATION' ? 'En attente' : user.status },
             ].map((item, i) => (
-              <XStack key={i} justifyContent="space-between" alignItems="center" paddingVertical="$2" borderBottomColor={colors.border} borderBottomWidth={i < 5 ? 1 : 0}>
+              <XStack key={i} justifyContent="space-between" alignItems="center" paddingVertical="$3" borderBottomColor={colors.border} borderBottomWidth={i < 5 ? 1 : 0}>
                 <SizableText color={colors.mutedForeground} size="$3">{item.label}</SizableText>
                 <SizableText color={colors.foreground} fontWeight="600" size="$3">{item.value}</SizableText>
               </XStack>
@@ -170,34 +178,40 @@ function ProfileScreen() {
           </YStack>
         </Card>
 
-        {/* Actions */}
-        <YStack gap="$3">
-          <Button
-            height={54}
-            backgroundColor={colors.accent}
-            color={colors.accentForeground}
-            borderRadius="$5"
-            onPress={() => {}}
-          >
-            <XStack gap="$2" alignItems="center">
-              <Settings2 size={20} />
-              <SizableText size="$3" fontWeight="700">Modifier mon profil</SizableText>
-            </XStack>
-          </Button>
-          
-          <Button
-            height={54}
-            backgroundColor={colors.destructive}
-            color={colors.destructiveForeground}
-            borderRadius="$5"
-            onPress={handleLogout}
-          >
-            <XStack gap="$2" alignItems="center">
-              <LogOut size={20} />
-              <SizableText size="$3" fontWeight="700">Se déconnecter</SizableText>
-            </XStack>
-          </Button>
-        </YStack>
+        {/* Theme Toggle */}
+        <Button
+          height={56}
+          backgroundColor={colors.secondary}
+          color={colors.foreground}
+          borderRadius="$5"
+          onPress={toggleTheme}
+          borderWidth={1}
+          borderColor={colors.border}
+        >
+          <XStack gap="$3" alignItems="center">
+            {mode === 'dark' ? <Sun size={22} color={colors.foreground} /> : <Moon size={22} color={colors.foreground} />}
+            <SizableText size="$3" fontWeight="700">{mode === 'dark' ? 'Mode clair' : 'Mode sombre'}</SizableText>
+          </XStack>
+        </Button>
+
+        {/* Logout */}
+        <Button
+          height={56}
+          backgroundColor={colors.destructive}
+          color={colors.destructiveForeground}
+          borderRadius="$5"
+          onPress={handleLogout}
+          shadowColor={colors.destructive}
+          shadowOffset={{ width: 0, height: 2 }}
+          shadowOpacity={0.2}
+          shadowRadius={4}
+          elevation={4}
+        >
+          <XStack gap="$3" alignItems="center">
+            <LogOut size={22} color={colors.destructiveForeground} />
+            <SizableText size="$3" fontWeight="700">Se déconnecter</SizableText>
+          </XStack>
+        </Button>
 
         <SizableText color={colors.mutedForeground} size="$1" textAlign="center" marginTop="$2">
           Lycée Horizon · Développé par DevMisaina
@@ -257,11 +271,11 @@ function PlaceholderScreen({ tab, role }: { tab: Tab; role?: string }) {
     <ScrollView flex={1} backgroundColor={colors.background} showsVerticalScrollIndicator={false}>
       <YStack paddingHorizontal="$4" paddingTop="$6" paddingBottom="$8" gap="$4">
         <YStack gap="$1">
-          <SizableText color={colors.mutedForeground} size="$3">ESPACE ENSEIGNANT</SizableText>
+          <SizableText color={colors.primary} size="$3" fontWeight="700">ESPACE ENSEIGNANT</SizableText>
           <H1 color={colors.foreground} fontWeight="800">{content.title}</H1>
         </YStack>
         
-        <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$6" padding="$5" gap="$3">
+        <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$6" padding="$5" gap="$3" shadowColor={colors.primary} shadowOffset={{ width: 0, height: 2 }} shadowOpacity={0.1} shadowRadius={8} elevation={4}>
           {content.restricted && (
             <YStack backgroundColor={colors.warning + '15'} borderRadius="$3" padding="$3" marginBottom="$2">
               <SizableText color={colors.warning} fontWeight="700" size="$3">
@@ -272,7 +286,7 @@ function PlaceholderScreen({ tab, role }: { tab: Tab; role?: string }) {
           <H2 color={colors.foreground}>{content.subtitle}</H2>
           <Paragraph color={colors.mutedForeground}>{content.body}</Paragraph>
           {!content.restricted && (
-            <Button marginTop="$3" backgroundColor={colors.accent} color={colors.accentForeground} borderRadius="$4">
+            <Button marginTop="$3" backgroundColor={colors.primary} color={colors.primaryForeground} borderRadius="$4" height={48}>
               Ouvrir
             </Button>
           )}
@@ -284,7 +298,7 @@ function PlaceholderScreen({ tab, role }: { tab: Tab; role?: string }) {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('Accueil');
-  const { colors } = useTheme();
+  const { colors, toggleTheme, mode } = useTheme();
   const { user, isAuthenticated, loading, isTeacher, isAdmin, isSurveillant } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -338,19 +352,24 @@ export default function Home() {
   if (!isAuthenticated) {
     return (
       <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" padding="$6" gap="$4">
-        <YStack backgroundColor={colors.accent} padding="$4" borderRadius="$6">
-          <SizableText color={colors.accentForeground} size="$8" fontWeight="800">LH</SizableText>
+        <YStack backgroundColor={colors.primary} padding="$4" borderRadius="$6" shadowColor={colors.primary} shadowOffset={{ width: 0, height: 4 }} shadowOpacity={0.3} shadowRadius={8} elevation={8}>
+          <SizableText color={colors.primaryForeground} size="$8" fontWeight="800">LH</SizableText>
         </YStack>
         <H1 color={colors.foreground} fontWeight="800" textAlign="center">Lycée Horizon</H1>
         <Paragraph color={colors.mutedForeground} textAlign="center">
           Espace enseignant · Pointage, notes, messagerie
         </Paragraph>
         <Button
-          backgroundColor={colors.accent}
-          color={colors.accentForeground}
+          backgroundColor={colors.primary}
+          color={colors.primaryForeground}
           height={54}
           borderRadius="$5"
           onPress={() => navigation.navigate('login' as never)}
+          shadowColor={colors.primary}
+          shadowOffset={{ width: 0, height: 4 }}
+          shadowOpacity={0.3}
+          shadowRadius={8}
+          elevation={8}
         >
           Se connecter
         </Button>
@@ -359,43 +378,62 @@ export default function Home() {
   }
 
   return (
-    <YStack flex={1} backgroundColor={colors.background}>
-      {/* Main Content */}
-      <YStack flex={1}>
-        {renderContent()}
-      </YStack>
+      <YStack flex={1} backgroundColor={colors.background}>
+        {/* Main Content */}
+        <YStack flex={1}>
+          {renderContent()}
+        </YStack>
 
-      {/* Bottom Navigation */}
-      <XStack
-        backgroundColor={colors.card}
-        borderTopWidth={1}
-        borderColor={colors.border}
-        paddingHorizontal="$1"
-        paddingTop="$2"
-        paddingBottom={insets.bottom + 8}
-        justifyContent="space-around"
-      >
-        {navItems.map(({ label, icon: Icon }) => {
-          const active = activeTab === label;
-          return (
-            <Button
-              key={label}
-              chromeless
-              flex={1}
-              minHeight={52}
-              paddingHorizontal="$1"
-              gap="$1"
-              color={active ? colors.accent : colors.mutedForeground}
-              icon={<Icon size={19} color={active ? colors.accent : colors.mutedForeground} />}
-              onPress={() => {
-                tapFeedback();
-                setActiveTab(label);
-              }}
-            >
-              {label === 'Emploi du temps' ? 'Planning' : label}
-            </Button>
-          );
-        })}
+        {/* Bottom Navigation */}
+        <XStack
+          backgroundColor={colors.card}
+          borderTopWidth={1}
+          borderColor={colors.border}
+          paddingHorizontal="$1"
+          paddingTop="$2"
+          paddingBottom={insets.bottom + 8}
+          justifyContent="space-around"
+          shadowColor="#000"
+          shadowOffset={{ width: 0, height: -2 }}
+          shadowOpacity={0.1}
+          shadowRadius={4}
+          elevation={8}
+        >
+          {navItems.map(({ label, icon: Icon }) => {
+            const active = activeTab === label;
+            return (
+              <Button
+                key={label}
+                chromeless
+                flex={1}
+                minHeight={52}
+                paddingHorizontal="$1"
+                gap="$1"
+                color={active ? colors.primary : colors.mutedForeground}
+                icon={<Icon size={19} color={active ? colors.primary : colors.mutedForeground} />}
+                onPress={() => {
+                  tapFeedback();
+                  setActiveTab(label);
+                }}
+              >
+                {label === 'Emploi du temps' ? 'Planning' : label}
+              </Button>
+            );
+          })}
+          <Button
+            key="theme"
+            chromeless
+            flex={1}
+            minHeight={52}
+            paddingHorizontal="$1"
+            gap="$1"
+            color={colors.mutedForeground}
+            icon={mode === 'dark' ? <Sun size={19} color={colors.mutedForeground} /> : <Moon size={19} color={colors.mutedForeground} />}
+            onPress={() => {
+              tapFeedback();
+              toggleTheme();
+            }}
+        />
       </XStack>
 
       {/* Mobile Menu Overlay */}
@@ -442,9 +480,9 @@ export default function Home() {
                   paddingHorizontal="$3"
                   justifyContent="flex-start"
                   gap="$3"
-                  color={activeTab === label ? colors.accent : colors.foreground}
-                  backgroundColor={activeTab === label ? colors.accent + '15' : 'transparent'}
-                  icon={<Icon size={20} color={activeTab === label ? colors.accent : colors.foreground} />}
+                  color={activeTab === label ? colors.primary : colors.foreground}
+                  backgroundColor={activeTab === label ? colors.primary + '15' : 'transparent'}
+                  icon={<Icon size={20} color={activeTab === label ? colors.primary : colors.foreground} />}
                   onPress={() => {
                     tapFeedback();
                     setActiveTab(label);
@@ -463,11 +501,11 @@ export default function Home() {
                     width={40}
                     height={40}
                     borderRadius="$3"
-                    backgroundColor={colors.accent}
+                    backgroundColor={colors.primary}
                     alignItems="center"
                     justifyContent="center"
                   >
-                    <SizableText color={colors.accentForeground} size="$3" fontWeight="800">
+                    <SizableText color={colors.primaryForeground} size="$3" fontWeight="800">
                       {user.first_name?.[0]}{user.last_name?.[0]}
                     </SizableText>
                   </YStack>
