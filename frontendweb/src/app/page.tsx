@@ -23,6 +23,7 @@ import {
   TrendingUp,
   Download,
   LogOut,
+  UserPlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,6 +37,7 @@ import { TimetableScreen } from '@/components/screens/timetable'
 import { BulletinsScreen } from '@/components/screens/bulletins'
 import { ChatScreen } from '@/components/screens/chat'
 import { AuditScreen } from '@/components/screens/audit'
+import { RegistrationsScreen } from '@/components/screens/registrations'
 
 const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
   { key: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
@@ -43,6 +45,7 @@ const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
   { key: 'enrollments', label: 'Inscriptions', icon: CheckCircle2 },
   { key: 'classes', label: 'Classes & matières', icon: BookOpen },
   { key: 'teachers', label: 'Enseignants', icon: Users },
+  { key: 'registrations', label: 'Demandes', icon: UserPlus },
   { key: 'timetable', label: 'Emploi du temps', icon: CalendarDays },
   { key: 'attendance', label: 'Pointage', icon: Clock3 },
   { key: 'grades', label: 'Notes', icon: FileText },
@@ -122,6 +125,7 @@ export default function Home() {
       case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} />
       case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} />
+      case 'registrations': return <RegistrationsScreen pendingUsers={data.pendingUsers} users={data.users} onReload={reload} />
       case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} users={data.users} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes as any} matieres={data.matieres} notes={data.notes} />

@@ -44,7 +44,19 @@ export default function LoginScreen() {
       await AsyncStorage.setItem('auth_user', JSON.stringify(data.user));
       router.replace('/');
     },
-    onError: (e) => setError(e instanceof Error ? e.message : 'Erreur'),
+    onError: (e) => {
+      if (e instanceof Error) {
+        if (e.message.includes('attente de validation')) {
+          setError('Votre compte est en attente de validation par l\'administration.');
+        } else if (e.message.includes('rejeté')) {
+          setError('Votre compte a été rejeté. Contactez l\'administration.');
+        } else {
+          setError(e.message);
+        }
+      } else {
+        setError('Erreur');
+      }
+    },
   });
 
   return (
@@ -110,6 +122,16 @@ export default function LoginScreen() {
                 height={52}
               >
                 {login.isPending ? 'Connexion…' : 'Se connecter'}
+              </Button>
+              <Button
+                variant="outline"
+                borderColor={colors.border}
+                color={colors.foreground}
+                onPress={() => router.push('/register')}
+                borderRadius="$4"
+                height={52}
+              >
+                S'inscrire
               </Button>
             </YStack>
           </Card>

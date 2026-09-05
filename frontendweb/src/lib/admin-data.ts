@@ -18,9 +18,11 @@ export type ScreenKey =
   | 'budget'
   | 'chat'
   | 'audit'
+  | 'registrations'
 
 export type AdminData = {
   users: User[]
+  pendingUsers: User[]
   classes: Classe[]
   matieres: Matiere[]
   etudiants: Etudiant[]
@@ -39,7 +41,7 @@ export type AdminData = {
 
 export function useAdminData() {
   const [data, setData] = useState<AdminData>({
-    users: [], classes: [], matieres: [], etudiants: [], notes: [],
+    users: [], pendingUsers: [], classes: [], matieres: [], etudiants: [], notes: [],
     absences: [], enrollments: [], orientations: [], periods: [],
     budgetItems: [], budgetCategories: [], budgetReports: [], budgetStats: null,
     timetableSlots: [], auditLogs: [],
@@ -51,8 +53,9 @@ export function useAdminData() {
     setIsLoading(true)
     setError(null)
     try {
-      const [u, c, m, e, n, a, en, o, p, bi, bc, br, bs, ts, al] = await Promise.all([
+      const [u, pu, c, m, e, n, a, en, o, p, bi, bc, br, bs, ts, al] = await Promise.all([
         api.get<PaginatedResponse<User>>('/users/').catch(() => ({ results: [] })),
+        api.get<PaginatedResponse<User>>('/users/?status=PENDING_VERIFICATION').catch(() => ({ results: [] })),
         api.get<PaginatedResponse<Classe>>('/classes/').catch(() => ({ results: [] })),
         api.get<PaginatedResponse<Matiere>>('/matieres/').catch(() => ({ results: [] })),
         api.get<PaginatedResponse<Etudiant>>('/etudiants/').catch(() => ({ results: [] })),
@@ -70,6 +73,7 @@ export function useAdminData() {
       ])
       setData({
         users: u.results || [],
+        pendingUsers: pu.results || [],
         classes: c.results || [],
         matieres: m.results || [],
         etudiants: e.results || [],

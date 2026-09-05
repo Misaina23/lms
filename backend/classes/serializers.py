@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Classe, Room, TeacherAssignment, MatiereCoefficient, SchoolConfig
+from .models import Classe, Room, TeacherAssignment, Matiere, MatiereCoefficient, SchoolConfig
 
 
 class ClasseSerializer(serializers.ModelSerializer):
@@ -50,6 +50,12 @@ class TeacherAssignmentSerializer(serializers.ModelSerializer):
 
     def get_matiere_detail(self, obj):
         return {'id': obj.matiere.id, 'nom': obj.matiere.nom, 'code': obj.matiere.code}
+
+
+class MatiereSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Matiere
+        fields = ['id', 'nom', 'code', 'description', 'coefficient']
 
 
 class MatiereCoefficientSerializer(serializers.ModelSerializer):
