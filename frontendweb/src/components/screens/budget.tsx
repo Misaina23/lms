@@ -8,17 +8,16 @@ import {
   Search,
   Plus,
   Download,
-  Filter,
   ArrowUpRight,
   ArrowDownRight,
   TrendingUp,
   Wallet,
   FileText,
-  Calendar,
-  ChevronDown,
-  MoreHorizontal,
+  GraduationCap,
+  Users,
+  HandHeart,
 } from 'lucide-react'
-import type { BudgetItem, BudgetCategory, BudgetReport, BudgetStats } from '@/lib/api'
+import type { BudgetItem, BudgetCategory, BudgetReport, BudgetStats, Enrollment, User } from '@/lib/api'
 
 function formatCurrency(value: string | number | null | undefined, devise = 'MGA') {
   if (value == null) return '—'
@@ -58,14 +57,18 @@ export function BudgetScreen({
   budgetItems, 
   budgetCategories, 
   budgetReports, 
-  budgetStats 
+  budgetStats,
+  enrollments,
+  users,
 }: { 
   budgetItems: BudgetItem[]
   budgetCategories: BudgetCategory[]
   budgetReports: BudgetReport[]
   budgetStats: BudgetStats | null
+  enrollments: Enrollment[]
+  users: User[]
 }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'reports'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'tuition' | 'salaries' | 'donations' | 'reports'>('overview')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<string>('ALL')
 
@@ -75,8 +78,21 @@ export function BudgetScreen({
     return cats
   }, [budgetCategories])
 
+  const tuitionItems = useMemo(() => budgetItems.filter(i => i.revenue_source === 'TUITION'), [budgetItems])
+  const salaryItems = useMemo(() => budgetItems.filter(i => i.expense_type === 'TEACHER_NON_PERM'), [budgetItems])
+  const donationItems = useMemo(() => budgetItems.filter(i => i.revenue_source === 'DONATION' || i.revenue_source === 'SUBSIDY'), [budgetItems])
+
+  const totalTuition = useMemo(() => tuitionItems.reduce((sum, i) => sum + parseFloat(i.amount || '0'), 0), [tuitionItems])
+  const totalSalaries = useMemo(() => salaryItems.reduce((sum, i) => sum + parseFloat(i.amount || '0'), 0), [salaryItems])
+  const totalDonations = useMemo(() => donationItems.reduce((sum, i) => sum + parseFloat(i.amount || '0'), 0), [donationItems])
+
   const filteredItems = useMemo(() => {
-    return budgetItems.filter(item => {
+    let items = budgetItems
+    if (activeTab === 'tuition') items = tuitionItems
+    else if (activeTab === 'salaries') items = salaryItems
+    else if (activeTab === 'donations') items = donationItems
+
+    return items.filter(item => {
       if (filterType !== 'ALL' && item.item_type !== filterType) return false
       if (!searchQuery) return true
       const q = searchQuery.toLowerCase()
@@ -88,7 +104,7 @@ export function BudgetScreen({
         item.reference_number.toLowerCase().includes(q)
       )
     })
-  }, [budgetItems, filterType, searchQuery, categories])
+  }, [budgetItems, tuitionItems, salaryItems, donationItems, filterType, searchQuery, categories, activeTab])
 
   const totalRevenue = useMemo(() => {
     return filteredItems
@@ -104,6 +120,11 @@ export function BudgetScreen({
 
   const balance = totalRevenue - totalExpense
 
+  const getUserName = (userId: number) => {
+    const user = users.find(u => u.id === userId)
+    return user ? `${user.first_name} ${user.last_name}` : '—'
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -112,7 +133,7 @@ export function BudgetScreen({
           <p className="mb-2 font-serif text-sm italic text-primary">Budget & Finances</p>
           <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">Gestion budgétaire</h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            Suivi des recettes (scolarité, subventions, dons) et des dépenses (matériel, salaires, maintenance).
+            Suivi des recettes (scolarité, subventions, dons) et des dépenses (salaires, matériel, maintenance).
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -126,16 +147,19 @@ export function BudgetScreen({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-border">
+      <div className="flex gap-2 border-b border-border overflow-x-auto">
         {[
           { key: 'overview', label: 'Vue d\'ensemble', icon: TrendingUp },
-          { key: 'items', label: 'Lignes budgétaires', icon: FileText },
+          { key: 'tuition', label: 'Scolarité', icon: GraduationCap },
+          { key: 'salaries', label: 'Salaires', icon: Users },
+          { key: 'donations', label: 'Dons & Subventions', icon: HandHeart },
+          { key: 'items', label: 'Toutes les lignes', icon: FileText },
           { key: 'reports', label: 'Rapports', icon: FileText },
         ].map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === tab.key
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -152,37 +176,36 @@ export function BudgetScreen({
           {/* Stats */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              label="Total Recettes"
-              value={formatCurrency(totalRevenue)}
-              detail={`${filteredItems.filter(i => i.item_type === 'REVENUE').length} lignes`}
+              label="Scolarité"
+              value={formatCurrency(totalTuition)}
+              detail={`${tuitionItems.length} paiements`}
               trend="+12.5%"
-              icon={ArrowUpRight}
+              icon={GraduationCap}
               accent="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
             />
             <StatCard
-              label="Total Dépenses"
-              value={formatCurrency(totalExpense)}
-              detail={`${filteredItems.filter(i => i.item_type === 'EXPENSE').length} lignes`}
-              trend="+8.2%"
-              icon={ArrowDownRight}
-              accent="bg-rose-500/10 text-rose-700 dark:text-rose-300"
-              isNegative
-            />
-            <StatCard
-              label="Solde"
-              value={formatCurrency(balance)}
-              detail="Recettes - Dépenses"
-              trend={balance >= 0 ? '+' : ''}
-              icon={Wallet}
-              accent={balance >= 0 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300'}
-            />
-            <StatCard
-              label="Rapports générés"
-              value={budgetReports.length.toString()}
-              detail="Cette année"
-              trend="+3"
-              icon={FileText}
+              label="Salaires"
+              value={formatCurrency(totalSalaries)}
+              detail={`${salaryItems.length} paiements`}
+              trend="+5.3%"
+              icon={Users}
               accent="bg-sky-500/10 text-sky-700 dark:text-sky-300"
+            />
+            <StatCard
+              label="Dons & Subventions"
+              value={formatCurrency(totalDonations)}
+              detail={`${donationItems.length} entrées`}
+              trend="+2.1%"
+              icon={HandHeart}
+              accent="bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            />
+            <StatCard
+              label="Solde global"
+              value={formatCurrency(budgetStats?.balance || 0)}
+              detail="Recettes - Dépenses"
+              trend={(parseFloat(budgetStats?.balance || '0') >= 0 ? '+' : '') + ((parseFloat(budgetStats?.balance || '0') / (parseFloat(budgetStats?.total_revenue || '1'))) * 100).toFixed(1) + '%'}
+              icon={Wallet}
+              accent={(parseFloat(budgetStats?.balance || '0') >= 0 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300')}
             />
           </div>
 
@@ -259,11 +282,16 @@ export function BudgetScreen({
         </>
       )}
 
-      {activeTab === 'items' && (
+      {(activeTab === 'items' || activeTab === 'tuition' || activeTab === 'salaries' || activeTab === 'donations') && (
         <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-4">
             <div>
-              <CardTitle className="text-base">Lignes budgétaires</CardTitle>
+              <CardTitle className="text-base">
+                {activeTab === 'tuition' && 'Paiements de scolarité'}
+                {activeTab === 'salaries' && 'Salaires enseignants'}
+                {activeTab === 'donations' && 'Dons & Subventions'}
+                {activeTab === 'items' && 'Lignes budgétaires'}
+              </CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
                 {filteredItems.length} ligne(s) · {formatCurrency(totalRevenue)} recettes · {formatCurrency(totalExpense)} dépenses
               </p>
@@ -278,15 +306,17 @@ export function BudgetScreen({
                   className="h-9 w-56 pl-9"
                 />
               </div>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="h-9 rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none"
-              >
-                <option value="ALL">Tous</option>
-                <option value="REVENUE">Recettes</option>
-                <option value="EXPENSE">Dépenses</option>
-              </select>
+              {activeTab === 'items' && (
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="h-9 rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none"
+                >
+                  <option value="ALL">Tous</option>
+                  <option value="REVENUE">Recettes</option>
+                  <option value="EXPENSE">Dépenses</option>
+                </select>
+              )}
             </div>
           </CardHeader>
           <CardContent className="px-0">
@@ -297,14 +327,16 @@ export function BudgetScreen({
                     <th className="px-3 py-3 sm:px-6 font-semibold">Date</th>
                     <th className="px-3 py-3 sm:px-4 font-semibold">Type</th>
                     <th className="px-3 py-3 sm:px-4 font-semibold">Catégorie</th>
+                    {activeTab === 'tuition' && <th className="px-3 py-3 sm:px-4 font-semibold">Élève</th>}
+                    {activeTab === 'salaries' && <th className="px-3 py-3 sm:px-4 font-semibold">Enseignant</th>}
+                    {activeTab === 'donations' && <th className="px-3 py-3 sm:px-4 font-semibold">Désignation</th>}
                     <th className="px-3 py-3 sm:px-4 font-semibold">Description</th>
-                    <th className="px-3 py-3 sm:px-4 font-semibold">Désignation</th>
                     <th className="px-3 py-3 sm:px-4 font-semibold text-right">Montant</th>
                     <th className="px-3 py-3 sm:px-4 font-semibold">Statut</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.slice(0, 5).map((item) => (
+                  {filteredItems.slice(0, 10).map((item) => (
                     <tr key={item.id} className="border-b border-border/60 hover:bg-muted/25">
                       <td className="px-3 py-3 sm:px-6 sm:py-4">{item.date}</td>
                       <td className="px-3 py-3 sm:px-4 sm:py-4">
@@ -314,8 +346,22 @@ export function BudgetScreen({
                         </span>
                       </td>
                       <td className="px-3 py-3 sm:px-4 sm:py-4">{categories[item.category]?.name || '—'}</td>
+                      {activeTab === 'tuition' && (
+                        <td className="px-3 py-3 sm:px-4 sm:py-4">
+                          {item.related_enrollment_detail?.student || '—'}
+                        </td>
+                      )}
+                      {activeTab === 'salaries' && (
+                        <td className="px-3 py-3 sm:px-4 sm:py-4">
+                          {item.related_teacher_assignment_detail?.teacher || '—'}
+                        </td>
+                      )}
+                      {activeTab === 'donations' && (
+                        <td className="px-3 py-3 sm:px-4 sm:py-4">
+                          {item.designation || '—'}
+                        </td>
+                      )}
                       <td className="px-3 py-3 sm:px-4 sm:py-4 max-w-[200px] truncate" title={item.description}>{item.description}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">{item.designation || '—'}</td>
                       <td className={`px-3 py-3 sm:px-6 sm:py-4 text-right font-semibold ${item.item_type === 'REVENUE' ? 'text-emerald-700' : 'text-rose-700'}`}>
                         {item.item_type === 'REVENUE' ? '+' : '-'}{formatCurrency(item.amount)}
                       </td>
@@ -327,14 +373,14 @@ export function BudgetScreen({
                     </tr>
                   ))}
                   {filteredItems.length === 0 && (
-                    <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucune ligne budgétaire.</td></tr>
+                    <tr><td colSpan={activeTab === 'items' ? 7 : 8} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucune ligne budgétaire.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            {filteredItems.length > 5 && (
+            {filteredItems.length > 10 && (
               <div className="mt-4 flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">5 / {filteredItems.length} lignes</p>
+                <p className="text-xs text-muted-foreground">10 / {filteredItems.length} lignes</p>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" disabled>Précédent</Button>
                   <Button variant="outline" size="sm" disabled>Suivant</Button>

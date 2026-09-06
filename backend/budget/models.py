@@ -82,6 +82,14 @@ class BudgetItem(models.Model):
         related_name='budget_items',
         help_text="Lien automatique avec l'inscription pour les paiements de scolarité"
     )
+    related_teacher_assignment = models.ForeignKey(
+        'classes.TeacherAssignment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='budget_items',
+        help_text="Lien avec l'affectation enseignante pour les salaires"
+    )
     created_by = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,

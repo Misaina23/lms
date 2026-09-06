@@ -93,7 +93,6 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const [showAddStudent, setShowAddStudent] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats', user?.id],
@@ -219,9 +218,8 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
               { label: 'Pointage', icon: CheckCircle2, color: colors.success, screen: 'Pointage' },
               { label: 'Messagerie', icon: MessageCircle, color: colors.primary, screen: 'Messages' },
               { label: 'Notes', icon: ClipboardCheck, color: colors.warning, screen: 'Notes' },
-              { label: 'Calendrier', icon: CalendarDays, color: colors.accent, screen: 'Emploi du temps' },
-              { label: 'Annonces', icon: Bell, color: colors.warning, screen: '' },
-              { label: 'Ressources', icon: BookOpen, color: colors.destructive, screen: '' },
+              { label: 'Planning', icon: CalendarDays, color: colors.accent, screen: 'Planning' },
+              { label: 'Notifications', icon: Bell, color: colors.info, screen: 'Notifications' },
             ].map((item) => (
               <YStack 
                 key={item.label} 
@@ -321,7 +319,7 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
         <YStack gap="$3">
           <XStack justifyContent="space-between" alignItems="center">
             <H3 color={colors.foreground} fontWeight="800" fontSize={16}>Emploi du temps</H3>
-            <SizableText color={colors.accent} fontWeight="700" size="$3" onPress={() => onNavigate('Emploi du temps')}>Voir tout</SizableText>
+            <SizableText color={colors.accent} fontWeight="700" size="$3" onPress={() => onNavigate('Planning')}>Voir tout</SizableText>
           </XStack>
           <Card backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$5" padding="$4" gap="$3">
             {scheduleLoading ? (
@@ -404,12 +402,12 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
           </XStack>
           <XStack gap="$3" flexWrap="wrap">
             {[
-              { label: 'Mes classes', icon: UsersRound, color: colors.accent, screen: 'Classes' },
-              { label: 'Emploi du temps', icon: CalendarDays, color: colors.info, screen: 'Emploi du temps' },
+              { label: 'Planning', icon: CalendarDays, color: colors.info, screen: 'Planning' },
               { label: 'Pointage', icon: CheckCircle2, color: colors.success, screen: 'Pointage' },
               { label: 'Notes', icon: ClipboardCheck, color: colors.warning, screen: 'Notes' },
               { label: 'Messages', icon: MessageCircle, color: colors.info, screen: 'Messages' },
-              { label: 'Rapports', icon: BarChart2, color: colors.accent, screen: 'Rapports' },
+              { label: 'Notifications', icon: Bell, color: colors.accent, screen: 'Notifications' },
+              { label: 'Profil', icon: UsersRound, color: colors.primary, screen: 'Profil' },
             ].map((item) => (
               <Button
                 key={item.label}
@@ -441,56 +439,6 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
           </XStack>
         </YStack>
       </YStack>
-
-      {showAddStudent && (
-        <YStack
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          bottom={0}
-          backgroundColor="rgba(0,0,0,0.5)"
-          justifyContent="center"
-          alignItems="center"
-          padding="$4"
-          zIndex={100}
-        >
-          <Card backgroundColor={colors.card} borderRadius="$5" padding="$5" gap="$4" width="100%" maxWidth={400}>
-            <XStack justifyContent="space-between" alignItems="center">
-              <H3 color={colors.foreground} fontWeight="700">Nouvel élève</H3>
-              <Button circular size="$3" backgroundColor={colors.secondary} onPress={() => setShowAddStudent(false)}>
-                <X size={16} color={colors.foreground} />
-              </Button>
-            </XStack>
-            <YStack gap="$3">
-              <YStack gap="$1">
-                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Nom</SizableText>
-                <Input placeholder="Nom" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
-              </YStack>
-              <YStack gap="$1">
-                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Prénom</SizableText>
-                <Input placeholder="Prénom" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
-              </YStack>
-              <YStack gap="$1">
-                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Email</SizableText>
-                <Input placeholder="email@exemple.com" keyboardType="email-address" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
-              </YStack>
-              <YStack gap="$1">
-                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Classe</SizableText>
-                <Input placeholder="Classe" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
-              </YStack>
-            </YStack>
-            <XStack gap="$3">
-              <Button flex={1} variant="outline" backgroundColor={colors.card} borderColor={colors.border} onPress={() => setShowAddStudent(false)}>
-                Annuler
-              </Button>
-              <Button flex={1} backgroundColor={colors.accent} color={colors.accentForeground} onPress={() => { alert('Formulaire élève: à connecter au backend'); setShowAddStudent(false); }}>
-                Enregistrer
-              </Button>
-            </XStack>
-          </Card>
-        </YStack>
-      )}
     </ScrollView>
   );
 }

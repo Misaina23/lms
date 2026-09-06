@@ -20,6 +20,7 @@ class BudgetItemSerializer(serializers.ModelSerializer):
     created_by_detail = UserListSerializer(source='created_by', read_only=True)
     validated_by_detail = UserListSerializer(source='validated_by', read_only=True)
     related_enrollment_detail = serializers.SerializerMethodField()
+    related_teacher_assignment_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = BudgetItem
@@ -27,6 +28,7 @@ class BudgetItemSerializer(serializers.ModelSerializer):
             'id', 'item_type', 'category', 'category_detail', 'academic_year', 'date',
             'amount', 'devise', 'description', 'designation', 'reference_number', 'attachment',
             'revenue_source', 'expense_type', 'related_enrollment', 'related_enrollment_detail',
+            'related_teacher_assignment', 'related_teacher_assignment_detail',
             'created_by', 'created_by_detail', 'validated_by', 'validated_by_detail',
             'is_validated', 'created_at', 'updated_at',
         ]
@@ -41,6 +43,16 @@ class BudgetItemSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def get_related_teacher_assignment_detail(self, obj):
+        if obj.related_teacher_assignment:
+            return {
+                'id': obj.related_teacher_assignment.id,
+                'teacher': obj.related_teacher_assignment.professeur.get_full_name(),
+                'classe': obj.related_teacher_assignment.classe.nom,
+                'matiere': obj.related_teacher_assignment.matiere.nom,
+            }
+        return None
+
 
 class BudgetItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -48,7 +60,7 @@ class BudgetItemCreateSerializer(serializers.ModelSerializer):
         fields = [
             'item_type', 'category', 'academic_year', 'date',
             'amount', 'devise', 'description', 'designation', 'reference_number', 'attachment',
-            'revenue_source', 'expense_type', 'related_enrollment',
+            'revenue_source', 'expense_type', 'related_enrollment', 'related_teacher_assignment',
         ]
 
     def validate(self, data):

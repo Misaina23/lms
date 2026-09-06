@@ -65,9 +65,11 @@ export type User = {
   phone: string;
   role: string;
   teacher_type: string | null;
+  surveillant_type: string | null;
   status: string;
   date_of_birth: string | null;
   address: string;
+  base_salary: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -278,6 +280,9 @@ export type BudgetItem = {
   revenue_source: string | null;
   expense_type: string | null;
   related_enrollment: string | null;
+  related_enrollment_detail: { id: string; student: string | null; receipt_number: string } | null;
+  related_teacher_assignment: string | null;
+  related_teacher_assignment_detail: { id: string; teacher: string; classe: string; matiere: string } | null;
   created_by: number;
   validated_by: number | null;
   is_validated: boolean;

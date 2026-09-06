@@ -51,6 +51,13 @@ class CustomUser(AbstractUser):
     )
     date_of_birth = models.DateField(null=True, blank=True)
     address = models.TextField(blank=True)
+    base_salary = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Salaire de base pour les enseignants non-fonctionnaires (SUPPLEANT)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

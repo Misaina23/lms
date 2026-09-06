@@ -36,7 +36,7 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
 
 
 class BudgetItemViewSet(viewsets.ModelViewSet):
-    queryset = BudgetItem.objects.select_related('category', 'created_by', 'validated_by', 'related_enrollment__student__user').all()
+    queryset = BudgetItem.objects.select_related('category', 'created_by', 'validated_by', 'related_enrollment__student__user', 'related_teacher_assignment__professeur', 'related_teacher_assignment__classe', 'related_teacher_assignment__matiere').all()
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['item_type', 'category', 'academic_year', 'revenue_source', 'expense_type', 'is_validated']

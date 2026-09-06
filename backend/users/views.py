@@ -50,6 +50,10 @@ def registration_options(request):
             {'value': role[0], 'label': role[1]}
             for role in CustomUser.Role.choices
         ],
+        'teacher_types': [
+            {'value': tt[0], 'label': tt[1]}
+            for tt in CustomUser.TeacherType.choices
+        ] if request.query_params.get('include_teacher_types') else [],
     })
 
 

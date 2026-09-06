@@ -131,7 +131,7 @@ export default function Home() {
       case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} users={data.users} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes as any} matieres={data.matieres} notes={data.notes} />
-      case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} />
+      case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} />
       case 'chat': return <ChatScreen users={data.users} />
       case 'audit': return <AuditScreen logs={data.auditLogs} />
     }

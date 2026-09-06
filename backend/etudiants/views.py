@@ -237,8 +237,13 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
-    queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['recipient', 'channel', 'notification_type', 'status']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return Notification.objects.all()
+        return Notification.objects.filter(recipient=user)

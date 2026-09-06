@@ -42,6 +42,8 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'PROFESSEUR' | 'SURVEILLANT' | 'ADMIN' | ''>('');
+  const [teacherType, setTeacherType] = useState<'FONCTIONNAIRE' | 'SUPPLEANT' | ''>('');
+  const [baseSalary, setBaseSalary] = useState('');
   const [matricule, setMatricule] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedClasseId, setSelectedClasseId] = useState<number | null>(null);
@@ -55,8 +57,9 @@ export default function RegisterScreen() {
       classes: ClasseOption[];
       matieres: MatiereOption[];
       roles: { value: string; label: string }[];
+      teacher_types: { value: string; label: string }[];
     }> => {
-      const res = await fetch(`${API_BASE}/register/options/`);
+      const res = await fetch(`${API_BASE}/register/options/?include_teacher_types=1`);
       if (!res.ok) throw new Error('Failed to fetch options');
       return res.json();
     },
@@ -137,6 +140,10 @@ export default function RegisterScreen() {
       payload.classe = selectedClasseId;
       if (selectedMatiereIds.length > 0) {
         payload.matieres = selectedMatiereIds;
+      }
+      payload.teacher_type = teacherType || 'FONCTIONNAIRE';
+      if (teacherType === 'SUPPLEANT' && baseSalary) {
+        payload.base_salary = baseSalary;
       }
     }
 
@@ -259,6 +266,41 @@ export default function RegisterScreen() {
 
               {role === 'PROFESSEUR' && (
                 <>
+                  <YStack gap="$1">
+                    <SizableText color={colors.foreground} size="$2" fontWeight="600">Type d'enseignant *</SizableText>
+                    <XStack gap="$2">
+                      {(['FONCTIONNAIRE', 'SUPPLEANT'] as const).map((t) => (
+                        <Button
+                          key={t}
+                          flex={1}
+                          height={44}
+                          variant={teacherType === t ? 'default' : 'outline'}
+                          backgroundColor={teacherType === t ? colors.primary : colors.card}
+                          borderColor={teacherType === t ? colors.primary : colors.border}
+                          color={teacherType === t ? colors.primaryForeground : colors.foreground}
+                          onPress={() => setTeacherType(t)}
+                        >
+                          {t === 'FONCTIONNAIRE' ? 'Fonctionnaire' : 'Suppléant'}
+                        </Button>
+                      ))}
+                    </XStack>
+                  </YStack>
+
+                  {teacherType === 'SUPPLEANT' && (
+                    <YStack gap="$1">
+                      <SizableText color={colors.foreground} size="$2" fontWeight="600">Salaire de base (MGA)</SizableText>
+                      <Input
+                        value={baseSalary}
+                        onChangeText={setBaseSalary}
+                        placeholder="Ex: 500000"
+                        keyboardType="numeric"
+                        color={colors.foreground}
+                        borderColor={colors.border}
+                        backgroundColor={colors.muted}
+                      />
+                    </YStack>
+                  )}
+
                   <YStack gap="$1">
                     <SizableText color={colors.foreground} size="$2" fontWeight="600">Classe *</SizableText>
                     <XStack flexWrap="wrap" gap="$2">

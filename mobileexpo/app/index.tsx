@@ -56,36 +56,27 @@ import DashboardScreen from '@/app/screens/DashboardScreen';
 import ScheduleScreen from '@/app/screens/ScheduleScreen';
 import AttendanceScreen from '@/app/screens/AttendanceScreen';
 import GradesScreen from '@/app/screens/GradesScreen';
-import EnrollmentScreen from '@/app/screens/EnrollmentScreen';
 import ChatScreen from '@/app/screens/ChatScreen';
-import ReportsScreen from '@/app/screens/ReportsScreen';
-import ClassesScreen from '@/app/screens/ClassesScreen';
-import MatieresScreen from '@/app/screens/MatieresScreen';
-import CalendarScreen from '@/app/screens/CalendarScreen';
+import NotificationsScreen from '@/app/screens/NotificationsScreen';
 
 function tapFeedback() {
   if (typeof Haptics !== 'undefined') Haptics.selectionAsync();
 }
 
-type Tab = 'Accueil' | 'Mes classes' | 'Notes' | 'Pointage' | 'Emploi du temps' | 'Messages' | 'Profil' | 'Rapports' | 'Inscriptions' | 'Classes' | 'Matières' | 'Calendrier';
+type Tab = 'Accueil' | 'Planning' | 'Pointage' | 'Notes' | 'Messages' | 'Notifications' | 'Profil';
 
-const NAV_ITEMS: { label: Tab; icon: typeof HomeIcon; roles: string[] }[] = [
-  { label: 'Accueil', icon: HomeIcon, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Mes classes', icon: UsersRound, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Classes', icon: BookOpen, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Matières', icon: BookOpen, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Calendrier', icon: CalendarDays, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Notes', icon: ClipboardCheck, roles: ['ADMIN', 'PROFESSEUR'] },
-  { label: 'Pointage', icon: CheckCircle2, roles: ['ADMIN', 'PROFESSEUR'] },
-  { label: 'Emploi du temps', icon: CalendarDays, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Messages', icon: MessageCircle, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Rapports', icon: BarChart2, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
-  { label: 'Inscriptions', icon: GraduationCap, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
+const BOTTOM_TABS: { label: Tab; icon: typeof HomeIcon }[] = [
+  { label: 'Accueil', icon: HomeIcon },
+  { label: 'Planning', icon: CalendarDays },
+  { label: 'Pointage', icon: CheckCircle2 },
+  { label: 'Notes', icon: ClipboardCheck },
+  { label: 'Messages', icon: MessageCircle },
 ];
 
-function getNavItemsForRole(role: string | undefined) {
-  return NAV_ITEMS.filter(item => item.roles.includes(role || ''));
-}
+const DRAWER_TABS: { label: Tab; icon: typeof HomeIcon }[] = [
+  { label: 'Notifications', icon: Bell },
+  { label: 'Profil', icon: UserRound },
+];
 
 function ProfileScreen() {
   const { colors, toggleTheme, mode } = useTheme();
@@ -227,90 +218,13 @@ function ProfileScreen() {
   );
 }
 
-function PlaceholderScreen({ tab, role }: { tab: Tab; role?: string }) {
-  const { colors } = useTheme();
-  const isSurveillant = role === 'SURVEILLANT';
-  
-  const copy: Record<string, { title: string; subtitle: string; body: string; restricted?: boolean }> = {
-    'Mes classes': {
-      title: 'Mes classes',
-      subtitle: 'Vos classes affectées',
-      body: 'Retrouvez vos élèves et leurs informations scolaires autorisées.',
-    },
-    'Notes': {
-      title: 'Notes',
-      subtitle: 'Saisie des notes',
-      body: isSurveillant ? 'Accès en lecture seule pour les surveillants.' : 'Saisissez et consultez les notes de vos classes.',
-      restricted: isSurveillant,
-    },
-    'Pointage': {
-      title: 'Pointage',
-      subtitle: 'Présence du jour',
-      body: isSurveillant ? 'Accès en lecture seule pour les surveillants.' : 'Enregistrez les présences et retards de vos classes.',
-      restricted: isSurveillant,
-    },
-    'Emploi du temps': {
-      title: 'Emploi du temps',
-      subtitle: 'Planning de la semaine',
-      body: 'Consultez votre emploi du temps et celui des autres enseignants.',
-    },
-    'Messages': {
-      title: 'Messages',
-      subtitle: 'Communication interne',
-      body: 'Échangez avec vos collègues et participez aux discussions.',
-    },
-    'Rapports': {
-      title: 'Rapports',
-      subtitle: 'Statistiques et analyses',
-      body: 'Consultez les rapports de performance de vos classes.',
-    },
-    'Inscriptions': {
-      title: 'Inscriptions',
-      subtitle: 'Gestion des inscriptions',
-      body: 'Consultez les inscriptions et paiements de vos classes.',
-    },
-  };
-
-  const content = copy[tab] || { title: tab, subtitle: '', body: '' };
-
-  return (
-    <ScrollView flex={1} backgroundColor={colors.background} showsVerticalScrollIndicator={false}>
-      <YStack paddingHorizontal="$4" paddingTop="$6" paddingBottom="$8" gap="$4">
-        <YStack gap="$1">
-          <SizableText color={colors.primary} size="$3" fontWeight="700">ESPACE ENSEIGNANT</SizableText>
-          <H1 color={colors.foreground} fontWeight="800">{content.title}</H1>
-        </YStack>
-        
-        <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$6" padding="$5" gap="$3" shadowColor={colors.primary} shadowOffset={{ width: 0, height: 2 }} shadowOpacity={0.1} shadowRadius={8} elevation={4}>
-          {content.restricted && (
-            <YStack backgroundColor={colors.warning + '15'} borderRadius="$3" padding="$3" marginBottom="$2">
-              <SizableText color={colors.warning} fontWeight="700" size="$3">
-                ⚠️ Accès en lecture seule
-              </SizableText>
-            </YStack>
-          )}
-          <H2 color={colors.foreground}>{content.subtitle}</H2>
-          <Paragraph color={colors.mutedForeground}>{content.body}</Paragraph>
-          {!content.restricted && (
-            <Button marginTop="$3" backgroundColor={colors.primary} color={colors.primaryForeground} borderRadius="$4" height={48}>
-              Ouvrir
-            </Button>
-          )}
-        </Card>
-      </YStack>
-    </ScrollView>
-  );
-}
-
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('Accueil');
   const { colors, toggleTheme, mode } = useTheme();
-  const { user, isAuthenticated, loading, isTeacher, isAdmin, isSurveillant } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [mobileNav, setMobileNav] = useState(false);
-
-  const navItems = getNavItemsForRole(user?.role);
 
   const renderContent = () => {
     if (!user) {
@@ -325,32 +239,23 @@ export default function Home() {
     switch (activeTab) {
       case 'Accueil':
         return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as Tab)} />;
-      case 'Mes classes':
-        return <EnrollmentScreen />;
-      case 'Classes':
-        return <ClassesScreen />;
-      case 'Matières':
-        return <MatieresScreen />;
-      case 'Calendrier':
-        return <CalendarScreen />;
-      case 'Notes':
-        return <GradesScreen />;
+      case 'Planning':
+        return <ScheduleScreen />;
       case 'Pointage':
         return <AttendanceScreen />;
-      case 'Emploi du temps':
-        return <ScheduleScreen />;
+      case 'Notes':
+        return <GradesScreen />;
       case 'Messages':
         return <ChatScreen />;
-      case 'Rapports':
-        return <ReportsScreen />;
-      case 'Inscriptions':
-        return <EnrollmentScreen />;
+      case 'Notifications':
+        return <NotificationsScreen />;
+      case 'Profil':
+        return <ProfileScreen />;
       default:
         return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as Tab)} />;
     }
   };
 
-  // Show loading while checking auth
   if (loading) {
     return (
       <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" gap="$4">
@@ -360,7 +265,6 @@ export default function Home() {
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return (
       <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" padding="$6" gap="$4">
@@ -390,61 +294,61 @@ export default function Home() {
   }
 
   return (
-      <YStack flex={1} backgroundColor={colors.background}>
-        {/* Main Content */}
-        <YStack flex={1}>
-          {renderContent()}
-        </YStack>
+    <YStack flex={1} backgroundColor={colors.background}>
+      {/* Main Content */}
+      <YStack flex={1}>
+        {renderContent()}
+      </YStack>
 
-        {/* Bottom Navigation */}
-        <XStack
-          backgroundColor={colors.card}
-          borderTopWidth={1}
-          borderColor={colors.border}
+      {/* Bottom Navigation */}
+      <XStack
+        backgroundColor={colors.card}
+        borderTopWidth={1}
+        borderColor={colors.border}
+        paddingHorizontal="$1"
+        paddingTop="$2"
+        paddingBottom={insets.bottom + 8}
+        justifyContent="space-around"
+        shadowColor="#000"
+        shadowOffset={{ width: 0, height: -2 }}
+        shadowOpacity={0.1}
+        shadowRadius={4}
+        elevation={8}
+      >
+        {BOTTOM_TABS.map(({ label, icon: Icon }) => {
+          const active = activeTab === label;
+          return (
+            <Button
+              key={label}
+              chromeless
+              flex={1}
+              minHeight={52}
+              paddingHorizontal="$1"
+              gap="$1"
+              color={active ? colors.primary : colors.mutedForeground}
+              icon={<Icon size={19} color={active ? colors.primary : colors.mutedForeground} />}
+              onPress={() => {
+                tapFeedback();
+                setActiveTab(label);
+              }}
+            >
+              {label}
+            </Button>
+          );
+        })}
+        <Button
+          key="theme"
+          chromeless
+          flex={1}
+          minHeight={52}
           paddingHorizontal="$1"
-          paddingTop="$2"
-          paddingBottom={insets.bottom + 8}
-          justifyContent="space-around"
-          shadowColor="#000"
-          shadowOffset={{ width: 0, height: -2 }}
-          shadowOpacity={0.1}
-          shadowRadius={4}
-          elevation={8}
-        >
-          {navItems.map(({ label, icon: Icon }) => {
-            const active = activeTab === label;
-            return (
-              <Button
-                key={label}
-                chromeless
-                flex={1}
-                minHeight={52}
-                paddingHorizontal="$1"
-                gap="$1"
-                color={active ? colors.primary : colors.mutedForeground}
-                icon={<Icon size={19} color={active ? colors.primary : colors.mutedForeground} />}
-                onPress={() => {
-                  tapFeedback();
-                  setActiveTab(label);
-                }}
-              >
-                {label === 'Emploi du temps' ? 'Planning' : label}
-              </Button>
-            );
-          })}
-          <Button
-            key="theme"
-            chromeless
-            flex={1}
-            minHeight={52}
-            paddingHorizontal="$1"
-            gap="$1"
-            color={colors.mutedForeground}
-            icon={mode === 'dark' ? <Sun size={19} color={colors.mutedForeground} /> : <Moon size={19} color={colors.mutedForeground} />}
-            onPress={() => {
-              tapFeedback();
-              toggleTheme();
-            }}
+          gap="$1"
+          color={colors.mutedForeground}
+          icon={mode === 'dark' ? <Sun size={19} color={colors.mutedForeground} /> : <Moon size={19} color={colors.mutedForeground} />}
+          onPress={() => {
+            tapFeedback();
+            toggleTheme();
+          }}
         />
       </XStack>
 
@@ -484,7 +388,27 @@ export default function Home() {
             </XStack>
             
             <YStack gap="$2">
-              {navItems.map(({ label, icon: Icon }) => (
+              {BOTTOM_TABS.map(({ label, icon: Icon }) => (
+                <Button
+                  key={label}
+                  chromeless
+                  height={48}
+                  paddingHorizontal="$3"
+                  justifyContent="flex-start"
+                  gap="$3"
+                  color={activeTab === label ? colors.primary : colors.foreground}
+                  backgroundColor={activeTab === label ? colors.primary + '15' : 'transparent'}
+                  icon={<Icon size={20} color={activeTab === label ? colors.primary : colors.foreground} />}
+                  onPress={() => {
+                    tapFeedback();
+                    setActiveTab(label);
+                    setMobileNav(false);
+                  }}
+                >
+                  <SizableText size="$3" fontWeight="600">{label}</SizableText>
+                </Button>
+              ))}
+              {DRAWER_TABS.map(({ label, icon: Icon }) => (
                 <Button
                   key={label}
                   chromeless

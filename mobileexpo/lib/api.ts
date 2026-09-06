@@ -73,6 +73,7 @@ export type User = {
   status: string;
   date_of_birth: string | null;
   address: string;
+  base_salary: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -367,6 +368,20 @@ export type ChatMessage = {
   created_at: string;
 };
 
+export type Notification = {
+  id: string;
+  recipient: number;
+  channel: string;
+  notification_type: string;
+  title: string;
+  message: string;
+  payload: Record<string, unknown>;
+  status: string;
+  sent_at: string | null;
+  retry_count: number;
+  created_at: string;
+};
+
 // Budget Types
 export type BudgetCategory = {
   id: number;
@@ -393,6 +408,9 @@ export type BudgetItem = {
   revenue_source: string | null;
   expense_type: string | null;
   related_enrollment: string | null;
+  related_enrollment_detail: { id: string; student: string | null; receipt_number: string } | null;
+  related_teacher_assignment: string | null;
+  related_teacher_assignment_detail: { id: string; teacher: string; classe: string; matiere: string } | null;
   created_by: number;
   validated_by: number | null;
   is_validated: boolean;
