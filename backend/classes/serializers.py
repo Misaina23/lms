@@ -55,9 +55,41 @@ class TeacherAssignmentSerializer(serializers.ModelSerializer):
 
 
 class MatiereSerializer(serializers.ModelSerializer):
+    classe = serializers.PrimaryKeyRelatedField(queryset=Classe.objects.all(), write_only=True, required=False, allow_null=True)
+
     class Meta:
         model = Matiere
-        fields = ['id', 'nom', 'code', 'description', 'coefficient']
+        fields = ['id', 'nom', 'code', 'description', 'coefficient', 'classe']
+        read_only_fields = ['id']
+
+    def create(self, validated_data):
+        classe = validated_data.pop('classe', None)
+        matiere = Matiere.objects.create(**validated_data)
+        if classe:
+            MatiereCoefficient.objects.update_or_create(
+                matiere=matiere,
+                niveau=classe.niveau,
+                stream=classe.stream or '',
+                defaults={'coefficient': matiere.coefficient},
+            )
+        return matiere
+
+    def update(self, instance, validated_data):
+        classe = validated_data.pop('classe', None)
+        instance.nom = validated_data.get('nom', instance.nom)
+        instance.code = validated_data.get('code', instance.code)
+        instance.description = validated_data.get('description', instance.description)
+        if 'coefficient' in validated_data:
+            instance.coefficient = validated_data['coefficient']
+        instance.save()
+        if classe:
+            MatiereCoefficient.objects.update_or_create(
+                matiere=instance,
+                niveau=classe.niveau,
+                stream=classe.stream or '',
+                defaults={'coefficient': instance.coefficient},
+            )
+        return instance
 
 
 class MatiereCoefficientSerializer(serializers.ModelSerializer):

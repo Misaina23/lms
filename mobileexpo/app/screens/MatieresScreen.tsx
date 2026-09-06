@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Pencil, Trash2, BookOpen, X } from '@blinkdotnew/mobile-ui'
+import { Search, Plus, Pencil, Trash2, BookOpen, X, ChevronDown } from '@blinkdotnew/mobile-ui'
 import { YStack, XStack, Card, H1, H3, Paragraph, SizableText, Input, Button, ScrollView } from '@blinkdotnew/mobile-ui'
 import { useTheme } from '@/lib/theme'
 import { API_BASE } from '@/lib/api'
@@ -13,14 +13,22 @@ interface Matiere {
   coefficient: number
 }
 
+interface Classe {
+  id: number
+  nom: string
+  niveau: string
+  stream: string | null
+}
+
 export default function MatieresScreen() {
   const { colors } = useTheme()
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [form, setForm] = useState({ nom: '', code: '', description: '', coefficient: 1 })
+  const [form, setForm] = useState({ nom: '', code: '', description: '', coefficient: 1, classe: '' })
   const [saving, setSaving] = useState(false)
+  const [showClassPicker, setShowClassPicker] = useState(false)
 
   const { data: matieresData, isLoading } = useQuery({
     queryKey: ['matieres'],
@@ -31,7 +39,19 @@ export default function MatieresScreen() {
     },
   })
 
+  const { data: classesData } = useQuery({
+    queryKey: ['classes-for-matiere'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/classes/`)
+      if (!res.ok) throw new Error('Failed')
+      return res.json() as Promise<{ results: Classe[] }>
+    },
+  })
+
   const matieres = matieresData?.results || []
+  const classes = classesData?.results || []
+
+  const selectedClasse = classes.find((c) => String(c.id) === form.classe)
 
   const createMutation = useMutation({
     mutationFn: (data: any) => fetch(`${API_BASE}/matieres/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json()),
@@ -54,24 +74,31 @@ export default function MatieresScreen() {
   })
 
   const resetForm = () => {
-    setForm({ nom: '', code: '', description: '', coefficient: 1 })
+    setForm({ nom: '', code: '', description: '', coefficient: 1, classe: '' })
     setEditingId(null)
     setShowForm(false)
+    setShowClassPicker(false)
   }
 
   const openCreate = () => { resetForm(); setShowForm(true) }
   const openEdit = (matiere: Matiere) => {
     setEditingId(matiere.id)
-    setForm({ nom: matiere.nom, code: matiere.code, description: matiere.description || '', coefficient: matiere.coefficient })
+    setForm({ nom: matiere.nom, code: matiere.code, description: matiere.description || '', coefficient: matiere.coefficient, classe: '' })
     setShowForm(true)
   }
 
   const handleSave = () => {
     setSaving(true)
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data: form }, { onSettled: () => setSaving(false) })
+    const payload: any = { ...form }
+    if (payload.classe) {
+      payload.classe = Number(payload.classe)
     } else {
-      createMutation.mutate(form, { onSettled: () => setSaving(false) })
+      delete payload.classe
+    }
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data: payload }, { onSettled: () => setSaving(false) })
+    } else {
+      createMutation.mutate(payload, { onSettled: () => setSaving(false) })
     }
   }
 
@@ -121,9 +148,56 @@ export default function MatieresScreen() {
                 <Input value={form.nom} onChangeText={(v: string) => setForm({ ...form, nom: v })} placeholder="Mathématiques" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
               </YStack>
               <YStack gap="$1">
-                <SizableText color={colors.foreground} size="$2" fontWeight="600">Code *</SizableText>
-                <Input value={form.code} onChangeText={(v: string) => setForm({ ...form, code: v })} placeholder="MATH" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />
+                <SizableText color={colors.foreground} size="$2" fontWeight="600">Classe</SizableText>
+                <Button
+                  backgroundColor={colors.muted}
+                  borderColor={colors.border}
+                  borderWidth={1}
+                  justifyContent="space-between"
+                  onPress={() => setShowClassPicker(true)}
+                >
+                  <SizableText color={selectedClasse ? colors.foreground : colors.mutedForeground} size="$2">
+                    {selectedClasse ? `${selectedClasse.nom} - ${selectedClasse.niveau} ${selectedClasse.stream || ''}` : 'Aucune (coefficient global)'}
+                  </SizableText>
+                  <ChevronDown size={16} color={colors.mutedForeground} />
+                </Button>
               </YStack>
+
+              {showClassPicker && (
+                <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$4" padding="$3">
+                  <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
+                    <SizableText color={colors.foreground} fontWeight="700" size="$3">Sélectionner une classe</SizableText>
+                    <Button circular size="$2" backgroundColor={colors.secondary} onPress={() => setShowClassPicker(false)}>
+                      <X size={14} color={colors.foreground} />
+                    </Button>
+                  </XStack>
+                  <ScrollView maxHeight={200}>
+                    <YStack gap="$1">
+                      <Button
+                        flex={1}
+                        height={40}
+                        backgroundColor={form.classe === '' ? colors.primary + '15' : colors.muted}
+                        justifyContent="flex-start"
+                        onPress={() => { setForm({ ...form, classe: '' }); setShowClassPicker(false) }}
+                      >
+                        <SizableText color={form.classe === '' ? colors.primary : colors.foreground} size="$2" fontWeight="600">Aucune (coefficient global)</SizableText>
+                      </Button>
+                      {classes.map((c: Classe) => (
+                        <Button
+                          key={c.id}
+                          flex={1}
+                          height={40}
+                          backgroundColor={form.classe === String(c.id) ? colors.primary + '15' : colors.muted}
+                          justifyContent="flex-start"
+                          onPress={() => { setForm({ ...form, classe: String(c.id) }); setShowClassPicker(false) }}
+                        >
+                          <SizableText color={form.classe === String(c.id) ? colors.primary : colors.foreground} size="$2" fontWeight="600">{c.nom} - {c.niveau} {c.stream || ''}</SizableText>
+                        </Button>
+                      ))}
+                    </YStack>
+                  </ScrollView>
+                </Card>
+              )}
               <YStack gap="$1">
                 <SizableText color={colors.foreground} size="$2" fontWeight="600">Coefficient</SizableText>
                 <Input value={form.coefficient.toString()} onChangeText={(v: string) => setForm({ ...form, coefficient: parseFloat(v) || 1 })} keyboardType="numeric" color={colors.foreground} borderColor={colors.border} backgroundColor={colors.muted} />

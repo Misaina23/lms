@@ -376,11 +376,11 @@ export function ClassesScreen({ classes, etudiants, onReload }: { classes: any[]
   )
 }
 
-export function MatieresScreen({ matieres, onReload }: { matieres: Matiere[]; onReload: () => void }) {
+export function MatieresScreen({ matieres, classes, onReload }: { matieres: Matiere[]; classes: any[]; onReload: () => void }) {
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingMatiere, setEditingMatiere] = useState<Matiere | null>(null)
-  const [form, setForm] = useState({ nom: '', code: '', description: '', coefficient: 1 })
+  const [form, setForm] = useState({ nom: '', code: '', description: '', coefficient: 1, classe: '' })
   const [saving, setSaving] = useState(false)
 
   const filtered = matieres.filter((m) => {
@@ -389,7 +389,7 @@ export function MatieresScreen({ matieres, onReload }: { matieres: Matiere[]; on
   })
 
   const resetForm = () => {
-    setForm({ nom: '', code: '', description: '', coefficient: 1 })
+    setForm({ nom: '', code: '', description: '', coefficient: 1, classe: '' })
     setEditingMatiere(null)
     setShowForm(false)
   }
@@ -401,17 +401,23 @@ export function MatieresScreen({ matieres, onReload }: { matieres: Matiere[]; on
 
   const openEdit = (matiere: Matiere) => {
     setEditingMatiere(matiere)
-    setForm({ nom: matiere.nom, code: matiere.code, description: matiere.description || '', coefficient: matiere.coefficient })
+    setForm({ nom: matiere.nom, code: matiere.code, description: matiere.description || '', coefficient: matiere.coefficient, classe: '' })
     setShowForm(true)
   }
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      if (editingMatiere) {
-        await api.patch(`/matieres/${editingMatiere.id}/`, form)
+      const payload: any = { ...form }
+      if (payload.classe) {
+        payload.classe = Number(payload.classe)
       } else {
-        await api.post('/matieres/', form)
+        delete payload.classe
+      }
+      if (editingMatiere) {
+        await api.patch(`/matieres/${editingMatiere.id}/`, payload)
+      } else {
+        await api.post('/matieres/', payload)
       }
       onReload()
       resetForm()
@@ -463,6 +469,19 @@ export function MatieresScreen({ matieres, onReload }: { matieres: Matiere[]; on
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Code *</label>
                 <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="MATH" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Classe</label>
+                <select
+                  value={form.classe}
+                  onChange={(e) => setForm({ ...form, classe: e.target.value })}
+                  className="h-9 w-full rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none"
+                >
+                  <option value="">Aucune (coefficient global)</option>
+                  {classes.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.nom} - {c.niveau} {c.stream || ''}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Coefficient</label>

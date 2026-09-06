@@ -124,7 +124,7 @@ export default function Home() {
         return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} users={data.users} classes={data.classes as any} />
       case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} onReload={reload} />
       case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
-      case 'matieres': return <MatieresScreen matieres={data.matieres} onReload={reload} />
+      case 'matieres': return <MatieresScreen matieres={data.matieres} classes={data.classes as any} onReload={reload} />
       case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} />
       case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} />
       case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
