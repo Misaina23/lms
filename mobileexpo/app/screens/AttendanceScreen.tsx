@@ -273,89 +273,95 @@ export default function AttendanceScreen() {
       flex={1}
       showsVerticalScrollIndicator={false}
     >
-      <YStack paddingHorizontal="$4" paddingTop="$6" paddingBottom="$8" gap="$5">
-        {/* Header */}
-        <XStack justifyContent="space-between" alignItems="center">
-          <YStack gap="$1" flex={1}>
-            <H1 color={colors.foreground} fontWeight="800">Pointage</H1>
-            <SizableText color={colors.mutedForeground} size="$4">
-              {new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+      <YStack paddingHorizontal="$4" paddingTop={insets.top + 16} paddingBottom="$8" gap="$4">
+        {/* Header with back button */}
+        <XStack gap="$3" alignItems="center">
+          <Button
+            circular
+            size="$4"
+            backgroundColor={colors.card}
+            borderWidth={1}
+            borderColor={colors.border}
+            icon={<ChevronRight size={18} color={colors.foreground} />}
+            onPress={() => {}}
+            aria-label="Retour"
+          />
+          <YStack flex={1} gap="$1">
+            <H2 color={colors.foreground} fontWeight="800" fontSize={18}>Pointage de Classe</H2>
+            <SizableText color={colors.mutedForeground} size="$3">
+              {selectedClassId ? assignments?.find(a => a.classe === selectedClassId)?.classe_detail?.nom || 'Classe' : 'Sélectionner une classe'}
+              {selectedClassId && assignments?.find(a => a.classe === selectedClassId)?.matiere_detail?.code && ` - ${assignments.find(a => a.classe === selectedClassId)?.matiere_detail?.code}`}
             </SizableText>
           </YStack>
-          <XStack gap="$2">
-            <Button
-              circular
-              size="$5"
-              backgroundColor={colors.secondary}
-              icon={<CalendarDays size={20} color={colors.accent} />}
-              onPress={() => { }}
-              aria-label="Changer la date"
-            />
-          </XStack>
         </XStack>
 
-        {/* Class Selector */}
-        <YStack gap="$2">
-          <XStack justifyContent="space-between" alignItems="center">
-            <H3 color={colors.foreground} fontWeight="700">Sélectionner une classe</H3>
-            {assignments && assignments.length > 1 && (
-              <SizableText color={colors.mutedForeground} size="$2">{assignments.length} classes affectées</SizableText>
-            )}
+        {/* Date Pill */}
+        <XStack backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$4" padding="$3" alignItems="center" justifyContent="space-between">
+          <Button circular size="$3" backgroundColor={colors.secondary} icon={<ChevronRight size={14} color={colors.mutedForeground} />} onPress={() => {
+            const d = new Date(selectedDate);
+            d.setDate(d.getDate() - 1);
+            setSelectedDate(d.toISOString().slice(0, 10));
+          }} />
+          <SizableText color={colors.foreground} fontWeight="700" size="$3">
+            {new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </SizableText>
+          <Button circular size="$3" backgroundColor={colors.secondary} icon={<ChevronRight size={14} color={colors.mutedForeground} />} onPress={() => {
+            const d = new Date(selectedDate);
+            d.setDate(d.getDate() + 1);
+            setSelectedDate(d.toISOString().slice(0, 10));
+          }} />
+        </XStack>
+
+        {/* Segment Control */}
+        <XStack backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$3" padding="$1">
+          <Button flex={1} height={36} backgroundColor={colors.primary} color={colors.primaryForeground} borderRadius="$2" fontSize={12} fontWeight="700">
+            Liste
+          </Button>
+          <Button flex={1} height={36} backgroundColor="transparent" color={colors.mutedForeground} borderRadius="$2" fontSize={12} fontWeight="700">
+            Résumé
+          </Button>
+        </XStack>
+
+        {/* Stats */}
+        {selectedClassId && (
+          <XStack gap="$2">
+            <YStack flex={1} backgroundColor={colors.success + '15'} borderRadius="$3" padding="$3" alignItems="center">
+              <SizableText color={colors.success} size="$2" fontWeight="700">Présents</SizableText>
+              <SizableText color={colors.success} fontSize={18} fontWeight="800">{presentCount}</SizableText>
+            </YStack>
+            <YStack flex={1} backgroundColor={colors.warning + '15'} borderRadius="$3" padding="$3" alignItems="center">
+              <SizableText color={colors.warning} size="$2" fontWeight="700">Retards</SizableText>
+              <SizableText color={colors.warning} fontSize={18} fontWeight="800">{lateCount}</SizableText>
+            </YStack>
+            <YStack flex={1} backgroundColor={colors.destructive + '15'} borderRadius="$3" padding="$3" alignItems="center">
+              <SizableText color={colors.destructive} size="$2" fontWeight="700">Absents</SizableText>
+              <SizableText color={colors.destructive} fontSize={18} fontWeight="800">{absentCount}</SizableText>
+            </YStack>
           </XStack>
-          {assignmentsLoading ? (
-            <SizableText color={colors.mutedForeground}>Chargement des classes…</SizableText>
-          ) : assignments && assignments.length > 0 ? (
-            <ClassSelector
-              classes={assignments}
-              selectedClassId={selectedClassId}
-              onSelect={setSelectedClassId}
-            />
-          ) : (
-            <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$4" padding="$4" alignItems="center">
-              <UsersRound size={32} color={colors.mutedForeground} />
-              <SizableText color={colors.mutedForeground} marginTop="$2" textAlign="center">
-                Aucune classe affectée
-              </SizableText>
-            </Card>
-          )}
-        </YStack>
+        )}
+
+        {/* Search */}
+        {selectedClassId && (
+          <XStack gap="$2">
+            <XStack flex={1} gap="$2" backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$3" paddingHorizontal="$3" alignItems="center">
+              <Search size={20} color={colors.mutedForeground} />
+              <Input
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Rechercher un élève..."
+                color={colors.foreground}
+                backgroundColor="transparent"
+                borderWidth={0}
+                flex={1}
+              />
+            </XStack>
+          </XStack>
+        )}
 
         {selectedClassId && (
           <>
-            {/* Stats Summary */}
-            <XStack gap="$2" flexWrap="wrap">
-              <Card flex={1} minWidth={80} backgroundColor={colors.success + '18'} borderRadius="$4" padding="$3" alignItems="center">
-                <SizableText color={colors.success} size="$2">Présents</SizableText>
-                <H2 color={colors.success}>{presentCount}</H2>
-              </Card>
-              <Card flex={1} minWidth={80} backgroundColor={colors.warning + '18'} borderRadius="$4" padding="$3" alignItems="center">
-                <SizableText color={colors.warning} size="$2">Retards</SizableText>
-                <H2 color={colors.warning}>{lateCount}</H2>
-              </Card>
-              <Card flex={1} minWidth={80} backgroundColor={colors.destructive + '18'} borderRadius="$4" padding="$3" alignItems="center">
-                <SizableText color={colors.destructive} size="$2">Absents</SizableText>
-                <H2 color={colors.destructive}>{absentCount}</H2>
-              </Card>
-            </XStack>
-
-            {/* Search */}
-            <XStack gap="$2">
-              <XStack flex={1} gap="$2" backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$3" paddingHorizontal="$3" alignItems="center">
-                <Search size={20} color={colors.mutedForeground} />
-                <Input
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Rechercher un élève..."
-                  color={colors.foreground}
-                  backgroundColor="transparent"
-                  borderWidth={0}
-                  flex={1}
-                />
-              </XStack>
-            </XStack>
-
             {/* Students List */}
-            <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$5" padding="$3" gap="$2">
+            <YStack gap="$2">
               {studentsLoading ? (
                 <YStack alignItems="center" justifyContent="center" padding="$6">
                   <ActivityIndicator size="large" color={colors.accent} />
@@ -369,31 +375,81 @@ export default function AttendanceScreen() {
                   </SizableText>
                 </YStack>
               ) : (
-                filteredStudents.map(student => (
-                  <StudentAttendanceRow
-                    key={student.id}
-                    student={student}
-                    currentStatus={getStudentStatus(student.id)}
-                    onStatusChange={(status) => handleStatusChange(student.id, status)}
-                    isSyncing={syncMutation.isPending}
-                  />
-                ))
+                filteredStudents.map(student => {
+                  const currentStatus = getStudentStatus(student.id);
+                  const statusConfig = STATUS_CONFIG[currentStatus as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.ABSENT;
+                  const statusColor = colors[statusConfig.color as keyof typeof colors];
+                  
+                  return (
+                    <XStack 
+                      key={student.id} 
+                      alignItems="center" 
+                      justifyContent="space-between" 
+                      paddingVertical="$2"
+                      borderBottomWidth={1}
+                      borderColor={colors.border}
+                    >
+                      <XStack alignItems="center" gap="$3" flex={1}>
+                        <YStack 
+                          width={32} 
+                          height={32} 
+                          borderRadius="$2" 
+                          backgroundColor={colors.secondary} 
+                          borderWidth={1}
+                          borderColor={colors.border}
+                          alignItems="center" 
+                          justifyContent="center"
+                        >
+                          <SizableText color={colors.foreground} size="$2" fontWeight="800">
+                            {student.user_detail?.first_name?.[0]}{student.user_detail?.last_name?.[0]}
+                          </SizableText>
+                        </YStack>
+                        <SizableText color={colors.foreground} fontWeight="700" size="$3">
+                          {student.user_detail?.full_name || `${student.user_detail?.first_name} ${student.user_detail?.last_name}`}
+                        </SizableText>
+                      </XStack>
+                      <Button
+                        height={32}
+                        paddingHorizontal="$3"
+                        backgroundColor={statusColor + '20'}
+                        borderRadius="$2"
+                        onPress={() => {
+                          tapFeedback();
+                          const states = ['PRESENT', 'LATE', 'ABSENT'] as const;
+                          const currentIndex = states.indexOf(currentStatus as any);
+                          const nextStatus = states[(currentIndex + 1) % states.length];
+                          handleStatusChange(student.id, nextStatus);
+                        }}
+                        disabled={syncMutation.isPending}
+                      >
+                        <SizableText color={statusColor} size="$2" fontWeight="800">{statusConfig.label}</SizableText>
+                      </Button>
+                    </XStack>
+                  );
+                })
               )}
-            </Card>
+            </YStack>
 
             {/* Sync Button */}
             {Object.keys(localStatuses).length > 0 && (
-              <Button
-                height={54}
-                backgroundColor={colors.accent}
-                color={colors.accentForeground}
-                borderRadius="$5"
-                icon={syncMutation.isPending ? <ActivityIndicator size="small" color={colors.accentForeground} /> : <CheckCircle2 size={20} />}
-                onPress={handleSync}
-                disabled={syncMutation.isPending}
-              >
-                {syncMutation.isPending ? 'Synchronisation…' : `Synchroniser ${Object.keys(localStatuses).length} modification(s)`}
-              </Button>
+              <YStack position="sticky" bottom={0} backgroundColor={colors.background} paddingTop="$4">
+                <Button
+                  height={54}
+                  backgroundColor={colors.accent}
+                  color={colors.accentForeground}
+                  borderRadius="$5"
+                  icon={syncMutation.isPending ? <ActivityIndicator size="small" color={colors.accentForeground} /> : <CheckCircle2 size={20} />}
+                  onPress={handleSync}
+                  disabled={syncMutation.isPending}
+                  shadowColor={colors.accent}
+                  shadowOffset={{ width: 0, height: 4 }}
+                  shadowOpacity={0.3}
+                  shadowRadius={12}
+                  elevation={8}
+                >
+                  {syncMutation.isPending ? 'Synchronisation…' : `Enregistrer le pointage`}
+                </Button>
+              </YStack>
             )}
 
             {/* Offline indicator */}

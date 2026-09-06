@@ -34,6 +34,9 @@ declare module '@blinkdotnew/mobile-ui' {
   export const Moon: LucideIcon;
   export const BarChart2: LucideIcon;
   export const MapPin: LucideIcon;
+  export const Plus: LucideIcon;
+  export const Pencil: LucideIcon;
+  export const Trash2: LucideIcon;
   
   export const YStack: any;
   export const XStack: any;

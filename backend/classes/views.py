@@ -5,7 +5,7 @@ from users.permissions import IsAdminOrReadOnly, IsAdminOnly, CanViewSchedule
 from .models import Classe, Room, TeacherAssignment, MatiereCoefficient, SchoolConfig
 from .serializers import (
     ClasseSerializer, RoomSerializer, TeacherAssignmentSerializer,
-    MatiereCoefficientSerializer, SchoolConfigSerializer,
+    MatiereCoefficientSerializer, SchoolConfigSerializer, TeacherSummarySerializer,
 )
 
 

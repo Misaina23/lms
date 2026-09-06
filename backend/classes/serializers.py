@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from users.models import CustomUser
+from users.serializers import UserListSerializer
 
 from .models import Classe, Room, TeacherAssignment, Matiere, MatiereCoefficient, SchoolConfig
 
@@ -68,6 +70,25 @@ class MatiereCoefficientSerializer(serializers.ModelSerializer):
 
     def get_matiere_detail(self, obj):
         return {'id': obj.matiere.id, 'nom': obj.matiere.nom, 'code': obj.matiere.code}
+
+
+class TeacherSummarySerializer(serializers.ModelSerializer):
+    classes_count = serializers.SerializerMethodField()
+    matieres_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            'id', 'username', 'matricule', 'first_name', 'last_name',
+            'email', 'phone', 'role', 'teacher_type', 'status',
+            'classes_count', 'matieres_count',
+        ]
+
+    def get_classes_count(self, obj):
+        return obj.assignments.values('classe').distinct().count()
+
+    def get_matieres_count(self, obj):
+        return obj.assignments.values('matiere').distinct().count()
 
 
 class SchoolConfigSerializer(serializers.ModelSerializer):

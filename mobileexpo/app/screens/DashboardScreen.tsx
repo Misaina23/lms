@@ -71,58 +71,6 @@ function tapFeedback() {
   if (typeof Haptics !== 'undefined') Haptics.selectionAsync();
 }
 
-function StatCard({ label, value, icon: Icon, accentColor, trend }: {
-  label: string;
-  value: string | number;
-  icon: typeof UsersRound;
-  accentColor: string;
-  trend?: string;
-}) {
-  const { colors } = useTheme();
-  return (
-    <Card
-      backgroundColor={colors.card}
-      borderColor={colors.border}
-      borderWidth={1}
-      borderRadius="$5"
-      padding="$4"
-      flex={1}
-    >
-      <XStack justifyContent="space-between" alignItems="flex-start" marginBottom="$3">
-        <YStack
-          width={40}
-          height={40}
-          borderRadius="$4"
-          backgroundColor={accentColor + '18'}
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Icon size={20} color={accentColor} />
-        </YStack>
-        {trend && (
-          <XStack alignItems="center" gap="$1">
-            <SizableText color={colors.success} size="$2" fontWeight="700">{trend}</SizableText>
-          </XStack>
-        )}
-      </XStack>
-      <SizableText color={colors.mutedForeground} size="$2" fontWeight="600" textTransform="uppercase" letterSpacing={0.5}>
-        {label}
-      </SizableText>
-      <H2 color={colors.foreground} marginTop="$1" marginBottom="$1">{value}</H2>
-    </Card>
-  );
-}
-
-function SectionTitle({ title, action }: { title: string; action?: string }) {
-  const { colors } = useTheme();
-  return (
-    <XStack justifyContent="space-between" alignItems="center" marginBottom="$3">
-      <H3 color={colors.foreground} fontWeight="800">{title}</H3>
-      {action ? <SizableText color={colors.accent} fontWeight="700" size="$3">{action}</SizableText> : null}
-    </XStack>
-  );
-}
-
 function StatusPill({ label, tone = 'green' }: { label: string; tone?: 'green' | 'amber' | 'blue' | 'red' }) {
   const { colors } = useTheme();
   const colorMap = {
@@ -143,6 +91,7 @@ function StatusPill({ label, tone = 'green' }: { label: string; tone?: 'green' |
 export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [showAddStudent, setShowAddStudent] = useState(false);
 
@@ -195,66 +144,191 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
     queryKey: ['today-schedule', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const dayOfWeek = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to 0=Monday
+      const dayOfWeek = new Date().getDay();
+      const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       const res = await api.get<{ results: TimetableSlot[] }>(`/api/timetable/?professeur=${user.id}&day_of_week=${adjustedDay}`).catch(() => ({ results: [] }));
       return res.results || [];
     },
     enabled: !!user,
   });
 
+  if (statsLoading) {
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center" gap="$4" paddingTop={insets.top + 40}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <SizableText color={colors.mutedForeground}>Chargement...</SizableText>
+      </YStack>
+    );
+  }
+
+  const nextClass = todaySchedule && todaySchedule.length > 0 ? todaySchedule[0] : null;
+
   return (
-    <ScrollView flex={1} showsVerticalScrollIndicator={false}>
-      <YStack paddingHorizontal="$4" paddingTop="$6" paddingBottom="$8" gap="$5">
+    <ScrollView flex={1} showsVerticalScrollIndicator={false} style={{ backgroundColor: colors.background }}>
+      <YStack paddingHorizontal="$4" paddingTop={insets.top + 16} paddingBottom="$8" gap="$5">
         {/* Header */}
         <XStack justifyContent="space-between" alignItems="center">
           <YStack gap="$1" flex={1}>
-            <SizableText color={colors.mutedForeground} size="$3">{new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</SizableText>
-            <H1 color={colors.foreground} fontWeight="800" letterSpacing={-1}>Bonjour, {user?.first_name || 'Enseignant'}</H1>
-            <SizableText color={colors.mutedForeground} size="$4">{user?.teacher_type === 'FONCTIONNAIRE' ? 'Fonctionnaire' : user?.teacher_type === 'SUPPLEANT' ? 'Suppléant' : 'Enseignant'}</SizableText>
+            <SizableText color={colors.mutedForeground} size="$3" fontWeight="600">Accueil</SizableText>
+            <H1 color={colors.foreground} fontWeight="800" fontSize={22}>Bonjour, {user?.first_name || 'Enseignant'} 👋</H1>
           </YStack>
           <XStack gap="$2">
-            <Button circular size="$5" backgroundColor={colors.secondary} icon={<Bell size={20} color={colors.accent} />} onPress={() => onNavigate('Messages')} aria-label="Notifications" />
-            <Button circular size="$5" backgroundColor={colors.secondary} icon={<Menu size={20} color={colors.foreground} />} onPress={() => {}} aria-label="Menu" />
+            <Button circular size="$5" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} icon={<Bell size={18} color={colors.accent} />} onPress={() => onNavigate('Messages')} aria-label="Notifications">
+              <YStack position="absolute" top={8} right={8} width={8} height={8} borderRadius="$2" backgroundColor={colors.destructive} />
+            </Button>
           </XStack>
         </XStack>
 
-        {/* Quick Actions */}
-        <XStack gap="$3">
-          <Button flex={1} height={56} backgroundColor={colors.accent} color={colors.accentForeground} borderRadius="$5" icon={<ClipboardCheck size={20} />} onPress={() => { tapFeedback(); onNavigate('Notes'); }}>
-            Saisir les notes
-          </Button>
-          <Button flex={1} height={56} backgroundColor={colors.secondary} color={colors.foreground} borderRadius="$5" icon={<CheckCircle2 size={20} />} onPress={() => { tapFeedback(); onNavigate('Pointage'); }}>
-            Pointer
-          </Button>
-        </XStack>
-
-        {/* Stats Grid */}
-        {stats && (
-          <>
-            <YStack gap="$3">
-              <SectionTitle title="Vue d'ensemble" />
-              <XStack gap="$3" flexWrap="wrap">
-                <StatCard label="Mes classes" value={stats.myClasses} icon={UsersRound} accentColor={colors.accent} />
-                <StatCard label="Mes élèves" value={stats.myStudents} icon={UsersRound} accentColor={colors.success} />
+        {/* Level Card */}
+        <Card 
+          backgroundColor={colors.primary + '20'} 
+          borderWidth={1} 
+          borderColor={colors.accent + '40'} 
+          borderRadius="$6" 
+          padding="$5"
+          shadowColor={colors.accent}
+          shadowOffset={{ width: 0, height: 0 }}
+          shadowOpacity={0.2}
+          shadowRadius={20}
+        >
+          <XStack justifyContent="space-between" alignItems="flex-start">
+            <YStack flex={1} gap="$2">
+              <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Niveau actuel</SizableText>
+              <XStack justifyContent="space-between" alignItems="center">
+                <H2 color={colors.foreground} fontWeight="800" fontSize={18}>Élève Avancé</H2>
+                <YStack width={34} height={34} borderRadius="$3" backgroundColor={colors.warning} alignItems="center" justifyContent="center">
+                  <SizableText color="#fff" fontSize={16}>⭐</SizableText>
+                </YStack>
               </XStack>
-              <XStack gap="$3" flexWrap="wrap">
-                <StatCard label="Mes matières" value={stats.mySubjects} icon={BookOpen} accentColor={colors.warning} />
-                <StatCard label="Présence aujourd'hui" value={`${stats.todayAttendance}/${stats.myStudents}`} icon={CheckCircle2} accentColor={colors.info} trend={`${stats.attendanceRate}%`} />
-              </XStack>
+              <YStack height={6} backgroundColor={colors.border} borderRadius="$3" overflow="hidden" marginTop="$2">
+                <YStack width="70%" height="100%" backgroundColor={colors.primary} borderRadius="$3" />
+              </YStack>
+              <SizableText color={colors.mutedForeground} size="$1" textAlign="right" fontWeight="600">70%</SizableText>
             </YStack>
-          </>
+          </XStack>
+        </Card>
+
+        {/* Quick Actions Grid */}
+        <YStack gap="$3">
+          <XStack justifyContent="space-between" alignItems="center">
+            <H3 color={colors.foreground} fontWeight="800" fontSize={16}>Accès rapides</H3>
+            <SizableText color={colors.accent} fontWeight="700" size="$3">Voir tout</SizableText>
+          </XStack>
+          <XStack gap="$3" flexWrap="wrap">
+            {[
+              { label: 'Pointage', icon: CheckCircle2, color: colors.success, screen: 'Pointage' },
+              { label: 'Messagerie', icon: MessageCircle, color: colors.primary, screen: 'Messages' },
+              { label: 'Notes', icon: ClipboardCheck, color: colors.warning, screen: 'Notes' },
+              { label: 'Calendrier', icon: CalendarDays, color: colors.accent, screen: 'Emploi du temps' },
+              { label: 'Annonces', icon: Bell, color: colors.warning, screen: '' },
+              { label: 'Ressources', icon: BookOpen, color: colors.destructive, screen: '' },
+            ].map((item) => (
+              <YStack 
+                key={item.label} 
+                flex={1} 
+                minWidth="30%" 
+                maxWidth="33%"
+                backgroundColor={colors.card} 
+                borderWidth={1} 
+                borderColor={colors.border} 
+                borderRadius="$4" 
+                padding="$3" 
+                alignItems="center" 
+                gap="$2"
+                onPress={() => { tapFeedback(); if (item.screen) onNavigate(item.screen); }}
+              >
+                <YStack 
+                  width={36} 
+                  height={36} 
+                  borderRadius="$3" 
+                  backgroundColor={item.color + '25'} 
+                  alignItems="center" 
+                  justifyContent="center"
+                >
+                  <item.icon size={18} color={item.color} />
+                </YStack>
+                <SizableText color={colors.foreground} fontWeight="700" size="$2" textAlign="center">{item.label}</SizableText>
+              </YStack>
+            ))}
+          </XStack>
+        </YStack>
+
+        {/* Next Class Card */}
+        {nextClass && (
+          <YStack gap="$3">
+            <XStack justifyContent="space-between" alignItems="center">
+              <H3 color={colors.foreground} fontWeight="800" fontSize={16}>Prochain cours</H3>
+            </XStack>
+            <Card 
+              backgroundColor={colors.card} 
+              borderWidth={1} 
+              borderColor={colors.border} 
+              borderRadius="$4" 
+              padding="$4"
+              flexDirection="row"
+              alignItems="center"
+              gap="$3"
+              onPress={() => onNavigate('Emploi du temps')}
+            >
+              <YStack 
+                width={38} 
+                height={38} 
+                borderRadius="$3" 
+                backgroundColor={colors.primary + '25'} 
+                alignItems="center" 
+                justifyContent="center"
+              >
+                <CalendarDays size={18} color={colors.primary} />
+              </YStack>
+              <YStack flex={1} gap="$1">
+                <SizableText color={colors.foreground} fontWeight="700" size="$3">{nextClass.matiere_name || 'Matière'}</SizableText>
+                <SizableText color={colors.mutedForeground} size="$2">Aujourd'hui • {nextClass.start_hour} - {nextClass.end_hour}</SizableText>
+              </YStack>
+              <ChevronRight size={16} color={colors.mutedForeground} />
+            </Card>
+          </YStack>
+        )}
+
+        {/* Stats Overview */}
+        {stats && (
+          <YStack gap="$3">
+            <XStack justifyContent="space-between" alignItems="center">
+              <H3 color={colors.foreground} fontWeight="800" fontSize={16}>Vue d'ensemble</H3>
+            </XStack>
+            <XStack gap="$3" flexWrap="wrap">
+              <YStack flex={1} minWidth="45%" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$4" padding="$4" gap="$2">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Mes classes</SizableText>
+                <H2 color={colors.foreground} fontSize={20}>{stats.myClasses}</H2>
+              </YStack>
+              <YStack flex={1} minWidth="45%" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$4" padding="$4" gap="$2">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Mes élèves</SizableText>
+                <H2 color={colors.foreground} fontSize={20}>{stats.myStudents}</H2>
+              </YStack>
+              <YStack flex={1} minWidth="45%" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$4" padding="$4" gap="$2">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Mes matières</SizableText>
+                <H2 color={colors.foreground} fontSize={20}>{stats.mySubjects}</H2>
+              </YStack>
+              <YStack flex={1} minWidth="45%" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$4" padding="$4" gap="$2">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Présence</SizableText>
+                <H2 color={colors.foreground} fontSize={20}>{stats.todayAttendance}<SizableText color={colors.mutedForeground} fontSize={14}>/{stats.myStudents}</SizableText></H2>
+                <StatusPill label={`${stats.attendanceRate}%`} tone="green" />
+              </YStack>
+            </XStack>
+          </YStack>
         )}
 
         {/* Today's Schedule */}
-        <YStack>
-          <SectionTitle title="Emploi du temps du jour" action="Voir tout" />
-          <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$5" padding="$4" gap="$3">
+        <YStack gap="$3">
+          <XStack justifyContent="space-between" alignItems="center">
+            <H3 color={colors.foreground} fontWeight="800" fontSize={16}>Emploi du temps</H3>
+            <SizableText color={colors.accent} fontWeight="700" size="$3" onPress={() => onNavigate('Emploi du temps')}>Voir tout</SizableText>
+          </XStack>
+          <Card backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$5" padding="$4" gap="$3">
             {scheduleLoading ? (
               <SizableText color={colors.mutedForeground}>Chargement…</SizableText>
             ) : todaySchedule && todaySchedule.length > 0 ? (
               todaySchedule.map((slot) => (
-                <XStack key={slot.id} gap="$3" alignItems="center" padding="$3" backgroundColor={colors.muted} borderRadius="$4">
+                <XStack key={slot.id} gap="$3" alignItems="center" padding="$3" backgroundColor={colors.secondary} borderRadius="$4">
                   <YStack
                     width={48}
                     height={48}
@@ -267,7 +341,7 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
                   </YStack>
                   <YStack flex={1}>
                     <XStack gap="$2" alignItems="center" flexWrap="wrap">
-                      <H3 color={colors.foreground}>{slot.matiere_name || 'Matière'}</H3>
+                      <H3 color={colors.foreground} fontSize={14}>{slot.matiere_name || 'Matière'}</H3>
                       {slot.classe_name && <StatusPill label={slot.classe_name} tone="blue" />}
                     </XStack>
                     <SizableText color={colors.mutedForeground} size="$3">
@@ -286,14 +360,17 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
         </YStack>
 
         {/* Pending Grades */}
-        <YStack>
-          <SectionTitle title="Notes en attente" action={stats?.pendingGrades ? `${stats.pendingGrades} à saisir` : 'Tout à jour'} />
-          <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$5" padding="$4" gap="$3">
+        <YStack gap="$3">
+          <XStack justifyContent="space-between" alignItems="center">
+            <H3 color={colors.foreground} fontWeight="800" fontSize={16}>Notes en attente</H3>
+            <SizableText color={colors.accent} fontWeight="700" size="$3">{stats?.pendingGrades ? `${stats.pendingGrades} à saisir` : 'Tout à jour'}</SizableText>
+          </XStack>
+          <Card backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$5" padding="$4" gap="$3">
             {notesLoading ? (
               <SizableText color={colors.mutedForeground}>Chargement…</SizableText>
             ) : recentNotes && recentNotes.length > 0 ? (
               recentNotes.map((note) => (
-                <XStack key={note.id} gap="$3" alignItems="center" padding="$3" backgroundColor={colors.muted} borderRadius="$4">
+                <XStack key={note.id} gap="$3" alignItems="center" padding="$3" backgroundColor={colors.secondary} borderRadius="$4">
                   <YStack
                     width={40}
                     height={40}
@@ -321,8 +398,10 @@ export default function DashboardScreen({ onNavigate }: { onNavigate: (tab: stri
         </YStack>
 
         {/* Quick Links */}
-        <YStack>
-          <SectionTitle title="Accès rapide" />
+        <YStack gap="$3">
+          <XStack justifyContent="space-between" alignItems="center">
+            <H3 color={colors.foreground} fontWeight="800" fontSize={16}>Accès rapide</H3>
+          </XStack>
           <XStack gap="$3" flexWrap="wrap">
             {[
               { label: 'Mes classes', icon: UsersRound, color: colors.accent, screen: 'Classes' },

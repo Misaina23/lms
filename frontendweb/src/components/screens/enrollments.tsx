@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Search, UsersRound } from 'lucide-react'
 import type { Etudiant, Enrollment, User, Classe } from '@/lib/api'
 import { initials, formatCurrency } from '@/lib/admin-data'
 
@@ -49,14 +50,14 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Inscriptions & Paiements</h2>
+        <h2 className="text-lg font-extrabold tracking-tight text-foreground">Inscriptions & Paiements</h2>
         <p className="text-sm text-muted-foreground">{stats.count} dossiers · {formatCurrency(stats.verse)} sur {formatCurrency(stats.total)}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Encaissé</p><p className="mt-1 text-2xl font-semibold">{formatCurrency(stats.verse)}</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Reste à payer</p><p className="mt-1 text-2xl font-semibold text-rose-600">{formatCurrency(stats.reste)}</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Payé / Partiel / Impayé</p><p className="mt-1 text-lg font-semibold">{stats.paid} · {stats.partial} · {stats.unpaid}</p></CardContent></Card>
+        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Encaissé</p><p className="mt-1 text-2xl font-semibold">{formatCurrency(stats.verse)}</p></CardContent></Card>
+        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Reste à payer</p><p className="mt-1 text-2xl font-semibold text-rose-600">{formatCurrency(stats.reste)}</p></CardContent></Card>
+        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Payé / Partiel / Impayé</p><p className="mt-1 text-lg font-semibold">{stats.paid} · {stats.partial} · {stats.unpaid}</p></CardContent></Card>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -67,7 +68,7 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
         ))}
       </div>
 
-      <Card className="border-border/70 bg-card/80">
+      <Card className="border-border/70 bg-card/80 rounded-2xl">
         <CardHeader><CardTitle className="text-base">Dossiers d'inscription</CardTitle></CardHeader>
         <CardContent className="px-0">
           <div className="overflow-x-auto">

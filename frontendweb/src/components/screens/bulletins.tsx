@@ -110,7 +110,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="mb-2 font-serif text-sm italic text-primary">Bulletins & Appréciations</p>
-          <h2 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Bulletins scolaires</h2>
+          <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">Bulletins scolaires</h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
             Sélectionnez un élève pour générer son bulletin avec les notes par matière et la moyenne générale.
           </p>
@@ -118,7 +118,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
       </div>
 
       {!selectedStudentId ? (
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader>
             <CardTitle className="text-base">Sélectionner un élève</CardTitle>
             <p className="text-xs text-muted-foreground">Choisissez un élève pour afficher son bulletin</p>
@@ -155,8 +155,9 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
                 )
               })}
               {filteredEtudiants.length === 0 && (
-                <div className="col-span-full py-8 text-center text-sm text-muted-foreground">
-                  Aucun élève trouvé
+                <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
+                  <GraduationCap className="size-10 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">Aucun élève trouvé</p>
                 </div>
               )}
             </div>
@@ -173,7 +174,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
             </Button>
           </div>
 
-          <Card className="border-border/70 bg-card/80 shadow-sm">
+          <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -190,7 +191,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
             </CardHeader>
             <CardContent>
               <div className="mb-6 grid gap-4 sm:grid-cols-3">
-                <Card className="border-border/60">
+                <Card className="border-border/60 rounded-2xl">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2">
                       <GraduationCap className="size-4 text-muted-foreground" />
@@ -199,7 +200,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
                     <p className="mt-1 text-xl font-semibold">{bulletinData.rows.length}</p>
                   </CardContent>
                 </Card>
-                <Card className="border-border/60">
+                <Card className="border-border/60 rounded-2xl">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="size-4 text-muted-foreground" />
@@ -208,7 +209,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
                     <p className="mt-1 text-xl font-semibold">{bulletinData.generalAverage.toFixed(2)}/20</p>
                   </CardContent>
                 </Card>
-                <Card className="border-border/60">
+                <Card className="border-border/60 rounded-2xl">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2">
                       <FileText className="size-4 text-muted-foreground" />
@@ -249,9 +250,9 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
                         </td>
                         <td className="px-3 py-3 sm:px-6 text-center">
                           {row.average >= 10 ? (
-                            <span className="text-[11px] font-semibold text-emerald-600">Réussi</span>
+                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold bg-emerald-500/10 text-emerald-700">Réussi</span>
                           ) : (
-                            <span className="text-[11px] font-semibold text-amber-600">À améliorer</span>
+                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold bg-amber-500/10 text-amber-700">À améliorer</span>
                           )}
                         </td>
                       </tr>
@@ -263,7 +264,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
           </Card>
         </div>
       ) : (
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardContent className="p-8 text-center text-muted-foreground">
             Sélectionnez un élève pour générer son bulletin.
           </CardContent>

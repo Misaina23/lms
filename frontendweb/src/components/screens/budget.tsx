@@ -37,7 +37,7 @@ function StatCard({ label, value, detail, trend, icon: Icon, accent, isNegative 
   isNegative?: boolean
 }) {
   return (
-    <Card className="border-border/70 bg-card/80 shadow-sm">
+    <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
       <CardContent className="p-5">
         <div className="mb-5 flex items-start justify-between">
           <div className={`flex size-10 items-center justify-center rounded-xl ${accent}`}><Icon className="size-5" /></div>
@@ -110,7 +110,7 @@ export function BudgetScreen({
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="mb-2 font-serif text-sm italic text-primary">Budget & Finances</p>
-          <h2 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Gestion budgétaire</h2>
+          <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">Gestion budgétaire</h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
             Suivi des recettes (scolarité, subventions, dons) et des dépenses (matériel, salaires, maintenance).
           </p>
@@ -188,7 +188,7 @@ export function BudgetScreen({
 
           {/* Revenue/Expense by Category */}
           <div className="mt-2 grid gap-6 xl:grid-cols-2">
-            <Card className="border-border/70 bg-card/80 shadow-sm">
+            <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Recettes par catégorie</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">Répartition des revenus</p>
@@ -222,7 +222,7 @@ export function BudgetScreen({
               </CardContent>
             </Card>
 
-            <Card className="border-border/70 bg-card/80 shadow-sm">
+            <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Dépenses par catégorie</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">Répartition des dépenses</p>
@@ -260,7 +260,7 @@ export function BudgetScreen({
       )}
 
       {activeTab === 'items' && (
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-4">
             <div>
               <CardTitle className="text-base">Lignes budgétaires</CardTitle>
@@ -346,7 +346,7 @@ export function BudgetScreen({
       )}
 
       {activeTab === 'reports' && (
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader>
             <CardTitle className="text-base">Rapports budgétaires</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">Générez des rapports mensuels, trimestriels ou annuels.</p>

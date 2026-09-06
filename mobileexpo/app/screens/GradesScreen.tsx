@@ -266,93 +266,85 @@ export default function GradesScreen() {
     matiere: assignments?.find(a => a.matiere === selectedAssignment.matiere)?.matiere_detail,
   } : null;
 
+  const average = gradeRows.length > 0 
+    ? (gradeRows.reduce((sum: number, g: GradeRow) => sum + parseFloat(g.note || '0'), 0) / gradeRows.length) 
+    : 0;
+  const averagePercent = (average / 20 * 100).toFixed(0);
+
   return (
     <ScrollView
       flex={1}
       showsVerticalScrollIndicator={false}
     >
-      <YStack paddingHorizontal="$4" paddingTop="$6" paddingBottom="$8" gap="$5">
-        {/* Header */}
-        <XStack justifyContent="space-between" alignItems="center">
-          <YStack gap="$1" flex={1}>
-            <H1 color={colors.foreground} fontWeight="800">Notes</H1>
-            <SizableText color={colors.mutedForeground} size="$4">
-              {selectedAssignment ? `${selectedAssignmentDetails?.classe?.nom} - ${selectedAssignmentDetails?.matiere?.code}` : 'Sélectionnez une classe/matière'}
-            </SizableText>
+      <YStack paddingHorizontal="$4" paddingTop={insets.top + 16} paddingBottom="$8" gap="$4">
+        {/* Header with back button */}
+        <XStack gap="$3" alignItems="center">
+          <Button
+            circular
+            size="$4"
+            backgroundColor={colors.card}
+            borderWidth={1}
+            borderColor={colors.border}
+            icon={<ChevronRight size={18} color={colors.foreground} />}
+            onPress={() => {}}
+            aria-label="Retour"
+          />
+          <YStack flex={1} gap="$1">
+            <H2 color={colors.foreground} fontWeight="800" fontSize={18}>Notes</H2>
           </YStack>
         </XStack>
 
-        {/* Class/Subject Selector */}
-        <YStack gap="$2">
-          <XStack justifyContent="space-between" alignItems="center">
-            <H3 color={colors.foreground} fontWeight="700">Mes affectations</H3>
-            <SizableText color={colors.mutedForeground} size="$2">
-              {assignments?.length || 0} affectation(s)
-            </SizableText>
+        {/* Dropdowns */}
+        <XStack gap="$2">
+          <XStack flex={1} gap="$2" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$3" paddingHorizontal="$3" paddingVertical="$2" alignItems="center" justifyContent="space-between">
+            <SizableText color={colors.foreground} size="$3" fontWeight="700">2nd Semestre</SizableText>
+            <ChevronRight size={12} color={colors.mutedForeground} />
           </XStack>
-          {assignmentsLoading ? (
-            <SizableText color={colors.mutedForeground}>Chargement des affectations…</SizableText>
-          ) : assignments && assignments.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              <XStack gap="$2">
-                {assignments.map(assignment => (
-                  <Button
-                    key={assignment.id}
-                    height={48}
-                    backgroundColor={selectedAssignment?.id === assignment.id ? colors.accent : colors.card}
-                    color={selectedAssignment?.id === assignment.id ? colors.accentForeground : colors.foreground}
-                    borderColor={colors.border}
-                    borderWidth={1}
-                    borderRadius="$4"
-                    paddingHorizontal="$4"
-                    onPress={() => { tapFeedback(); setSelectedAssignment(assignment); }}
-                  >
-                    <YStack gap="$1">
-                      <SizableText size="$3" fontWeight="700">{assignment.classe_detail?.nom}</SizableText>
-                      <SizableText 
-                        size="$2" 
-                        color={selectedAssignment?.id === assignment.id ? colors.accentForeground : colors.mutedForeground}
-                      >
-                        {assignment.matiere_detail?.code} {assignment.is_main_teacher ? '(PP)' : ''}
-                      </SizableText>
-                    </YStack>
-                  </Button>
-                ))}
-              </XStack>
-            </ScrollView>
-          ) : (
-            <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$4" padding="$4" alignItems="center">
-              <ClipboardCheck size={32} color={colors.mutedForeground} />
-              <SizableText color={colors.mutedForeground} marginTop="$2" textAlign="center">
-                Aucune affectation
-              </SizableText>
-            </Card>
-          )}
-        </YStack>
+        </XStack>
+
+        <XStack gap="$2">
+          <XStack flex={1} gap="$2" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$3" paddingHorizontal="$3" paddingVertical="$2" alignItems="center" justifyContent="space-between">
+            <SizableText color={colors.foreground} size="$3" fontWeight="700">Mathématiques</SizableText>
+            <ChevronRight size={12} color={colors.mutedForeground} />
+          </XStack>
+        </XStack>
+
+        {/* Average Card with Ring */}
+        {selectedAssignment && gradeRows.length > 0 && (
+          <Card backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$5" padding="$5">
+            <XStack justifyContent="space-between" alignItems="center">
+              <YStack flex={1} gap="$2">
+                <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">Moyenne générale</SizableText>
+                <XStack alignItems="baseline" gap="$1">
+                  <SizableText color={colors.foreground} fontSize={28} fontWeight="800">
+                    {average.toFixed(2)}
+                  </SizableText>
+                  <SizableText color={colors.mutedForeground} size="$2" fontWeight="600">/ 20</SizableText>
+                </XStack>
+                <SizableText color={colors.success} size="$2" fontWeight="700">Très bien !</SizableText>
+              </YStack>
+              <YStack width={66} height={66}>
+                <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke={colors.border} strokeWidth="3" />
+                  <circle 
+                    cx="18" 
+                    cy="18" 
+                    r="15.5" 
+                    fill="none" 
+                    stroke={colors.primary} 
+                    strokeWidth="3" 
+                    strokeLinecap="round"
+                    strokeDasharray={`${averagePercent} ${100 - parseInt(averagePercent)}`}
+                    strokeDashoffset="0"
+                  />
+                </svg>
+              </YStack>
+            </XStack>
+          </Card>
+        )}
 
         {selectedAssignment && (
           <>
-            {/* Stats */}
-            <XStack gap="$2" flexWrap="wrap">
-              <Card flex={1} minWidth={80} backgroundColor={colors.accent + '18'} borderRadius="$4" padding="$3" alignItems="center">
-                <SizableText color={colors.accent} size="$2">Notes</SizableText>
-                <H2 color={colors.accent}>{gradeRows.length}</H2>
-              </Card>
-              <Card flex={1} minWidth={80} backgroundColor={colors.success + '18'} borderRadius="$4" padding="$3" alignItems="center">
-                <SizableText color={colors.success} size="$2">Moyenne</SizableText>
-                <H2 color={colors.success}>
-                  {gradeRows.length > 0 
-                    ? (gradeRows.reduce((sum, g) => sum + parseFloat(g.note || '0'), 0) / gradeRows.length).toFixed(1)
-                    : '—'
-                  }/20
-                </H2>
-              </Card>
-              <Card flex={1} minWidth={80} backgroundColor={colors.warning + '18'} borderRadius="$4" padding="$3" alignItems="center">
-                <SizableText color={colors.warning} size="$2">Brouillon</SizableText>
-                <H2 color={colors.warning}>{gradeRows.filter(g => g.status === 'DRAFT').length}</H2>
-              </Card>
-            </XStack>
-
             {/* Search */}
             {gradeRows.length > 0 && (
               <XStack gap="$2">

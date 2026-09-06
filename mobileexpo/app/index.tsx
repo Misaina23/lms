@@ -59,16 +59,22 @@ import GradesScreen from '@/app/screens/GradesScreen';
 import EnrollmentScreen from '@/app/screens/EnrollmentScreen';
 import ChatScreen from '@/app/screens/ChatScreen';
 import ReportsScreen from '@/app/screens/ReportsScreen';
+import ClassesScreen from '@/app/screens/ClassesScreen';
+import MatieresScreen from '@/app/screens/MatieresScreen';
+import CalendarScreen from '@/app/screens/CalendarScreen';
 
 function tapFeedback() {
   if (typeof Haptics !== 'undefined') Haptics.selectionAsync();
 }
 
-type Tab = 'Accueil' | 'Mes classes' | 'Notes' | 'Pointage' | 'Emploi du temps' | 'Messages' | 'Profil' | 'Rapports' | 'Inscriptions';
+type Tab = 'Accueil' | 'Mes classes' | 'Notes' | 'Pointage' | 'Emploi du temps' | 'Messages' | 'Profil' | 'Rapports' | 'Inscriptions' | 'Classes' | 'Matières' | 'Calendrier';
 
 const NAV_ITEMS: { label: Tab; icon: typeof HomeIcon; roles: string[] }[] = [
   { label: 'Accueil', icon: HomeIcon, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
   { label: 'Mes classes', icon: UsersRound, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
+  { label: 'Classes', icon: BookOpen, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
+  { label: 'Matières', icon: BookOpen, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
+  { label: 'Calendrier', icon: CalendarDays, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
   { label: 'Notes', icon: ClipboardCheck, roles: ['ADMIN', 'PROFESSEUR'] },
   { label: 'Pointage', icon: CheckCircle2, roles: ['ADMIN', 'PROFESSEUR'] },
   { label: 'Emploi du temps', icon: CalendarDays, roles: ['ADMIN', 'PROFESSEUR', 'SURVEILLANT'] },
@@ -321,6 +327,12 @@ export default function Home() {
         return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as Tab)} />;
       case 'Mes classes':
         return <EnrollmentScreen />;
+      case 'Classes':
+        return <ClassesScreen />;
+      case 'Matières':
+        return <MatieresScreen />;
+      case 'Calendrier':
+        return <CalendarScreen />;
       case 'Notes':
         return <GradesScreen />;
       case 'Pointage':

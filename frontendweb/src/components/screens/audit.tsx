@@ -55,13 +55,13 @@ export function AuditScreen({ logs = [] }: { logs: AuditLog[] }) {
     <div className="space-y-6">
       <div>
         <p className="mb-2 font-serif text-sm italic text-primary">Traçabilité</p>
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Audit & Logs</h2>
+        <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">Audit & Logs</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
           Historique des actions sensibles : créations, modifications, suppressions, changements de statut.
         </p>
       </div>
 
-      <Card className="border-border/70 bg-card/80 shadow-sm">
+      <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

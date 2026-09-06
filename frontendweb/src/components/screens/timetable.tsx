@@ -105,7 +105,7 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="mb-2 font-serif text-sm italic text-primary">Organisation</p>
-          <h2 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Emploi du temps</h2>
+          <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">Emploi du temps</h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
             Matrice semaine par classe / professeur. Détection automatique des conflits.
           </p>
@@ -160,7 +160,7 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
       </div>
 
       {Object.keys(conflicts).length > 0 && (
-        <Card className="border-rose-500/70 bg-rose-500/5">
+        <Card className="border-rose-500/70 bg-rose-500/5 rounded-2xl">
           <CardHeader>
             <CardTitle className="text-base text-rose-700 dark:text-rose-300">Conflits détectés</CardTitle>
             <p className="text-xs text-muted-foreground">Créneaux qui se superposent pour la même classe/professeur.</p>
@@ -185,7 +185,7 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
         </Card>
       )}
 
-      <Card className="border-border/70 bg-card/80 shadow-sm">
+      <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Grille hebdomadaire</CardTitle>
           <p className="text-xs text-muted-foreground">{filteredSlots.length} créneau(x) affiché(s)</p>
@@ -238,9 +238,9 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
                       <td className="px-3 py-3 sm:px-4">{slot.academic_year}</td>
                       <td className="px-3 py-3 sm:px-6">
                         {isConflict ? (
-                          <span className="text-[11px] font-semibold text-rose-600">Conflit</span>
+                          <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold bg-rose-500/10 text-rose-700">Conflit</span>
                         ) : (
-                          <span className="text-[11px] font-semibold text-emerald-600">OK</span>
+                          <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold bg-emerald-500/10 text-emerald-700">OK</span>
                         )}
                       </td>
                     </tr>

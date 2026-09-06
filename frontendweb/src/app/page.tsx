@@ -31,7 +31,7 @@ import { api, type PaginatedResponse, type User, type Classe, type Matiere, type
 import { useAdminData, type ScreenKey } from '@/lib/admin-data'
 import { StudentsScreen } from '@/components/screens/students'
 import { EnrollmentsScreen } from '@/components/screens/enrollments'
-import { TeachersScreen, ClassesScreen, GradesScreen, AttendanceScreen, ReportsScreen } from '@/components/screens/modules'
+import { TeachersScreen, ClassesScreen, MatieresScreen, GradesScreen, AttendanceScreen, ReportsScreen } from '@/components/screens/modules'
 import { BudgetScreen } from '@/components/screens/budget'
 import { TimetableScreen } from '@/components/screens/timetable'
 import { BulletinsScreen } from '@/components/screens/bulletins'
@@ -43,9 +43,10 @@ const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
   { key: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
   { key: 'students', label: 'Élèves', icon: GraduationCap },
   { key: 'enrollments', label: 'Inscriptions', icon: CheckCircle2 },
-  { key: 'classes', label: 'Classes & matières', icon: BookOpen },
+  { key: 'classes', label: 'Classes', icon: BookOpen },
   { key: 'teachers', label: 'Enseignants', icon: Users },
   { key: 'registrations', label: 'Demandes', icon: UserPlus },
+  { key: 'matieres', label: 'Matières', icon: BookOpen },
   { key: 'timetable', label: 'Emploi du temps', icon: CalendarDays },
   { key: 'attendance', label: 'Pointage', icon: Clock3 },
   { key: 'grades', label: 'Notes', icon: FileText },
@@ -58,7 +59,7 @@ const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
 
 function StatCard({ label, value, detail, trend, icon: Icon, accent }: { label: string; value: string; detail: string; trend: string; icon: typeof Users; accent: string }) {
   return (
-    <Card className="group border-border/70 bg-card/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+    <Card className="border-border/70 bg-card/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg rounded-2xl">
       <CardContent className="p-5">
         <div className="mb-5 flex items-start justify-between">
           <div className={`flex size-10 items-center justify-center rounded-xl ${accent}`}><Icon className="size-5" /></div>
@@ -121,11 +122,12 @@ export default function Home() {
       case 'enrollments':
       case 'payments':
         return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} users={data.users} classes={data.classes as any} />
-      case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} />
-      case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} />
+      case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} onReload={reload} />
+      case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
+      case 'matieres': return <MatieresScreen matieres={data.matieres} onReload={reload} />
       case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} />
       case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} />
-      case 'registrations': return <RegistrationsScreen pendingUsers={data.pendingUsers} users={data.users} onReload={reload} />
+      case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
       case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} users={data.users} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes as any} matieres={data.matieres} notes={data.notes} />
@@ -238,7 +240,7 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
       </div>
 
       <div className="mt-2 grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
             <div><CardTitle className="text-base">Dernières notes</CardTitle><p className="mt-1 text-xs text-muted-foreground">Saisies récentes · toutes matières</p></div>
           </CardHeader>
@@ -261,7 +263,7 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
           </CardContent>
         </Card>
 
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
             <div><CardTitle className="text-base">À traiter aujourd'hui</CardTitle><p className="mt-1 text-xs text-muted-foreground">Actions prioritaires</p></div>
           </CardHeader>

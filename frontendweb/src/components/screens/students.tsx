@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, CheckCircle2, UserPlus, Upload, X } from 'lucide-react'
+import { Search, CheckCircle2, UserPlus, Upload, X, UsersRound } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,7 @@ export function StudentsScreen({ users, etudiants, classes, onReload }: {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Élèves</h2>
+          <h2 className="text-lg font-extrabold tracking-tight text-foreground">Élèves</h2>
           <p className="text-sm text-muted-foreground">{etudiants.length} élèves inscrits · {classes.length} classes</p>
         </div>
         <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export function StudentsScreen({ users, etudiants, classes, onReload }: {
       </div>
 
       {showAddForm && (
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Nouvel élève</CardTitle>
             <Button variant="ghost" size="icon" onClick={() => setShowAddForm(false)}><X className="size-4" /></Button>
@@ -105,7 +105,7 @@ export function StudentsScreen({ users, etudiants, classes, onReload }: {
       )}
 
       {showImportModal && (
-        <Card className="border-border/70 bg-card/80 shadow-sm">
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Importer des élèves (Excel/CSV)</CardTitle>
             <Button variant="ghost" size="icon" onClick={() => setShowImportModal(false)}><X className="size-4" /></Button>
@@ -125,7 +125,7 @@ export function StudentsScreen({ users, etudiants, classes, onReload }: {
         </Card>
       )}
 
-      <Card className="border-border/70 bg-card/80">
+      <Card className="border-border/70 bg-card/80 rounded-2xl">
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle className="text-base">Liste des élèves</CardTitle>

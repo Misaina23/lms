@@ -122,7 +122,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
           ))}
         </div>
 
-        <Card className="flex-1 border-border/70 bg-card/80 shadow-sm flex flex-col">
+        <Card className="flex-1 border-border/70 bg-card/80 shadow-sm flex flex-col rounded-2xl">
           <CardHeader className="border-b border-border">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedGroup(null)}>
@@ -187,14 +187,14 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
     <div className="space-y-6">
       <div>
         <p className="mb-2 font-serif text-sm italic text-primary">Communication</p>
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Messagerie</h2>
+        <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">Messagerie</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
           Échangez avec vos collègues, participez aux groupes de matière et de classe.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1 border-border/70 bg-card/80 shadow-sm">
+        <Card className="lg:col-span-1 border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Groupes</CardTitle>
             <div className="relative mt-2">
@@ -213,7 +213,10 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
               </div>
             ) : filteredGroups.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">Aucun groupe</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <MessageCircle className="size-10 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Aucun groupe</p>
+              </div>
             ) : (
               filteredGroups.map(group => (
                 <button
@@ -237,7 +240,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 border-border/70 bg-card/80 shadow-sm">
+        <Card className="lg:col-span-2 border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardContent className="flex h-[500px] items-center justify-center text-muted-foreground">
             <div className="text-center">
               <MessageCircle className="mx-auto size-12 mb-4 opacity-50" />

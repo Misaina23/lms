@@ -127,6 +127,7 @@ function MessageBubble({ message, isOwn }: { message: any; isOwn: boolean }) {
 export default function ChatScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [draft, setDraft] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -298,54 +299,123 @@ export default function ChatScreen() {
 
   return (
     <ScrollView flex={1} showsVerticalScrollIndicator={false}>
-      <YStack paddingHorizontal="$4" paddingTop="$6" paddingBottom="$8" gap="$5">
-        <XStack justifyContent="space-between" alignItems="center">
-          <YStack gap="$1" flex={1}>
-            <H1 color={colors.foreground} fontWeight="800">Messages</H1>
-            <SizableText color={colors.mutedForeground} size="$4">
-              Discussions et annonces
-            </SizableText>
-          </YStack>
+      <YStack paddingHorizontal="$4" paddingTop={insets.top + 16} paddingBottom="$8" gap="$4">
+        {/* Header */}
+        <XStack gap="$3" alignItems="center">
+          <Button
+            circular
+            size="$4"
+            backgroundColor={colors.card}
+            borderWidth={1}
+            borderColor={colors.border}
+            icon={<ChevronRight size={18} color={colors.foreground} />}
+            onPress={() => {}}
+            aria-label="Retour"
+          />
+          <H2 color={colors.foreground} fontWeight="800" fontSize={18}>Messagerie</H2>
         </XStack>
 
+        {/* Search */}
+        <XStack gap="$2" backgroundColor={colors.card} borderWidth={1} borderColor={colors.border} borderRadius="$3" paddingHorizontal="$3" alignItems="center">
+          <Input
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Rechercher une conversation..."
+            color={colors.foreground}
+            backgroundColor="transparent"
+            borderWidth={0}
+            flex={1}
+          />
+        </XStack>
+
+        {/* Filter Pills */}
         <XStack gap="$2">
-          <XStack flex={1} gap="$2" backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$3" paddingHorizontal="$3" alignItems="center">
-            <Input
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Rechercher un groupe..."
-              color={colors.foreground}
-              backgroundColor="transparent"
-              borderWidth={0}
-              flex={1}
-            />
-          </XStack>
+          <Button flex={1} height={36} backgroundColor={colors.primary} color={colors.primaryForeground} borderRadius="$3" fontSize={12} fontWeight="700">
+            Tous
+          </Button>
+          <Button flex={1} height={36} backgroundColor={colors.card} color={colors.mutedForeground} borderWidth={1} borderColor={colors.border} borderRadius="$3" fontSize={12} fontWeight="700">
+            Non lus
+          </Button>
+          <Button flex={1} height={36} backgroundColor={colors.card} color={colors.mutedForeground} borderWidth={1} borderColor={colors.border} borderRadius="$3" fontSize={12} fontWeight="700">
+            Groupes · {groups?.length || 0}
+          </Button>
         </XStack>
 
-        <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$5" padding="$3" gap="$2">
+        {/* Conversation List */}
+        <YStack gap="$2">
           {groupsLoading ? (
             <YStack alignItems="center" justifyContent="center" padding="$6">
               <ActivityIndicator size="large" color={colors.accent} />
-              <SizableText color={colors.mutedForeground} marginTop="$3">Chargement des groupes…</SizableText>
+              <SizableText color={colors.mutedForeground} marginTop="$3">Chargement...</SizableText>
             </YStack>
           ) : filteredGroups.length === 0 ? (
             <YStack alignItems="center" justifyContent="center" padding="$6" gap="$2">
               <MessageCircle size={48} color={colors.mutedForeground} />
               <SizableText color={colors.mutedForeground} textAlign="center" size="$3">
-                {searchQuery ? 'Aucun groupe trouvé' : 'Aucun groupe de discussion'}
+                {searchQuery ? 'Aucun groupe trouvé' : 'Aucune conversation'}
               </SizableText>
             </YStack>
           ) : (
-            filteredGroups.map((group: any) => (
-              <GroupCard
-                key={group.id}
-                group={group}
-                isSelected={selectedGroup?.id === group.id}
-                onSelect={(g) => { tapFeedback(); setSelectedGroup(g); }}
-              />
-            ))
+            filteredGroups.map((group: any) => {
+              const initials = group.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+              const time = group.last_message_at ? new Date(group.last_message_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+              const snippet = group.last_message || `${group.members?.length || 0} membres`;
+              const isGroup = group.group_type === 'CLASS' || group.group_type === 'SUBJECT' || group.group_type === 'ADMIN_ANNOUNCE';
+              
+              return (
+                <XStack 
+                  key={group.id} 
+                  gap="$3" 
+                  alignItems="center" 
+                  paddingVertical="$2"
+                  borderBottomWidth={1}
+                  borderColor={colors.border}
+                  onPress={() => { tapFeedback(); setSelectedGroup(group); }}
+                >
+                  <YStack 
+                    width={38} 
+                    height={38} 
+                    borderRadius="$3" 
+                    backgroundColor={isGroup ? colors.primary + '30' : colors.secondary} 
+                    borderWidth={1}
+                    borderColor={colors.border}
+                    alignItems="center" 
+                    justifyContent="center"
+                  >
+                    <SizableText color={isGroup ? colors.primary : colors.foreground} size="$3" fontWeight="800">
+                      {isGroup ? group.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : initials}
+                    </SizableText>
+                  </YStack>
+                  <YStack flex={1} minWidth={0}>
+                    <XStack justifyContent="space-between" alignItems="center">
+                      <SizableText color={colors.foreground} fontWeight="800" size="$3" numberOfLines={1}>{group.name}</SizableText>
+                      <SizableText color={colors.mutedForeground} size="$1" fontWeight="600">{time}</SizableText>
+                    </XStack>
+                    <SizableText color={colors.mutedForeground} size="$2" numberOfLines={1} marginTop="$1">{snippet}</SizableText>
+                  </YStack>
+                </XStack>
+              );
+            })
           )}
-        </Card>
+        </YStack>
+      </YStack>
+
+      {/* FAB */}
+      <YStack position="absolute" bottom={80} right={20}>
+        <Button
+          circular
+          size="$5"
+          backgroundColor={colors.primary}
+          color={colors.primaryForeground}
+          shadowColor={colors.primary}
+          shadowOffset={{ width: 0, height: 4 }}
+          shadowOpacity={0.4}
+          shadowRadius={12}
+          elevation={8}
+          onPress={() => {}}
+        >
+          <SizableText color={colors.primaryForeground} fontSize={20} fontWeight="700">+</SizableText>
+        </Button>
       </YStack>
     </ScrollView>
   );
