@@ -20,24 +20,30 @@ class ClasseNestedSerializer(serializers.Serializer):
 
 
 class EtudiantSerializer(serializers.ModelSerializer):
-    user_detail = UserNestedSerializer(source='user', read_only=True)
+    """Eleve n'est PAS un utilisateur - c'est une entite geree par l'admin."""
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
     classe_detail = ClasseNestedSerializer(source='classe', read_only=True)
     moyenne_generale = serializers.SerializerMethodField()
 
     class Meta:
         model = Etudiant
         fields = [
-            'id', 'user', 'user_detail', 'classe', 'classe_detail', 'date_inscription',
+            'id', 'matricule', 'first_name', 'last_name', 'full_name',
+            'date_of_birth', 'gender', 'phone', 'email_parent', 'phone_parent', 'address',
+            'classe', 'classe_detail', 'date_inscription',
             'statut', 'actif', 'moyenne_generale', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'moyenne_generale']
 
     def get_moyenne_generale(self, obj):
-        notes = obj.notes.all()
+        notes = obj.notes.all() if hasattr(obj, 'notes') else []
         if not notes:
             return None
-        total_weighted = sum(float(n.note) * float(n.coefficient) for n in notes)
-        total_coefficient = sum(float(n.coefficient) for n in notes)
+        try:
+            total_weighted = sum(float(n.note) * float(n.coefficient) for n in notes)
+            total_coefficient = sum(float(n.coefficient) for n in notes)
+        except (TypeError, ValueError, AttributeError):
+            return None
         if total_coefficient == 0:
             return None
         return round(total_weighted / total_coefficient, 2)

@@ -1,19 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ActivityIndicator, Platform } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
   YStack,
   XStack,
-  ScrollView,
   Card,
-  Button,
-  Input,
-  H1,
+  Text,
+  SizableText,
   H2,
   H3,
   Paragraph,
-  SizableText,
   Home as HomeIcon,
   ClipboardCheck,
   CalendarDays,
@@ -24,74 +21,164 @@ import {
   CheckCircle2,
   Clock3,
   UsersRound,
-  Wifi,
-  Send,
   Search,
-  MoreHorizontal,
-  ShieldCheck,
-  Settings2,
   GraduationCap,
   BookOpen,
-  FileText,
   Building2,
   CircleDollarSign,
-  Download,
-  Printer,
   ArrowUpRight,
-  ArrowDownRight,
   Menu,
-  X,
-  ChevronDown,
-  LogOut,
   Sun,
   Moon,
-  BarChart2,
+  X,
+  LogOut,
+  Settings2 as SettingsIcon,
 } from '@blinkdotnew/mobile-ui';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
 import * as Haptics from 'expo-haptics';
+import { spacing, fontSize, iconSize, SCREEN_WIDTH } from '@/lib/responsive';
+import { BottomNav, type TabItem } from '@/components/BottomNav';
+import { TopBar } from '@/components/TopBar';
+import { Drawer } from '@/components/Drawer';
+import { PrimaryButton } from '@/components/PrimaryButton';
 
-// Import screens
 import DashboardScreen from '@/app/screens/DashboardScreen';
 import ScheduleScreen from '@/app/screens/ScheduleScreen';
 import AttendanceScreen from '@/app/screens/AttendanceScreen';
 import GradesScreen from '@/app/screens/GradesScreen';
 import ChatScreen from '@/app/screens/ChatScreen';
 import NotificationsScreen from '@/app/screens/NotificationsScreen';
+import SettingsScreen from '@/app/screens/SettingsScreen';
 
 function tapFeedback() {
-  if (typeof Haptics !== 'undefined') Haptics.selectionAsync();
+  if (Platform.OS !== 'web') {
+    try { Haptics.selectionAsync(); } catch {}
+  }
 }
 
-type Tab = 'Accueil' | 'Planning' | 'Pointage' | 'Notes' | 'Messages' | 'Notifications' | 'Profil';
+type TabKey = 'Accueil' | 'Planning' | 'Pointage' | 'Notes' | 'Messages' | 'Notifications' | 'Paramètres';
 
-const BOTTOM_TABS: { label: Tab; icon: typeof HomeIcon }[] = [
-  { label: 'Accueil', icon: HomeIcon },
-  { label: 'Planning', icon: CalendarDays },
-  { label: 'Pointage', icon: CheckCircle2 },
-  { label: 'Notes', icon: ClipboardCheck },
-  { label: 'Messages', icon: MessageCircle },
+const BOTTOM_TABS: TabItem<TabKey>[] = [
+  {
+    key: 'Accueil',
+    label: 'Accueil',
+    icon: ({ color, size }) => <HomeIcon size={size} color={color} />,
+  },
+  {
+    key: 'Planning',
+    label: 'Planning',
+    icon: ({ color, size }) => <CalendarDays size={size} color={color} />,
+  },
+  {
+    key: 'Pointage',
+    label: 'Pointage',
+    icon: ({ color, size }) => <CheckCircle2 size={size} color={color} />,
+  },
+  {
+    key: 'Notes',
+    label: 'Notes',
+    icon: ({ color, size }) => <ClipboardCheck size={size} color={color} />,
+  },
+  {
+    key: 'Messages',
+    label: 'Messages',
+    icon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+  },
 ];
 
-const DRAWER_TABS: { label: Tab; icon: typeof HomeIcon }[] = [
-  { label: 'Notifications', icon: Bell },
-  { label: 'Profil', icon: UserRound },
+const ALL_TABS: TabItem<TabKey>[] = [
+  ...BOTTOM_TABS,
+  {
+    key: 'Notifications',
+    label: 'Notifications',
+    icon: ({ color, size }) => <Bell size={size} color={color} />,
+  },
+  {
+    key: 'Paramètres',
+    label: 'Paramètres',
+    icon: ({ color, size }) => <SettingsIcon size={size} color={color} />,
+  },
 ];
 
-function ProfileScreen() {
-  const { colors, toggleTheme, mode } = useTheme();
-  const { user, logout } = useAuth();
-  const insets = useSafeAreaInsets();
+const TAB_TITLES: Record<TabKey, { title: string; subtitle?: string }> = {
+  'Accueil': { title: 'Tableau de bord', subtitle: 'Aperçu rapide' },
+  'Planning': { title: 'Emploi du temps', subtitle: 'Vos cours' },
+  'Pointage': { title: 'Pointage', subtitle: 'Présences & retards' },
+  'Notes': { title: 'Saisie des notes', subtitle: 'Évaluations' },
+  'Messages': { title: 'Messages', subtitle: 'Échanges & groupes' },
+  'Notifications': { title: 'Notifications', subtitle: 'Alertes & annonces' },
+  'Paramètres': { title: 'Paramètres', subtitle: 'Profil & préférences' },
+};
+
+function LoadingScreen({ message = 'Chargement...' }: { message?: string }) {
+  const { colors } = useTheme();
+  return (
+    <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" gap={spacing.md}>
+      <ActivityIndicator size="large" color={colors.accent} />
+      <SizableText color={colors.mutedForeground} size={fontSize.md}>{message}</SizableText>
+    </YStack>
+  );
+}
+
+function LoginScreen() {
+  const { colors } = useTheme();
   const navigation = useNavigation();
 
-  if (!user) {
-    return (
-      <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" padding="$6">
-        <ActivityIndicator size="large" color={colors.accent} />
-        <SizableText color={colors.mutedForeground}>Chargement...</SizableText>
+  return (
+    <YStack
+      flex={1}
+      backgroundColor={colors.background}
+      justifyContent="center"
+      alignItems="center"
+      paddingHorizontal={spacing.xl}
+      gap={spacing.lg}
+    >
+      <View
+        style={{
+          width: 72,
+          height: 72,
+          borderRadius: 18,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 12,
+          elevation: 8,
+        }}
+      >
+        <SizableText color={colors.primaryForeground} fontWeight="800" size={28}>LH</SizableText>
+      </View>
+      <YStack gap={spacing.xs} alignItems="center">
+        <SizableText color={colors.foreground} fontWeight="800" size={fontSize.xxl} textAlign="center">
+          Lycée Horizon
+        </SizableText>
+        <SizableText color={colors.mutedForeground} size={fontSize.sm} textAlign="center">
+          Espace enseignant · Pointage, notes, messagerie
+        </SizableText>
       </YStack>
-    );
-  }
+      <YStack width="100%" maxWidth={360} gap={spacing.md} marginTop={spacing.lg}>
+        <PrimaryButton
+          label="Se connecter"
+          onPress={() => navigation.navigate('login' as never)}
+          fullWidth
+          size="lg"
+        />
+        <SizableText color={colors.mutedForeground} size={fontSize.xs} textAlign="center">
+          Lycée Horizon · Développé par DevMisaina
+        </SizableText>
+      </YStack>
+    </YStack>
+  );
+}
+
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<TabKey>('Accueil');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { colors, toggleTheme, isDark, mode } = useTheme();
+  const { user, isAuthenticated, loading, logout } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -101,144 +188,12 @@ function ProfileScreen() {
     }
   };
 
-  const roleLabels: Record<string, string> = {
-    ADMIN: 'Administrateur',
-    PROFESSEUR: 'Professeur',
-    ELEVE: 'Élève',
-    PARENT: 'Parent',
-    SURVEILLANT: 'Surveillant',
-  };
-
-  return (
-    <ScrollView
-      flex={1}
-      backgroundColor={colors.background}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        flexGrow: 1,
-        paddingTop: insets.top + 24,
-        paddingHorizontal: 20,
-        paddingBottom: insets.bottom + 24,
-      }}
-    >
-      <YStack gap="$6" maxWidth={520} alignSelf="center" width="100%">
-        {/* Header avec avatar */}
-        <YStack gap="$3" alignItems="center">
-          <YStack
-            width={88}
-            height={88}
-            borderRadius="$6"
-            backgroundColor={colors.primary}
-            alignItems="center"
-            justifyContent="center"
-            shadowColor={colors.primary}
-            shadowOffset={{ width: 0, height: 4 }}
-            shadowOpacity={0.3}
-            shadowRadius={8}
-            elevation={8}
-          >
-            <SizableText color={colors.primaryForeground} size="$7" fontWeight="800">
-              {user.first_name?.[0]}{user.last_name?.[0]}
-            </SizableText>
-          </YStack>
-          <YStack gap="$1" alignItems="center">
-            <H2 color={colors.foreground} fontWeight="800" textAlign="center">
-              {user.first_name} {user.last_name}
-            </H2>
-            <SizableText color={colors.primary} size="$3" fontWeight="600" textAlign="center">
-              {roleLabels[user.role] || user.role}
-            </SizableText>
-            <SizableText color={colors.mutedForeground} size="$2" textAlign="center">
-              {user.matricule}
-            </SizableText>
-          </YStack>
-        </YStack>
-
-        {/* Informations personnelles */}
-        <Card backgroundColor={colors.card} borderColor={colors.border} borderWidth={1} borderRadius="$6" padding="$5" gap="$4" shadowColor={colors.primary} shadowOffset={{ width: 0, height: 2 }} shadowOpacity={0.1} shadowRadius={8} elevation={4}>
-          <H3 color={colors.foreground} fontWeight="700">Informations personnelles</H3>
-          
-          <YStack gap="$2">
-            {[
-              { label: 'Email', value: user.email },
-              { label: 'Téléphone', value: user.phone || 'Non renseigné' },
-              { label: 'Rôle', value: roleLabels[user.role] || user.role },
-              ...(user.teacher_type ? [{ label: 'Type', value: user.teacher_type === 'FONCTIONNAIRE' ? 'Fonctionnaire' : 'Suppléant' }] : []),
-              ...(user.surveillant_type ? [{ label: 'Type', value: user.surveillant_type }] : []),
-              { label: 'Statut', value: user.status === 'ACTIVE' ? 'Actif' : user.status === 'PENDING_VERIFICATION' ? 'En attente' : user.status },
-            ].map((item, i) => (
-              <XStack key={i} justifyContent="space-between" alignItems="center" paddingVertical="$3" borderBottomColor={colors.border} borderBottomWidth={i < 5 ? 1 : 0}>
-                <SizableText color={colors.mutedForeground} size="$3">{item.label}</SizableText>
-                <SizableText color={colors.foreground} fontWeight="600" size="$3">{item.value}</SizableText>
-              </XStack>
-            ))}
-          </YStack>
-        </Card>
-
-        {/* Theme Toggle */}
-        <Button
-          height={56}
-          backgroundColor={colors.secondary}
-          color={colors.foreground}
-          borderRadius="$5"
-          onPress={toggleTheme}
-          borderWidth={1}
-          borderColor={colors.border}
-        >
-          <XStack gap="$3" alignItems="center">
-            {mode === 'dark' ? <Sun size={22} color={colors.foreground} /> : <Moon size={22} color={colors.foreground} />}
-            <SizableText size="$3" fontWeight="700">{mode === 'dark' ? 'Mode clair' : 'Mode sombre'}</SizableText>
-          </XStack>
-        </Button>
-
-        {/* Logout */}
-        <Button
-          height={56}
-          backgroundColor={colors.destructive}
-          color={colors.destructiveForeground}
-          borderRadius="$5"
-          onPress={handleLogout}
-          shadowColor={colors.destructive}
-          shadowOffset={{ width: 0, height: 2 }}
-          shadowOpacity={0.2}
-          shadowRadius={4}
-          elevation={4}
-        >
-          <XStack gap="$3" alignItems="center">
-            <LogOut size={22} color={colors.destructiveForeground} />
-            <SizableText size="$3" fontWeight="700">Se déconnecter</SizableText>
-          </XStack>
-        </Button>
-
-        <SizableText color={colors.mutedForeground} size="$1" textAlign="center" marginTop="$2">
-          Lycée Horizon · Développé par DevMisaina
-        </SizableText>
-      </YStack>
-    </ScrollView>
-  );
-}
-
-export default function Home() {
-  const [activeTab, setActiveTab] = useState<Tab>('Accueil');
-  const { colors, toggleTheme, mode } = useTheme();
-  const { user, isAuthenticated, loading } = useAuth();
-  const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
-  const [mobileNav, setMobileNav] = useState(false);
-
   const renderContent = () => {
-    if (!user) {
-      return (
-        <YStack flex={1} justifyContent="center" alignItems="center" padding="$6" gap="$4">
-          <ActivityIndicator size="large" color={colors.accent} />
-          <SizableText color={colors.mutedForeground}>Chargement...</SizableText>
-        </YStack>
-      );
-    }
+    if (!user) return <LoadingScreen />;
 
     switch (activeTab) {
       case 'Accueil':
-        return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as Tab)} />;
+        return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as TabKey)} />;
       case 'Planning':
         return <ScheduleScreen />;
       case 'Pointage':
@@ -249,214 +204,96 @@ export default function Home() {
         return <ChatScreen />;
       case 'Notifications':
         return <NotificationsScreen />;
-      case 'Profil':
-        return <ProfileScreen />;
+      case 'Paramètres':
+        return <SettingsScreen />;
       default:
-        return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as Tab)} />;
+        return <DashboardScreen onNavigate={(tab: string) => setActiveTab(tab as TabKey)} />;
     }
   };
 
-  if (loading) {
-    return (
-      <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" gap="$4">
-        <ActivityIndicator size="large" color={colors.accent} />
-        <SizableText color={colors.mutedForeground}>Chargement...</SizableText>
-      </YStack>
-    );
-  }
+  if (loading) return <LoadingScreen />;
+  if (!isAuthenticated) return <LoginScreen />;
 
-  if (!isAuthenticated) {
-    return (
-      <YStack flex={1} backgroundColor={colors.background} justifyContent="center" alignItems="center" padding="$6" gap="$4">
-        <YStack backgroundColor={colors.primary} padding="$4" borderRadius="$6" shadowColor={colors.primary} shadowOffset={{ width: 0, height: 4 }} shadowOpacity={0.3} shadowRadius={8} elevation={8}>
-          <SizableText color={colors.primaryForeground} size="$8" fontWeight="800">LH</SizableText>
-        </YStack>
-        <H1 color={colors.foreground} fontWeight="800" textAlign="center">Lycée Horizon</H1>
-        <Paragraph color={colors.mutedForeground} textAlign="center">
-          Espace enseignant · Pointage, notes, messagerie
-        </Paragraph>
-        <Button
-          backgroundColor={colors.primary}
-          color={colors.primaryForeground}
-          height={54}
-          borderRadius="$5"
-          onPress={() => navigation.navigate('login' as never)}
-          shadowColor={colors.primary}
-          shadowOffset={{ width: 0, height: 4 }}
-          shadowOpacity={0.3}
-          shadowRadius={8}
-          elevation={8}
-        >
-          Se connecter
-        </Button>
-      </YStack>
-    );
-  }
+  const tabInfo = TAB_TITLES[activeTab];
+  const userInitials = user ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() : '?';
 
   return (
     <YStack flex={1} backgroundColor={colors.background}>
-      {/* Main Content */}
+      <TopBar
+        title={tabInfo.title}
+        subtitle={tabInfo.subtitle}
+        leftIcon={<Menu size={20} color={colors.foreground} />}
+        onLeftPress={() => {
+          tapFeedback();
+          setDrawerOpen(true);
+        }}
+        rightIcons={[
+          <View
+            key="bell"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: colors.secondary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Bell size={18} color={colors.foreground} />
+            <View
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: colors.destructive,
+              }}
+            />
+          </View>,
+          <View
+            key="avatar"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SizableText color={colors.primaryForeground} fontWeight="800" size={13}>
+              {userInitials}
+            </SizableText>
+          </View>,
+        ]}
+      />
+
       <YStack flex={1}>
         {renderContent()}
       </YStack>
 
-      {/* Bottom Navigation */}
-      <XStack
-        backgroundColor={colors.card}
-        borderTopWidth={1}
-        borderColor={colors.border}
-        paddingHorizontal="$1"
-        paddingTop="$2"
-        paddingBottom={insets.bottom + 8}
-        justifyContent="space-around"
-        shadowColor="#000"
-        shadowOffset={{ width: 0, height: -2 }}
-        shadowOpacity={0.1}
-        shadowRadius={4}
-        elevation={8}
-      >
-        {BOTTOM_TABS.map(({ label, icon: Icon }) => {
-          const active = activeTab === label;
-          return (
-            <Button
-              key={label}
-              chromeless
-              flex={1}
-              minHeight={52}
-              paddingHorizontal="$1"
-              gap="$1"
-              color={active ? colors.primary : colors.mutedForeground}
-              icon={<Icon size={19} color={active ? colors.primary : colors.mutedForeground} />}
-              onPress={() => {
-                tapFeedback();
-                setActiveTab(label);
-              }}
-            >
-              {label}
-            </Button>
-          );
-        })}
-        <Button
-          key="theme"
-          chromeless
-          flex={1}
-          minHeight={52}
-          paddingHorizontal="$1"
-          gap="$1"
-          color={colors.mutedForeground}
-          icon={mode === 'dark' ? <Sun size={19} color={colors.mutedForeground} /> : <Moon size={19} color={colors.mutedForeground} />}
-          onPress={() => {
-            tapFeedback();
-            toggleTheme();
-          }}
-        />
-      </XStack>
+      <BottomNav
+        tabs={BOTTOM_TABS}
+        activeKey={activeTab}
+        onChange={(key) => {
+          tapFeedback();
+          setActiveTab(key);
+        }}
+      />
 
-      {/* Mobile Menu Overlay */}
-      {mobileNav && user && (
-        <>
-          <XStack
-            position="absolute"
-            top={0}
-            left={0}
-            right={0}
-            bottom={0}
-            backgroundColor="rgba(0,0,0,0.5)"
-            zIndex={50}
-            onPress={() => setMobileNav(false)}
-          />
-          <YStack
-            position="absolute"
-            top={0}
-            left={0}
-            bottom={0}
-            width={280}
-            backgroundColor={colors.card}
-            borderRightWidth={1}
-            borderColor={colors.border}
-            paddingTop={insets.top + 16}
-            paddingHorizontal="$4"
-            paddingBottom={insets.bottom + 16}
-            zIndex={60}
-            gap="$4"
-          >
-            <XStack justifyContent="space-between" alignItems="center">
-              <H2 color={colors.foreground} fontWeight="800">Menu</H2>
-              <Button circular size="$3" backgroundColor={colors.secondary} onPress={() => setMobileNav(false)}>
-                <X size={18} color={colors.foreground} />
-              </Button>
-            </XStack>
-            
-            <YStack gap="$2">
-              {BOTTOM_TABS.map(({ label, icon: Icon }) => (
-                <Button
-                  key={label}
-                  chromeless
-                  height={48}
-                  paddingHorizontal="$3"
-                  justifyContent="flex-start"
-                  gap="$3"
-                  color={activeTab === label ? colors.primary : colors.foreground}
-                  backgroundColor={activeTab === label ? colors.primary + '15' : 'transparent'}
-                  icon={<Icon size={20} color={activeTab === label ? colors.primary : colors.foreground} />}
-                  onPress={() => {
-                    tapFeedback();
-                    setActiveTab(label);
-                    setMobileNav(false);
-                  }}
-                >
-                  <SizableText size="$3" fontWeight="600">{label}</SizableText>
-                </Button>
-              ))}
-              {DRAWER_TABS.map(({ label, icon: Icon }) => (
-                <Button
-                  key={label}
-                  chromeless
-                  height={48}
-                  paddingHorizontal="$3"
-                  justifyContent="flex-start"
-                  gap="$3"
-                  color={activeTab === label ? colors.primary : colors.foreground}
-                  backgroundColor={activeTab === label ? colors.primary + '15' : 'transparent'}
-                  icon={<Icon size={20} color={activeTab === label ? colors.primary : colors.foreground} />}
-                  onPress={() => {
-                    tapFeedback();
-                    setActiveTab(label);
-                    setMobileNav(false);
-                  }}
-                >
-                  <SizableText size="$3" fontWeight="600">{label}</SizableText>
-                </Button>
-              ))}
-            </YStack>
-
-            <YStack position="absolute" bottom={0} left={0} right={0} paddingHorizontal="$4" paddingBottom={insets.bottom + 8}>
-              <Card backgroundColor={colors.secondary} borderRadius="$4" padding="$4" gap="$2">
-                <XStack gap="$3" alignItems="center">
-                  <YStack
-                    width={40}
-                    height={40}
-                    borderRadius="$3"
-                    backgroundColor={colors.primary}
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    <SizableText color={colors.primaryForeground} size="$3" fontWeight="800">
-                      {user.first_name?.[0]}{user.last_name?.[0]}
-                    </SizableText>
-                  </YStack>
-                  <YStack flex={1}>
-                    <SizableText color={colors.foreground} fontWeight="700" size="$3">
-                      {user.first_name} {user.last_name}
-                    </SizableText>
-                    <SizableText color={colors.mutedForeground} size="$2">{user.email}</SizableText>
-                  </YStack>
-                </XStack>
-              </Card>
-            </YStack>
-          </YStack>
-        </>
-      )}
+      <Drawer
+        visible={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        tabs={ALL_TABS}
+        activeKey={activeTab}
+        onSelect={(key) => setActiveTab(key)}
+        user={user}
+        onLogout={handleLogout}
+        onToggleTheme={toggleTheme}
+        isDark={isDark}
+      />
     </YStack>
   );
 }

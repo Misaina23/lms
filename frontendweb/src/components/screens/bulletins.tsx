@@ -13,23 +13,16 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react'
-import type { Etudiant, User, Note, Matiere, ExamPeriod } from '@/lib/api'
+import type { Etudiant, Note, Matiere, ExamPeriod } from '@/lib/api'
 
-export function BulletinsScreen({ etudiants = [], users = [], notes = [], matieres = [], periods = [] }: {
+export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], periods = [] }: {
   etudiants: Etudiant[]
-  users: User[]
   notes: Note[]
   matieres: Matiere[]
   periods: ExamPeriod[]
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-
-  const userMap = useMemo(() => {
-    const map: Record<number, User> = {}
-    users.forEach(u => { map[u.id] = u })
-    return map
-  }, [users])
 
   const matiereMap = useMemo(() => {
     const map: Record<number, Matiere> = {}
@@ -46,16 +39,14 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
   const filteredEtudiants = useMemo(() => {
     return etudiants.filter(etudiant => {
       if (!searchQuery) return true
-      const user = userMap[etudiant.user]
-      if (!user) return false
       const q = searchQuery.toLowerCase()
       return (
-        user.first_name?.toLowerCase().includes(q) ||
-        user.last_name?.toLowerCase().includes(q) ||
-        user.matricule?.toLowerCase().includes(q)
+        etudiant.first_name?.toLowerCase().includes(q) ||
+        etudiant.last_name?.toLowerCase().includes(q) ||
+        etudiant.matricule?.toLowerCase().includes(q)
       )
     })
-  }, [etudiants, users, searchQuery])
+  }, [etudiants, searchQuery])
 
   const studentNotes = useMemo(() => {
     if (!selectedStudentId) return []
@@ -65,8 +56,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
   const bulletinData = useMemo(() => {
     if (!selectedStudentId) return null
     const etudiant = etudiants.find(e => e.id === selectedStudentId)
-    const user = userMap[etudiant?.user || 0]
-    if (!etudiant || !user) return null
+    if (!etudiant) return null
 
     const studentNotes = notes.filter(n => n.etudiant === selectedStudentId)
     const byMatiere: Record<number, Note[]> = {}
@@ -92,13 +82,13 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
       : 0
 
     return {
-      student: user,
+      student: etudiant,
       classe: etudiant.classe,
       rows,
       generalAverage,
       totalCoefficient: rows.reduce((sum, r) => sum + parseFloat(r.coefficient), 0),
     }
-  }, [selectedStudentId, etudiants, users, notes, matieres])
+  }, [selectedStudentId, etudiants, notes, matieres])
 
   const handleGeneratePDF = () => {
     if (!bulletinData) return
@@ -135,8 +125,7 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filteredEtudiants.map(etudiant => {
-                const user = userMap[etudiant.user]
-                if (!user) return null
+                if (!etudiant.first_name) return null
                 return (
                   <button
                     key={etudiant.id}
@@ -144,11 +133,11 @@ export function BulletinsScreen({ etudiants = [], users = [], notes = [], matier
                     className="flex items-center gap-3 rounded-lg border border-border/70 p-4 text-left transition-colors hover:bg-muted/40"
                   >
                     <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                      {user.first_name?.[0]}{user.last_name?.[0]}
+                      {etudiant.first_name?.[0]}{etudiant.last_name?.[0]}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{user.first_name} {user.last_name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{user.matricule}</p>
+                      <p className="truncate font-medium">{etudiant.first_name} {etudiant.last_name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{etudiant.matricule}</p>
                     </div>
                     <FileText className="size-4 text-muted-foreground" />
                   </button>

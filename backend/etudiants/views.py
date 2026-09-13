@@ -132,7 +132,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
 
 class StudentOrientationViewSet(viewsets.ModelViewSet):
-    queryset = StudentOrientation.objects.select_related('student__user').all()
+    queryset = StudentOrientation.objects.select_related('student__classe').all()
     serializer_class = StudentOrientationSerializer
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]

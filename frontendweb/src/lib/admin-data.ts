@@ -101,21 +101,18 @@ export function useAdminData() {
   return { data, isLoading, error, reload, setData }
 }
 
-export function useFilteredStudents(etudiants: Etudiant[], users: User[], query: string) {
+export function useFilteredStudents(etudiants: Etudiant[], query: string) {
   return useMemo(
     () =>
       etudiants.filter((etudiant) => {
-        const user = users.find((u) => u.id === etudiant.user)
-        if (!user) return false
         const q = query.toLowerCase()
         return (
-          user.first_name?.toLowerCase().includes(q) ||
-          user.last_name?.toLowerCase().includes(q) ||
-          user.matricule?.toLowerCase().includes(q) ||
-          user.email?.toLowerCase().includes(q)
+          etudiant.first_name?.toLowerCase().includes(q) ||
+          etudiant.last_name?.toLowerCase().includes(q) ||
+          etudiant.matricule?.toLowerCase().includes(q)
         )
       }),
-    [etudiants, users, query]
+    [etudiants, query]
   )
 }
 

@@ -5,11 +5,10 @@ import { Search, CheckCircle2, UserPlus, Upload, X, UsersRound } from 'lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import type { User, Etudiant, Classe } from '@/lib/api'
+import type { Etudiant, Classe } from '@/lib/api'
 import { useFilteredStudents, initials, formatCurrency } from '@/lib/admin-data'
 
-export function StudentsScreen({ users, etudiants, classes, onReload }: {
-  users: User[]
+export function StudentsScreen({ etudiants, classes, onReload }: {
   etudiants: Etudiant[]
   classes: Classe[]
   onReload: () => void
@@ -18,7 +17,7 @@ export function StudentsScreen({ users, etudiants, classes, onReload }: {
   const [page, setPage] = useState(0)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const filtered = useFilteredStudents(etudiants, users, query)
+  const filtered = useFilteredStudents(etudiants, query)
   const pageSize = 5
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
@@ -146,18 +145,17 @@ export function StudentsScreen({ users, etudiants, classes, onReload }: {
               </thead>
               <tbody>
                 {pageItems.map((etudiant) => {
-                  const user = users.find((u) => u.id === etudiant.user)
                   const classe = classes.find((c) => c.id === etudiant.classe)
                   return (
                     <tr key={etudiant.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/25">
                       <td className="px-3 py-3 sm:px-6 sm:py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                            {user ? initials(`${user.first_name} ${user.last_name}`) : '?'}
+                            {initials(`${etudiant.first_name} ${etudiant.last_name}`)}
                           </div>
                           <div>
-                            <p className="font-semibold">{user ? `${user.first_name} ${user.last_name}` : '—'}</p>
-                            <p className="text-xs text-muted-foreground">{user?.matricule || '—'}</p>
+                            <p className="font-semibold">{etudiant.first_name} {etudiant.last_name}</p>
+                            <p className="text-xs text-muted-foreground">{etudiant.matricule}</p>
                           </div>
                         </div>
                       </td>

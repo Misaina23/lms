@@ -4,13 +4,12 @@ import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Search, UsersRound } from 'lucide-react'
-import type { Etudiant, Enrollment, User, Classe } from '@/lib/api'
+import type { Etudiant, Enrollment, Classe } from '@/lib/api'
 import { initials, formatCurrency } from '@/lib/admin-data'
 
-export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
+export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
   enrollments: Enrollment[]
   etudiants: Etudiant[]
-  users: User[]
   classes: Classe[]
 }) {
   const [filter, setFilter] = useState<'ALL' | 'PAID' | 'PARTIAL' | 'UNPAID'>('ALL')
@@ -88,7 +87,6 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
               <tbody>
                 {pageItems.map((en) => {
                   const etudiant = etudiants.find((e) => e.id === en.student)
-                  const user = etudiant && users.find((u) => u.id === etudiant.user)
                   const classe = classes.find((c) => c.id === en.classe)
                   const reste = en.reste_a_payer ?? (Number(en.frais_total || 0) - Number(en.frais_verses || 0))
                   return (
@@ -96,11 +94,11 @@ export function EnrollmentsScreen({ enrollments, etudiants, users, classes }: {
                       <td className="px-3 py-3 sm:px-6 sm:py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                            {user ? initials(`${user.first_name} ${user.last_name}`) : '?'}
+                            {etudiant ? initials(`${etudiant.first_name} ${etudiant.last_name}`) : '?'}
                           </div>
                           <div>
-                            <p className="font-semibold">{user ? `${user.first_name} ${user.last_name}` : '—'}</p>
-                            <p className="text-xs text-muted-foreground">{user?.matricule || '—'}</p>
+                            <p className="font-semibold">{etudiant ? `${etudiant.first_name} ${etudiant.last_name}` : '—'}</p>
+                            <p className="text-xs text-muted-foreground">{etudiant?.matricule || '—'}</p>
                           </div>
                         </div>
                       </td>

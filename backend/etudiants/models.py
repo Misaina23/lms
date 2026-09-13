@@ -2,6 +2,8 @@ from django.db import models
 from users.models import CustomUser
 from classes.models import Classe
 import uuid
+# Note: CustomUser reste utilisé pour AuditLog.actor, StudentOrientation.decided_by, Notification.recipient
+# Les Etudiants NE sont PAS des utilisateurs (pas de compte) - ils sont gérés par admin web et consultés par profs via mobile
 
 
 class Etudiant(models.Model):
@@ -11,12 +13,22 @@ class Etudiant(models.Model):
         SUSPENDED = 'SUSPENDED', 'Suspendu'
         GRADUATED = 'GRADUATED', 'Diplômé'
 
-    user = models.OneToOneField(
-        CustomUser,
-        on_delete=models.CASCADE,
-        limit_choices_to={'role': CustomUser.Role.ELEVE},
-    )
-    classe = models.ForeignKey(Classe, on_delete=models.SET_NULL, null=True)
+    class Gender(models.TextChoices):
+        M = 'M', 'Masculin'
+        F = 'F', 'Féminin'
+
+    # Champs propres à l'élève (pas de User associé)
+    matricule = models.CharField(max_length=50, unique=True)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=1, choices=Gender.choices, null=True, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    email_parent = models.EmailField(blank=True, help_text="Email du parent/tuteur")
+    phone_parent = models.CharField(max_length=20, blank=True, help_text="Téléphone du parent/tuteur")
+    address = models.TextField(blank=True)
+
+    classe = models.ForeignKey(Classe, on_delete=models.SET_NULL, null=True, related_name='etudiants')
     date_inscription = models.DateField()
     statut = models.CharField(
         max_length=20,
@@ -28,10 +40,13 @@ class Etudiant(models.Model):
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
     def __str__(self):
-        return self.user.get_full_name()
+        return f"{self.last_name} {self.first_name}"
+
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}"
 
     class Meta:
-        ordering = ['user__last_name', 'user__first_name']
+        ordering = ['last_name', 'first_name']
 
 
 class Enrollment(models.Model):

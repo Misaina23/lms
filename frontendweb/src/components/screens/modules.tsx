@@ -567,12 +567,11 @@ export function GradesScreen({ notes, users, etudiants, matieres, periods }: {
               <tbody>
                 {notes.slice(0, 30).map((n) => {
                   const et = etudiants.find((e) => e.id === n.etudiant)
-                  const user = et && users.find((u) => u.id === et.user)
                   const mat = matieres.find((m) => m.id === n.matiere)
                   const per = periods.find((p) => p.id === n.exam_period)
                   return (
                     <tr key={n.id} className="border-b border-border/60 hover:bg-muted/25">
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">{user ? `${user.first_name} ${user.last_name}` : '—'}</td>
+                      <td className="px-3 py-3 sm:px-6 sm:py-4">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
                       <td className="px-3 py-3 sm:px-4 sm:py-4">{mat?.code || '—'}</td>
                       <td className="px-3 py-3 sm:px-4 sm:py-4">{per?.label || '—'}</td>
                       <td className="px-3 py-3 sm:px-4 sm:py-4 font-semibold">{n.note}/20</td>
@@ -616,11 +615,10 @@ export function AttendanceScreen({ absences, users, etudiants }: { absences: any
               <tbody>
                 {absences.slice(0, 30).map((a) => {
                   const et = etudiants.find((e) => e.id === a.etudiant)
-                  const user = et && users.find((u) => u.id === et.user)
                   return (
                     <tr key={a.id} className="border-b border-border/60 hover:bg-muted/25">
                       <td className="px-6 py-3">{a.date_absence}</td>
-                      <td className="px-4 py-3">{user ? `${user.first_name} ${user.last_name}` : '—'}</td>
+                      <td className="px-4 py-3">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${a.statut === 'PRESENT' ? 'bg-emerald-500/10 text-emerald-700' : a.statut === 'LATE' ? 'bg-amber-500/10 text-amber-700' : 'bg-rose-500/10 text-rose-700'}`}>
                           {a.statut}

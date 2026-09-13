@@ -30,17 +30,10 @@ class AbsenceViewSetTests(APITestCase):
             role=CustomUser.Role.PROFESSEUR,
         )
         cls.classe = Classe.objects.create(nom='6eme A', niveau=Classe.Niveau.SECONDAIRE_GENERAL, capacite=40)
-        cls.eleve_user = CustomUser.objects.create_user(
-            username='eleve',
-            email='eleve@lycee.com',
-            password='elevepass',
+        cls.etudiant = Etudiant.objects.create(
+            matricule='ELV001',
             first_name='Marie',
             last_name='Durand',
-            matricule='ELV001',
-            role=CustomUser.Role.ELEVE,
-        )
-        cls.etudiant = Etudiant.objects.create(
-            user=cls.eleve_user,
             classe=cls.classe,
             date_inscription='2024-09-01',
             actif=True,

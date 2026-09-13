@@ -111,8 +111,23 @@ export type ExamPeriod = {
 
 export type Etudiant = {
   id: number;
-  user: number;
+  matricule: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
   classe: number | null;
+  classe_detail: {
+    id: number;
+    nom: string;
+    niveau: string;
+    stream: string;
+  } | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  phone: string;
+  email_parent: string;
+  phone_parent: string;
+  address: string;
   date_inscription: string;
   statut: string;
   actif: boolean;

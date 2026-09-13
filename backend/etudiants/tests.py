@@ -19,22 +19,15 @@ class EtudiantViewSetTests(APITestCase):
             role=CustomUser.Role.ADMIN,
         )
         Token.objects.create(user=cls.admin_user)
-        cls.eleve_user = CustomUser.objects.create_user(
-            username='eleve',
-            email='eleve@lycee.com',
-            password='elevepass',
-            first_name='Marie',
-            last_name='Dupont',
-            matricule='ELV001',
-            role=CustomUser.Role.ELEVE,
-        )
         cls.classe = Classe.objects.create(
             nom='6eme A',
             niveau=Classe.Niveau.SECONDAIRE_GENERAL,
             capacite=40,
         )
         cls.etudiant = Etudiant.objects.create(
-            user=cls.eleve_user,
+            matricule='ELV001',
+            first_name='Marie',
+            last_name='Dupont',
             classe=cls.classe,
             date_inscription='2024-09-01',
             actif=True,
@@ -51,17 +44,10 @@ class EtudiantViewSetTests(APITestCase):
 
     def test_create_etudiant(self):
         url = reverse('etudiant-list')
-        eleve_user = CustomUser.objects.create_user(
-            username='eleve2',
-            email='eleve2@lycee.com',
-            password='pass',
-            first_name='Pierre',
-            last_name='Martin',
-            matricule='ELV002',
-            role=CustomUser.Role.ELEVE,
-        )
         data = {
-            'user': eleve_user.id,
+            'matricule': 'ELV002',
+            'first_name': 'Pierre',
+            'last_name': 'Martin',
             'classe': self.classe.id,
             'date_inscription': '2024-09-01',
             'actif': True,
