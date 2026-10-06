@@ -192,7 +192,7 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="mobile-card-table w-full min-w-[900px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 font-semibold">Jour</th>
@@ -210,24 +210,24 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
                   const isConflict = conflictIds.has(slot.id)
                   return (
                     <tr key={slot.id} className={`border-b border-border/60 hover:bg-muted/25 ${isConflict ? 'bg-rose-500/5' : ''}`}>
-                      <td className="px-3 py-3 sm:px-6 font-semibold">{DAY_NAMES[slot.day_of_week]}</td>
-                      <td className="px-3 py-3 sm:px-4">{classeMap[slot.classe]?.nom || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4">
+                      <td data-label="Jour" className="px-3 py-3 sm:px-6 font-semibold">{DAY_NAMES[slot.day_of_week]}</td>
+                      <td data-label="Classe" className="px-3 py-3 sm:px-4">{classeMap[slot.classe]?.nom || '—'}</td>
+                      <td data-label="Matière" className="px-3 py-3 sm:px-4">
                         <div className="flex flex-col">
                           <span className="font-medium">{matiereMap[slot.matiere]?.nom || '—'}</span>
                           <span className="text-[11px] text-muted-foreground">{matiereMap[slot.matiere]?.code}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 sm:px-4">
+                      <td data-label="Professeur" className="px-3 py-3 sm:px-4">
                         {slot.professeur ? `${userMap[slot.professeur]?.first_name || ''} ${userMap[slot.professeur]?.last_name || ''}` : '—'}
                       </td>
-                      <td className="px-3 py-3 sm:px-4">
+                      <td data-label="Horaire" className="px-3 py-3 sm:px-4">
                         <div className="flex items-center gap-1">
                           <Clock className="size-3 text-muted-foreground" />
                           {slot.start_hour}–{slot.end_hour}
                         </div>
                       </td>
-                      <td className="px-3 py-3 sm:px-4">
+                      <td data-label="Salle" className="px-3 py-3 sm:px-4">
                         {slot.room ? (
                           <div className="flex items-center gap-1">
                             <MapPin className="size-3 text-muted-foreground" />
@@ -235,8 +235,8 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
                           </div>
                         ) : '—'}
                       </td>
-                      <td className="px-3 py-3 sm:px-4">{slot.academic_year}</td>
-                      <td className="px-3 py-3 sm:px-6">
+                      <td data-label="Année" className="px-3 py-3 sm:px-4">{slot.academic_year}</td>
+                      <td data-label="Statut" className="px-3 py-3 sm:px-6">
                         {isConflict ? (
                           <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold bg-rose-500/10 text-rose-700">Conflit</span>
                         ) : (

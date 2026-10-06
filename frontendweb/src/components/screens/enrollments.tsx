@@ -22,7 +22,7 @@ export function EnrollmentRegistryScreen({ enrollments, etudiants, classes }: {
         <CardHeader><CardTitle className="text-base">Dossiers élèves</CardTitle></CardHeader>
         <CardContent className="px-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="mobile-card-table w-full min-w-[560px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 sm:px-6 font-semibold">Élève</th>
@@ -37,7 +37,7 @@ export function EnrollmentRegistryScreen({ enrollments, etudiants, classes }: {
                   const classe = classes.find((item) => item.id === enrollment.classe)
                   return (
                     <tr key={enrollment.id} className="border-b border-border/60 last:border-0 hover:bg-muted/25">
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                      <td data-label="Élève" className="px-3 py-3 sm:px-6 sm:py-4">
                         <div className="flex items-center gap-3">
                           <span className="grid size-8 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                             {student ? initials(`${student.first_name} ${student.last_name}`) : '?'}
@@ -48,9 +48,9 @@ export function EnrollmentRegistryScreen({ enrollments, etudiants, classes }: {
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-muted-foreground sm:px-4 sm:py-4">{classe?.nom || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">{enrollment.academic_year}</td>
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                      <td data-label="Classe" className="px-3 py-3 text-muted-foreground sm:px-4 sm:py-4">{classe?.nom || '—'}</td>
+                      <td data-label="Année scolaire" className="px-3 py-3 sm:px-4 sm:py-4">{enrollment.academic_year}</td>
+                      <td data-label="Dossier" className="px-3 py-3 sm:px-6 sm:py-4">
                         <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Inscrit</span>
                       </td>
                     </tr>
@@ -135,7 +135,7 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
         <CardHeader><CardTitle className="text-base">Dossiers d'inscription</CardTitle></CardHeader>
         <CardContent className="px-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="mobile-card-table w-full min-w-[720px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 sm:px-6 font-semibold">Élève</th>
@@ -155,7 +155,7 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
                   const reste = en.reste_a_payer ?? (Number(en.frais_total || 0) - Number(en.frais_verses || 0))
                   return (
                     <tr key={en.id} className="border-b border-border/60 hover:bg-muted/25">
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                      <td data-label="Élève" className="px-3 py-3 sm:px-6 sm:py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                             {etudiant ? initials(`${etudiant.first_name} ${etudiant.last_name}`) : '?'}
@@ -166,17 +166,17 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4 text-muted-foreground">{classe?.nom || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">{en.academic_year}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">
+                      <td data-label="Classe" className="px-3 py-3 sm:px-4 sm:py-4 text-muted-foreground">{classe?.nom || '—'}</td>
+                      <td data-label="Année" className="px-3 py-3 sm:px-4 sm:py-4">{en.academic_year}</td>
+                      <td data-label="Statut" className="px-3 py-3 sm:px-4 sm:py-4">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusBadge(en.payment_status)}`}>
                           {en.payment_status}
                         </span>
                       </td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4 hidden md:table-cell font-mono text-xs">{en.receipt_number || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4 text-right">{formatCurrency(en.frais_total, en.devise)}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4 text-right">{formatCurrency(en.frais_verses, en.devise)}</td>
-                      <td className="px-3 py-3 sm:px-6 sm:py-4 text-right font-semibold text-rose-600">{formatCurrency(reste, en.devise)}</td>
+                      <td data-label="Reçu" className="px-3 py-3 sm:px-4 sm:py-4 hidden md:table-cell font-mono text-xs">{en.receipt_number || '—'}</td>
+                      <td data-label="Total" className="px-3 py-3 sm:px-4 sm:py-4 text-right">{formatCurrency(en.frais_total, en.devise)}</td>
+                      <td data-label="Versé" className="px-3 py-3 sm:px-4 sm:py-4 text-right">{formatCurrency(en.frais_verses, en.devise)}</td>
+                      <td data-label="Reste" className="px-3 py-3 sm:px-6 sm:py-4 text-right font-semibold text-rose-600">{formatCurrency(reste, en.devise)}</td>
                     </tr>
                   )
                 })}

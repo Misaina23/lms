@@ -225,7 +225,7 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-left text-sm">
+                <table className="mobile-card-table w-full min-w-[640px] text-left text-sm">
                   <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                     <tr>
                       <th className="px-3 py-3 sm:px-6 font-semibold">Matière</th>
@@ -240,19 +240,19 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
                   <tbody>
                     {bulletinData.rows.map((row, i) => (
                       <tr key={i} className="border-b border-border/60 hover:bg-muted/25">
-                        <td className="px-3 py-3 sm:px-6 font-medium">{row.matiere}</td>
-                        <td className="px-3 py-3 sm:px-4 text-muted-foreground">{row.code}</td>
-                        <td className="px-3 py-3 sm:px-4 text-center">{row.coefficient}</td>
-                        <td className="px-3 py-3 sm:px-4 text-center">
+                        <td data-label="Matière" className="px-3 py-3 sm:px-6 font-medium">{row.matiere}</td>
+                        <td data-label="Code" className="px-3 py-3 sm:px-4 text-muted-foreground">{row.code}</td>
+                        <td data-label="Coefficient" className="px-3 py-3 sm:px-4 text-center">{row.coefficient}</td>
+                        <td data-label="Note 1" className="px-3 py-3 sm:px-4 text-center">
                           {row.notes[0]?.score_1 || '—'}
                         </td>
-                        <td className="px-3 py-3 sm:px-4 text-center">
+                        <td data-label="Note 2" className="px-3 py-3 sm:px-4 text-center">
                           {row.notes[0]?.score_2 || '—'}
                         </td>
-                        <td className="px-3 py-3 sm:px-4 text-center font-semibold">
+                        <td data-label="Moyenne" className="px-3 py-3 sm:px-4 text-center font-semibold">
                           {row.average.toFixed(2)}
                         </td>
-                        <td className="px-3 py-3 sm:px-6 text-center">
+                        <td data-label="Appréciation" className="px-3 py-3 sm:px-6 text-center">
                           {row.average >= 10 ? (
                             <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold bg-emerald-500/10 text-emerald-700">Réussi</span>
                           ) : (

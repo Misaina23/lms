@@ -180,7 +180,7 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
         </CardHeader>
         <CardContent className="px-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="mobile-card-table w-full min-w-[640px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 sm:px-6 font-semibold">Élève</th>
@@ -195,7 +195,7 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
                   const classe = classes.find((c) => c.id === etudiant.classe)
                   return (
                     <tr key={etudiant.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/25">
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                      <td data-label="Élève" className="px-3 py-3 sm:px-6 sm:py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                             {initials(`${etudiant.first_name} ${etudiant.last_name}`)}
@@ -206,16 +206,16 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4 text-muted-foreground">{classe?.nom || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">
+                      <td data-label="Classe" className="px-3 py-3 sm:px-4 sm:py-4 text-muted-foreground">{classe?.nom || '—'}</td>
+                      <td data-label="Statut" className="px-3 py-3 sm:px-4 sm:py-4">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${statutBadge(etudiant.statut)}`}>
                           {etudiant.statut}
                         </span>
                       </td>
-                      {showGrades && <td className="px-3 py-3 sm:px-4 sm:py-4 hidden md:table-cell font-semibold">
+                      {showGrades && <td data-label="Moyenne" className="px-3 py-3 sm:px-4 sm:py-4 hidden md:table-cell font-semibold">
                         {etudiant.moyenne_generale != null ? `${etudiant.moyenne_generale}/20` : '—'}
                       </td>}
-                      <td className="px-3 py-3 sm:px-6 sm:py-4 text-right">
+                      <td data-label="Action" className="px-3 py-3 sm:px-6 sm:py-4 text-right">
                         {canManage && (
                           <Button variant="ghost" size="sm" className="gap-1" onClick={() => setCardStudent(etudiant)}>
                             <IdCard className="size-4" /> Carte

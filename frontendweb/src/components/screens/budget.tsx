@@ -321,7 +321,7 @@ export function BudgetScreen({
           </CardHeader>
           <CardContent className="px-0">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
+              <table className="mobile-card-table w-full min-w-[900px] text-left text-sm">
                 <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   <tr>
                     <th className="px-3 py-3 sm:px-6 font-semibold">Date</th>
@@ -338,34 +338,34 @@ export function BudgetScreen({
                 <tbody>
                   {filteredItems.slice(0, 10).map((item) => (
                     <tr key={item.id} className="border-b border-border/60 hover:bg-muted/25">
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">{item.date}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">
+                      <td data-label="Date" className="px-3 py-3 sm:px-6 sm:py-4">{item.date}</td>
+                      <td data-label="Type" className="px-3 py-3 sm:px-4 sm:py-4">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${item.item_type === 'REVENUE' ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-700'}`}>
                           {item.item_type === 'REVENUE' ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
                           {item.item_type === 'REVENUE' ? 'Recette' : 'Dépense'}
                         </span>
                       </td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">{categories[item.category]?.name || '—'}</td>
+                      <td data-label="Catégorie" className="px-3 py-3 sm:px-4 sm:py-4">{categories[item.category]?.name || '—'}</td>
                       {activeTab === 'tuition' && (
-                        <td className="px-3 py-3 sm:px-4 sm:py-4">
+                        <td data-label="Élève" className="px-3 py-3 sm:px-4 sm:py-4">
                           {item.related_enrollment_detail?.student || '—'}
                         </td>
                       )}
                       {activeTab === 'salaries' && (
-                        <td className="px-3 py-3 sm:px-4 sm:py-4">
+                        <td data-label="Enseignant" className="px-3 py-3 sm:px-4 sm:py-4">
                           {item.related_teacher_assignment_detail?.teacher || '—'}
                         </td>
                       )}
                       {activeTab === 'donations' && (
-                        <td className="px-3 py-3 sm:px-4 sm:py-4">
+                        <td data-label="Désignation" className="px-3 py-3 sm:px-4 sm:py-4">
                           {item.designation || '—'}
                         </td>
                       )}
-                      <td className="px-3 py-3 sm:px-4 sm:py-4 max-w-[200px] truncate" title={item.description}>{item.description}</td>
-                      <td className={`px-3 py-3 sm:px-6 sm:py-4 text-right font-semibold ${item.item_type === 'REVENUE' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      <td data-label="Description" className="px-3 py-3 sm:px-4 sm:py-4 max-w-[200px] truncate" title={item.description}>{item.description}</td>
+                      <td data-label="Montant" className={`px-3 py-3 sm:px-6 sm:py-4 text-right font-semibold ${item.item_type === 'REVENUE' ? 'text-emerald-700' : 'text-rose-700'}`}>
                         {item.item_type === 'REVENUE' ? '+' : '-'}{formatCurrency(item.amount)}
                       </td>
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                      <td data-label="Validation" className="px-3 py-3 sm:px-6 sm:py-4">
                         <span className={`text-[11px] font-semibold ${item.is_validated ? 'text-emerald-600' : 'text-amber-600'}`}>
                           {item.is_validated ? 'Validé' : 'En attente'}
                         </span>

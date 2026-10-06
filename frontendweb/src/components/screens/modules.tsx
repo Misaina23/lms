@@ -607,7 +607,7 @@ export function GradesScreen({ notes, users, etudiants, matieres, periods, role,
         {actionError && <p className="mx-6 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{actionError}</p>}
         <CardContent className="px-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="mobile-card-table w-full min-w-[640px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 sm:px-6 font-semibold">Élève</th>
@@ -625,12 +625,12 @@ export function GradesScreen({ notes, users, etudiants, matieres, periods, role,
                   const per = periods.find((p) => p.id === n.exam_period)
                   return (
                     <tr key={n.id} className="border-b border-border/60 hover:bg-muted/25">
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">{mat?.code || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">{per?.label || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4 font-semibold">{n.note}/20</td>
-                      <td className="px-3 py-3 sm:px-4 sm:py-4">{n.coefficient}</td>
-                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                      <td data-label="Élève" className="px-3 py-3 sm:px-6 sm:py-4">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
+                      <td data-label="Matière" className="px-3 py-3 sm:px-4 sm:py-4">{mat?.code || '—'}</td>
+                      <td data-label="Période" className="px-3 py-3 sm:px-4 sm:py-4">{per?.label || '—'}</td>
+                      <td data-label="Note" className="px-3 py-3 sm:px-4 sm:py-4 font-semibold">{n.note}/20</td>
+                      <td data-label="Coefficient" className="px-3 py-3 sm:px-4 sm:py-4">{n.coefficient}</td>
+                      <td data-label="Statut et actions" className="px-3 py-3 sm:px-6 sm:py-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${n.status === 'APPROVED' || n.status === 'LOCKED' ? 'bg-emerald-500/10 text-emerald-700' : n.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-700' : 'bg-amber-500/10 text-amber-700'}`}>{n.status}</span>
                           {role === 'PROFESSEUR' && (n.status === 'DRAFT' || n.status === 'REJECTED') && (
@@ -901,7 +901,7 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
         <CardHeader><CardTitle className="text-base">Pointages récents</CardTitle></CardHeader>
         <CardContent className="px-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="mobile-card-table w-full min-w-[640px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr><th className="px-6 py-3 font-semibold">Date</th><th className="px-4 py-3 font-semibold">Élève</th><th className="px-4 py-3 font-semibold">Statut</th><th className="px-4 py-3 font-semibold">Créneau</th><th className="px-6 py-3 font-semibold">Source</th></tr>
               </thead>
@@ -910,15 +910,15 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
                   const et = etudiants.find((e) => e.id === a.etudiant)
                   return (
                     <tr key={a.id} className="border-b border-border/60 hover:bg-muted/25">
-                      <td className="px-6 py-3">{a.date_absence}</td>
-                      <td className="px-4 py-3">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
-                      <td className="px-4 py-3">
+                      <td data-label="Date" className="px-6 py-3">{a.date_absence}</td>
+                      <td data-label="Élève" className="px-4 py-3">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
+                      <td data-label="Statut" className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${a.statut === 'PRESENT' ? 'bg-emerald-500/10 text-emerald-700' : a.statut === 'LATE' ? 'bg-amber-500/10 text-amber-700' : 'bg-rose-500/10 text-rose-700'}`}>
                           {a.statut}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{a.heure_debut}–{a.heure_fin}</td>
-                      <td className="px-6 py-3 text-xs text-muted-foreground">{a.sync_source}</td>
+                      <td data-label="Créneau" className="px-4 py-3 text-xs text-muted-foreground">{a.heure_debut}–{a.heure_fin}</td>
+                      <td data-label="Source" className="px-6 py-3 text-xs text-muted-foreground">{a.sync_source}</td>
                     </tr>
                   )
                 })}

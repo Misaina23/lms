@@ -257,8 +257,102 @@ tbody tr {
   transition: background-color 140ms ease;
 }
 
+@media screen and (max-width: 639px) {
+  .overflow-x-auto:has(> .mobile-card-table) {
+    overflow: visible;
+  }
+
+  .mobile-card-table {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .mobile-card-table thead {
+    display: none;
+  }
+
+  .mobile-card-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobile-card-table tbody tr {
+    display: block;
+    overflow: hidden;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mobile-card-table tbody tr:has(td[colspan]) {
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .mobile-card-table td:not([colspan]) {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, .75fr) minmax(0, 1.25fr);
+    align-items: start;
+    gap: 12px;
+    min-width: 0;
+    padding: 9px 0 !important;
+    border-bottom: 1px solid var(--border);
+    text-align: left !important;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-card-table td:not([colspan])::before {
+    content: attr(data-label);
+    color: var(--muted-foreground);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .mobile-card-table td:not([colspan]):last-child {
+    border-bottom: 0;
+  }
+
+  .mobile-card-table td.hidden {
+    display: none !important;
+  }
+
+  .mobile-card-table td[colspan] {
+    display: block;
+    padding: 18px 12px !important;
+    text-align: center !important;
+  }
+
+  .mobile-card-table td[colspan]::before {
+    content: none;
+  }
+
+  .mobile-card-table td > div {
+    min-width: 0;
+  }
+}
+
 footer {
   color: var(--muted-foreground);
+}
+
+@media screen and (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  main section > header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .mobile-tab-bar {
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
 }
 
 ::-webkit-scrollbar {

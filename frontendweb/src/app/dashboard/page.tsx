@@ -220,7 +220,7 @@ export default function Home() {
           {mobileNav && <button className="fixed inset-0 z-30 bg-foreground/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileNav(false)} aria-label="Fermer la navigation" />}
 
           <section className="min-w-0 flex-1">
-            <header className="flex h-[82px] items-center justify-between border-b border-border/70 bg-background/90 px-5 backdrop-blur-md sm:px-8">
+            <header className="flex h-[68px] items-center justify-between border-b border-border/70 bg-background/90 px-3 backdrop-blur-md sm:h-[82px] sm:px-8">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileNav(true)} aria-label="Ouvrir le menu"><Menu className="size-5" /></Button>
                 <div className="min-w-0">
@@ -244,11 +244,34 @@ export default function Home() {
               </div>
             </header>
 
-            <div className="mx-auto max-w-[1500px] p-5 sm:p-8">
+            <div className="mx-auto max-w-[1500px] px-3 pb-24 pt-4 sm:p-8">
               {renderScreen()}
             </div>
           </section>
         </div>
+        <nav className="mobile-tab-bar fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border/80 bg-card/95 px-2 pt-2 shadow-[0_-8px_24px_-18px_rgba(10,30,44,.28)] backdrop-blur-xl lg:hidden" aria-label="Navigation rapide">
+          {visibleNavigation.slice(0, 4).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              type="button"
+              aria-current={active === key ? 'page' : undefined}
+              onClick={() => { setActive(key); setMobileNav(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition-colors ${active === key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+            >
+              <Icon className="size-[18px]" />
+              <span className="max-w-full truncate">{label}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-expanded={mobileNav}
+            onClick={() => setMobileNav((open) => !open)}
+            className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition-colors ${mobileNav ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+          >
+            <Menu className="size-[18px]" />
+            <span>Menu</span>
+          </button>
+        </nav>
       </main>
       <footer className="border-t border-border/70 bg-background/90 px-5 py-4 sm:px-8">
         <div className="mx-auto max-w-[1500px] text-center">

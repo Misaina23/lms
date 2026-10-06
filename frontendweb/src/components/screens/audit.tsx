@@ -103,7 +103,7 @@ export function AuditScreen({ logs = [] }: { logs: AuditLog[] }) {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-left text-sm">
+            <table className="mobile-card-table w-full min-w-[800px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
                   <th className="px-3 py-3 sm:px-6 font-semibold">Date</th>
@@ -121,26 +121,26 @@ export function AuditScreen({ logs = [] }: { logs: AuditLog[] }) {
                   const actor = typeof log.actor === 'object' ? log.actor as any : null
                   return (
                     <tr key={i} className="border-b border-border/60 hover:bg-muted/25">
-                      <td className="px-3 py-3 sm:px-6 whitespace-nowrap">
+                      <td data-label="Date" className="px-3 py-3 sm:px-6 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Clock className="size-3 text-muted-foreground" />
                           {log.created_at ? new Date(log.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
                         </div>
                       </td>
-                      <td className="px-3 py-3 sm:px-4">
+                      <td data-label="Action" className="px-3 py-3 sm:px-4">
                         <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${actionConfig.color}`}>
                           {actionConfig.label}
                         </span>
                       </td>
-                      <td className="px-3 py-3 sm:px-4 font-medium">{log.entity_type || '—'}</td>
-                      <td className="px-3 py-3 sm:px-4 font-mono text-xs text-muted-foreground">{log.entity_id}</td>
-                      <td className="px-3 py-3 sm:px-4 max-w-[150px] truncate text-xs text-muted-foreground" title={JSON.stringify(log.old_value)}>
+                      <td data-label="Entité" className="px-3 py-3 sm:px-4 font-medium">{log.entity_type || '—'}</td>
+                      <td data-label="ID" className="px-3 py-3 sm:px-4 font-mono text-xs text-muted-foreground">{log.entity_id}</td>
+                      <td data-label="Ancienne valeur" className="px-3 py-3 sm:px-4 max-w-[150px] truncate text-xs text-muted-foreground" title={JSON.stringify(log.old_value)}>
                         {typeof log.old_value === 'string' ? log.old_value : JSON.stringify(log.old_value)}
                       </td>
-                      <td className="px-3 py-3 sm:px-4 max-w-[150px] truncate text-xs" title={JSON.stringify(log.new_value)}>
+                      <td data-label="Nouvelle valeur" className="px-3 py-3 sm:px-4 max-w-[150px] truncate text-xs" title={JSON.stringify(log.new_value)}>
                         {typeof log.new_value === 'string' ? log.new_value : JSON.stringify(log.new_value)}
                       </td>
-                      <td className="px-3 py-3 sm:px-4">
+                      <td data-label="Acteur" className="px-3 py-3 sm:px-4">
                         {actor ? `${actor.first_name || ''} ${actor.last_name || ''}`.trim() || actor.matricule || '—' : '—'}
                       </td>
                     </tr>
