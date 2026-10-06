@@ -22,3 +22,5 @@ services:
         value: "5432"
       - key: ALLOWED_HOSTS
         value: .onrender.com
+      - key: FRONTEND_URL
+        value: https://lyceemidongysud.vercel.app

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,8 +13,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('passwordReset') === 'success') {
+      setMessage('Votre mot de passe a été modifié. Vous pouvez vous connecter.')
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,7 +72,12 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">Mot de passe</label>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="password" className="text-sm font-medium">Mot de passe</label>
+                <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline sm:text-sm">
+                  Mot de passe oublié ?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -74,11 +87,15 @@ export default function LoginPage() {
                 required
               />
             </div>
+            {message && <p role="status" className="text-sm text-primary">{message}</p>}
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Connexion...' : 'Se connecter'}
             </Button>
           </form>
+          <Link href="/" className="mt-5 flex min-h-11 items-center justify-center rounded-full border border-border text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            Retour à l’accueil
+          </Link>
         </CardContent>
       </Card>
     </div>

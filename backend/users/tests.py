@@ -1,3 +1,7 @@
+from django.contrib.auth import authenticate
+from django.core.cache import cache
+from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
@@ -106,3 +110,86 @@ class CustomUserViewSetTests(APITestCase):
         self.client.credentials()
         response = self.client.get(reverse('user-list'))
         self.assertEqual(response.status_code, 401)
+
+
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    FRONTEND_URL='http://localhost:3000',
+    DEFAULT_FROM_EMAIL='Lycée Midongy Sud <noreply@example.com>',
+    REST_FRAMEWORK={'DEFAULT_THROTTLE_RATES': {'password_reset': '100/hour'}},
+)
+class PasswordResetAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = CustomUser.objects.create_user(
+            username='reset-user',
+            email='reset@example.com',
+            password='OriginalPassw0rd!',
+            first_name='Reset',
+            last_name='User',
+            matricule='RESET001',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+
+    def setUp(self):
+        cache.clear()
+
+    def test_reset_request_sends_link_to_frontend(self):
+        response = self.client.post(reverse('password-reset'), {'email': self.user.email})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('/reset-password?uid=', mail.outbox[0].body)
+        self.assertIn('token=', mail.outbox[0].body)
+
+    def test_reset_request_does_not_disclose_unknown_email(self):
+        known = self.client.post(reverse('password-reset'), {'email': self.user.email})
+        unknown = self.client.post(reverse('password-reset'), {'email': 'unknown@example.com'})
+
+        self.assertEqual(known.status_code, unknown.status_code)
+        self.assertEqual(known.data, unknown.data)
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend',
+        EMAIL_HOST='',
+    )
+    def test_reset_request_reports_missing_production_mail_configuration(self):
+        response = self.client.post(reverse('password-reset'), {'email': self.user.email})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn('n’est pas encore configurée', response.data['detail'])
+
+    def test_reset_confirmation_changes_password_and_invalidates_token(self):
+        self.client.post(reverse('password-reset'), {'email': self.user.email})
+        reset_link = next(
+            line for line in mail.outbox[0].body.splitlines()
+            if '/reset-password?' in line
+        )
+        query = reset_link.split('?', 1)[1]
+        uid, token = [part.split('=', 1)[1] for part in query.split('&')]
+        payload = {'uid': uid, 'token': token, 'password': 'NewStrongPassw0rd!'}
+
+        response = self.client.post(reverse('password-reset-confirm'), payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(authenticate(username=self.user.email, password=payload['password']))
+        self.assertEqual(self.client.post(reverse('password-reset-confirm'), payload).status_code, 400)
+
+    def test_reset_confirmation_rejects_weak_password(self):
+        self.client.post(reverse('password-reset'), {'email': self.user.email})
+        reset_link = next(
+            line for line in mail.outbox[0].body.splitlines()
+            if '/reset-password?' in line
+        )
+        query = reset_link.split('?', 1)[1]
+        uid, token = [part.split('=', 1)[1] for part in query.split('&')]
+
+        response = self.client.post(reverse('password-reset-confirm'), {
+            'uid': uid,
+            'token': token,
+            'password': '123456',
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('mot de passe', response.data['detail'].lower())

@@ -1,3 +1,8 @@
+from datetime import date
+from io import StringIO
+
+from django.core.management import call_command, CommandError
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
@@ -7,6 +12,30 @@ from classes.models import TeacherAssignment
 from matieres.models import Matiere
 from budget.models import BudgetItem
 from .models import Etudiant, Enrollment, Notification, StudentOfficePass
+
+
+class DemoPortalSeedCommandTests(TestCase):
+    @override_settings(DEBUG=True)
+    def test_demo_command_seeds_requested_users_classes_and_five_students_per_class_idempotently(self):
+        call_command('seed_demo_portal', allow_insecure_passwords=True, stdout=StringIO())
+        call_command('seed_demo_portal', allow_insecure_passwords=True, stdout=StringIO())
+
+        today = date.today()
+        academic_year = f'{today.year}-{today.year + 1}' if today.month >= 9 else f'{today.year - 1}-{today.year}'
+        self.assertEqual(CustomUser.objects.get(email='admin@gmail.com').role, CustomUser.Role.ADMIN)
+        self.assertTrue(CustomUser.objects.get(email='admin@gmail.com').check_password('123456'))
+        self.assertEqual(CustomUser.objects.get(email='enseignantmath@gmail.com').role, CustomUser.Role.PROFESSEUR)
+        self.assertEqual(CustomUser.objects.get(email='surveillant1@gmail.com').role, CustomUser.Role.SURVEILLANT)
+        self.assertEqual(Classe.objects.filter(academic_year=academic_year).count(), 9)
+        self.assertEqual(Etudiant.objects.filter(classe__academic_year=academic_year).count(), 45)
+        for classe in Classe.objects.filter(academic_year=academic_year):
+            self.assertEqual(classe.etudiants.count(), 5)
+
+    @override_settings(DEBUG=False)
+    def test_demo_command_refuses_weak_accounts_outside_debug(self):
+        with self.assertRaises(CommandError):
+            call_command('seed_demo_portal', allow_insecure_passwords=True, stdout=StringIO())
+        self.assertFalse(CustomUser.objects.filter(email='admin@gmail.com').exists())
 
 
 class EtudiantViewSetTests(APITestCase):

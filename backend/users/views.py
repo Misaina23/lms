@@ -1,13 +1,24 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import api_view, permission_classes, authentication_classes, action
+from rest_framework.decorators import api_view, permission_classes, authentication_classes, action, throttle_classes
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from django_filters.rest_framework import DjangoFilterBackend
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, password_validation
+from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.tokens import default_token_generator
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from classes.models import Classe, Matiere
 from classes.serializers import ClasseSerializer, MatiereSerializer
 from .models import CustomUser
 from .serializers import CustomUserSerializer, UserListSerializer
 from .permissions import IsAdminOnly, IsStaffUser, STAFF_ROLES
+
+
+class PasswordResetRateThrottle(AnonRateThrottle):
+    scope = 'password_reset'
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -141,3 +152,62 @@ def login_view(request):
         token, _ = Token.objects.get_or_create(user=user)
         return Response({'token': token.key, 'user': CustomUserSerializer(user).data})
     return Response({'detail': 'Identifiants invalides'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@authentication_classes([])
+@throttle_classes([PasswordResetRateThrottle])
+def password_reset_request_view(request):
+    form = PasswordResetForm(data={'email': request.data.get('email', '')})
+    if not form.is_valid():
+        return Response({'detail': 'Saisissez une adresse e-mail valide.'}, status=status.HTTP_400_BAD_REQUEST)
+    if (
+        settings.EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend'
+        and not settings.EMAIL_HOST
+    ):
+        return Response({
+            'detail': 'La récupération par e-mail n’est pas encore configurée. Contactez l’administration.'
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    form.save(
+        request=request,
+        use_https=not settings.DEBUG,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        email_template_name='users/password_reset_email.txt',
+        subject_template_name='users/password_reset_subject.txt',
+        domain_override=settings.FRONTEND_URL,
+    )
+    return Response({
+        'detail': 'Si un compte correspond à cette adresse, un lien de réinitialisation va être envoyé.'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@authentication_classes([])
+@throttle_classes([PasswordResetRateThrottle])
+def password_reset_confirm_view(request):
+    uidb64 = request.data.get('uid')
+    token = request.data.get('token')
+    password = request.data.get('password')
+    if not all(isinstance(value, str) and value for value in (uidb64, token, password)):
+        return Response({'detail': 'Lien ou mot de passe manquant.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user_id = force_str(urlsafe_base64_decode(uidb64))
+        user = CustomUser._default_manager.get(pk=user_id)
+    except (TypeError, ValueError, OverflowError, UnicodeDecodeError, CustomUser.DoesNotExist):
+        return Response({'detail': 'Ce lien de réinitialisation est invalide ou expiré.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not user.is_active or not default_token_generator.check_token(user, token):
+        return Response({'detail': 'Ce lien de réinitialisation est invalide ou expiré.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        password_validation.validate_password(password, user)
+    except ValidationError as error:
+        return Response({'detail': ' '.join(error.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(password)
+    user.save(update_fields=['password'])
+    return Response({'detail': 'Votre mot de passe a été modifié. Vous pouvez vous connecter.'})
