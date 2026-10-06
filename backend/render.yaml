@@ -24,3 +24,15 @@ services:
         value: .onrender.com
       - key: FRONTEND_URL
         value: https://lyceemidongysud.vercel.app
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: DEFAULT_FROM_EMAIL
+        value: noreply@lyceemidongysud.mg

@@ -37,6 +37,37 @@ class DemoPortalSeedCommandTests(TestCase):
             call_command('seed_demo_portal', allow_insecure_passwords=True, stdout=StringIO())
         self.assertFalse(CustomUser.objects.filter(email='admin@gmail.com').exists())
 
+    @override_settings(DEBUG=False)
+    def test_production_seed_creates_same_demo_data_with_generated_passwords(self):
+        output = StringIO()
+        call_command('seed_demo_portal', production=True, stdout=output)
+
+        today = date.today()
+        academic_year = f'{today.year}-{today.year + 1}' if today.month >= 9 else f'{today.year - 1}-{today.year}'
+        self.assertEqual(Classe.objects.filter(academic_year=academic_year).count(), 9)
+        self.assertEqual(Etudiant.objects.filter(classe__academic_year=academic_year).count(), 45)
+
+        generated = {}
+        for line in output.getvalue().splitlines():
+            if '@gmail.com :' in line:
+                email, password = line.strip().split(' : ', maxsplit=1)
+                generated[email] = password
+        self.assertEqual(set(generated), {
+            'admin@gmail.com',
+            'enseignantmath@gmail.com',
+            'surveillant1@gmail.com',
+        })
+        for email, password in generated.items():
+            self.assertGreaterEqual(len(password), 32)
+            self.assertNotEqual(password, '123456')
+            self.assertTrue(CustomUser.objects.get(email=email).check_password(password))
+
+        admin_password = generated['admin@gmail.com']
+        call_command('seed_demo_portal', production=True, stdout=StringIO())
+        self.assertTrue(CustomUser.objects.get(email='admin@gmail.com').check_password(admin_password))
+        self.assertEqual(Classe.objects.filter(academic_year=academic_year).count(), 9)
+        self.assertEqual(Etudiant.objects.filter(classe__academic_year=academic_year).count(), 45)
+
 
 class EtudiantViewSetTests(APITestCase):
     @classmethod

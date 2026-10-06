@@ -1,4 +1,5 @@
 from datetime import date
+import secrets
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -60,17 +61,25 @@ class Command(BaseCommand):
             action='store_true',
             help='Confirme explicitement la création de comptes de démonstration avec le mot de passe 123456.',
         )
+        parser.add_argument(
+            '--production',
+            action='store_true',
+            help='Autorise explicitement le seed en production avec des mots de passe forts générés aléatoirement.',
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
-        if not settings.DEBUG:
-            raise CommandError('Les comptes de démonstration à mot de passe faible sont interdits hors environnement DEBUG.')
-        if not options['allow_insecure_passwords']:
+        production = options['production']
+        if production and settings.DEBUG:
+            raise CommandError('--production est réservé à une instance configurée avec DEBUG=False.')
+        if not production and not settings.DEBUG:
+            raise CommandError('En production, ajoutez --production pour générer des mots de passe temporaires forts.')
+        if not production and not options['allow_insecure_passwords']:
             raise CommandError('Ajoutez --allow-insecure-passwords pour confirmer la création locale des comptes de démonstration.')
 
         today = date.today()
         academic_year = f'{today.year}-{today.year + 1}' if today.month >= 9 else f'{today.year - 1}-{today.year}'
-        users = self._seed_users()
+        users, generated_passwords = self._seed_users(production=production)
         classes = self._seed_classes(academic_year)
         self._seed_students(classes, today)
         self._assign_math_teacher(users['enseignantmath@gmail.com'], classes, academic_year)
@@ -79,11 +88,15 @@ class Command(BaseCommand):
             f'Démo prête : {len(classes)} classes, {len(classes) * len(STUDENT_FIRST_NAMES)} élèves, '
             f'année {academic_year}.'
         ))
-        self.stdout.write('Comptes créés ici uniquement : admin@gmail.com, enseignantmath@gmail.com, surveillant1@gmail.com')
-        self.stdout.write('Mot de passe initial : 123456 (à remplacer avant toute utilisation réelle).')
+        if generated_passwords:
+            self.stdout.write(self.style.WARNING('Mots de passe temporaires (affichés une seule fois pour les comptes nouvellement créés) :'))
+            for email, password in generated_passwords.items():
+                self.stdout.write(f'  {email} : {password}')
+        self.stdout.write('Les mots de passe des comptes préexistants ne sont jamais modifiés.')
 
-    def _seed_users(self):
+    def _seed_users(self, production):
         users = {}
+        generated_passwords = {}
         for data in DEMO_USERS:
             user = CustomUser.objects.filter(email=data['email']).first()
             if user is not None:
@@ -105,10 +118,13 @@ class Command(BaseCommand):
                     is_staff=data['role'] == CustomUser.Role.ADMIN,
                     is_superuser=data['role'] == CustomUser.Role.ADMIN,
                 )
-                user.set_password(DEMO_PASSWORD)
+                password = secrets.token_urlsafe(24) if production else DEMO_PASSWORD
+                user.set_password(password)
                 user.save()
+                if production:
+                    generated_passwords[data['email']] = password
             users[data['email']] = user
-        return users
+        return users, generated_passwords
 
     def _seed_classes(self, academic_year):
         classes = {}
