@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from .models import TimetableSlot
 from .serializers import TimetableSlotSerializer
-from users.permissions import IsAdminOrReadOnly, IsAdminOnly, CanViewSchedule
+from users.permissions import IsAdminOnly, CanViewSchedule
 
 
 class TimetableSlotViewSet(viewsets.ModelViewSet):
@@ -19,7 +19,7 @@ class TimetableSlotViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.role == 'ADMIN':
             return TimetableSlot.objects.select_related('classe', 'matiere', 'professeur').all()
-        elif user.role in ('PROFESSEUR', 'SURVEILLANT'):
+        elif user.role in ('PROFESSEUR', 'SURVEILLANT', 'SECRETARIAT'):
             # Teachers and surveillants can see all schedules for coordination
             return TimetableSlot.objects.select_related('classe', 'matiere', 'professeur').all()
         return TimetableSlot.objects.none()
@@ -29,7 +29,7 @@ class TimetableSlotViewSet(viewsets.ModelViewSet):
             return [IsAdminOnly()]
         return super().get_permissions()
 
-    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly])
     def conflicts(self, request):
         from datetime import time
         day = request.query_params.get('day')

@@ -5,12 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 
-/**
- * Client providers for the App Router. Design tokens live entirely in
- * app/globals.css (single file, Tailwind v4). Dark mode is a `.dark` class on
- * <html> set pre-paint by the inline script in layout.tsx — no theme provider,
- * no competing style layer.
- */
+/** Client providers for the App Router; design tokens live in app/globals.css. */
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,9 +21,13 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const response = await api.post<{ token: string; user: unknown }>('/login/', { email, password })
+      const response = await api.post<{ token: string; user: import('@/lib/api').User }>('/login/', { email, password })
+      if (!response.token || !response.user) {
+        throw new Error('La réponse du serveur est incomplète. Réessayez ou contactez l’administration.')
+      }
       localStorage.setItem('token', response.token)
-      router.push('/')
+      localStorage.setItem('user', JSON.stringify(response.user))
+      router.push('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de connexion')
     } finally {
@@ -32,16 +37,17 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md border-border/70 bg-card/80 shadow-lg">
+      <Card className="w-full max-w-lg border-border/70 bg-card/80 shadow-lg">
         <CardHeader className="space-y-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
-              <span className="text-lg font-bold">LH</span>
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={112} height={54} className="h-8 w-16 shrink-0 object-contain sm:h-12 sm:w-24" />
+              <div className="min-w-0">
+                <CardTitle className="text-base sm:text-xl">Lycée Midongy Sud</CardTitle>
+                <p className="text-xs text-muted-foreground">Administration centrale</p>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-xl">Lycée Horizon</CardTitle>
-              <p className="text-xs text-muted-foreground">Administration centrale</p>
-            </div>
+            <Image src="/drapeau.jpeg" alt="Emblème du lycée" width={56} height={56} className="ml-auto size-10 shrink-0 object-contain sm:size-12" />
           </div>
         </CardHeader>
         <CardContent>
@@ -72,9 +78,6 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Connexion...' : 'Se connecter'}
             </Button>
-            <p className="text-center text-xs text-muted-foreground">
-              Démo: andrianisaina23@gmail.com / 2311saina
-            </p>
           </form>
         </CardContent>
       </Card>

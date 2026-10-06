@@ -9,7 +9,7 @@ import {
   Send,
   Search,
   ChevronRight,
-  Users,
+  UserPlus,
   Loader2,
 } from 'lucide-react'
 import type { ChatGroup, ChatMessage, User } from '@/lib/api'
@@ -30,6 +30,11 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [showDirectForm, setShowDirectForm] = useState(false)
+  const [contactId, setContactId] = useState('')
+  const [startingChat, setStartingChat] = useState(false)
+  const [error, setError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const userMap = useMemo(() => {
@@ -40,11 +45,12 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
 
   const fetchGroups = async () => {
     setLoading(true)
+    setError('')
     try {
-      const res = await api.get<{ results: ChatGroup[] }>('/api/chat-groups/')
-      setGroups(res.results || [])
-    } catch (e) {
-      console.error('Failed to load groups', e)
+      const res = await api.get<ChatGroup[] | { results: ChatGroup[] }>('/chat-groups/')
+      setGroups(Array.isArray(res) ? res : res.results)
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : 'Impossible de charger les groupes.')
     } finally {
       setLoading(false)
     }
@@ -52,20 +58,30 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
 
   const fetchMessages = async (groupId: string) => {
     try {
-      const res = await api.get<{ results: ChatMessage[] }>(`/api/chat-groups/${groupId}/messages/`)
-      setMessages(res.results || [])
-    } catch (e) {
-      console.error('Failed to load messages', e)
+      const res = await api.get<ChatMessage[] | { results: ChatMessage[] }>(`/chat-groups/${groupId}/messages/`)
+      setMessages(Array.isArray(res) ? res : res.results)
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : 'Impossible de charger les messages.')
     }
   }
 
   useEffect(() => {
+    const savedUser = localStorage.getItem('user')
+    if (savedUser) {
+      try {
+        setCurrentUserId((JSON.parse(savedUser) as User).id)
+      } catch {
+        setError('La session utilisateur est invalide. Reconnectez-vous.')
+      }
+    }
     fetchGroups()
   }, [])
 
   useEffect(() => {
     if (selectedGroup) {
-      fetchMessages(selectedGroup.id)
+      void fetchMessages(selectedGroup.id)
+      const interval = window.setInterval(() => { void fetchMessages(selectedGroup.id) }, 5000)
+      return () => window.clearInterval(interval)
     }
   }, [selectedGroup?.id])
 
@@ -79,13 +95,31 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
     if (!draft.trim() || !selectedGroup || sending) return
     setSending(true)
     try {
-      await api.post(`/api/chat-groups/${selectedGroup.id}/send/`, { content: draft.trim() })
+      await api.post(`/chat-groups/${selectedGroup.id}/send/`, { content: draft.trim() })
       setDraft('')
-      fetchMessages(selectedGroup.id)
-    } catch (e) {
-      console.error('Failed to send message', e)
+      await fetchMessages(selectedGroup.id)
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : 'Impossible d’envoyer le message.')
     } finally {
       setSending(false)
+    }
+  }
+
+  const startDirectChat = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!contactId || startingChat) return
+    setStartingChat(true)
+    setError('')
+    try {
+      const group = await api.post<ChatGroup>('/chat-groups/direct/', { recipient: Number(contactId) })
+      setShowDirectForm(false)
+      setContactId('')
+      await fetchGroups()
+      setSelectedGroup(group)
+    } catch (chatError) {
+      setError(chatError instanceof Error ? chatError.message : 'Impossible de démarrer la conversation.')
+    } finally {
+      setStartingChat(false)
     }
   }
 
@@ -131,7 +165,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
               <div className="flex-1">
                 <CardTitle className="text-base">{selectedGroup.name}</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  {selectedGroup.members?.length || 0} membres · {GROUP_TYPE_LABELS[selectedGroup.group_type]}
+                  {selectedGroup.member_count || selectedGroup.members_detail?.length || 0} membres · {GROUP_TYPE_LABELS[selectedGroup.group_type]}
                 </p>
               </div>
             </div>
@@ -139,7 +173,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-3" ref={scrollRef}>
             {messages.map(message => {
               const sender = userMap[message.sender || 0]
-              const isOwn = message.sender === users[0]?.id
+              const isOwn = message.sender === currentUserId
               return (
                 <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[70%] rounded-lg px-4 py-2 ${
@@ -196,7 +230,22 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1 border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Groupes</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base">Conversations</CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setShowDirectForm((value) => !value)} className="gap-1"><UserPlus className="size-4" /> Nouveau</Button>
+            </div>
+            {showDirectForm && (
+              <form onSubmit={startDirectChat} className="mt-3 flex gap-2">
+                <select required value={contactId} onChange={(event) => setContactId(event.target.value)} className="h-9 min-w-0 flex-1 rounded-xl border border-border bg-card px-2 text-xs" aria-label="Choisir un membre du personnel">
+                  <option value="">Choisir un collègue</option>
+                  {users.filter((user) => user.status === 'ACTIVE' && user.id !== currentUserId).map((user) => (
+                    <option key={user.id} value={user.id}>{user.first_name} {user.last_name} · {user.role}</option>
+                  ))}
+                </select>
+                <Button type="submit" size="sm" disabled={!contactId || startingChat}>{startingChat ? <Loader2 className="size-4 animate-spin" /> : 'Créer'}</Button>
+              </form>
+            )}
+            {error && <p className="mt-2 text-xs text-destructive" role="alert">{error}</p>}
             <div className="relative mt-2">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -230,7 +279,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{group.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {GROUP_TYPE_LABELS[group.group_type]} · {group.members?.length || 0} membres
+                      {GROUP_TYPE_LABELS[group.group_type]} · {group.member_count || group.members_detail?.length || 0} membres
                     </p>
                   </div>
                   <ChevronRight className="size-4 text-muted-foreground" />

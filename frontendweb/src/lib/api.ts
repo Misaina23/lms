@@ -31,16 +31,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      const pathParts = path.split('/');
-      const resource = pathParts[pathParts.length - 2] || 'items';
-      return {
-        count: 0,
-        next: null,
-        previous: null,
-        results: [],
-      } as T;
+      throw new Error('Le serveur est injoignable. Vérifiez votre connexion et réessayez.')
     }
-    throw error;
+    throw error
   }
 }
 
@@ -100,8 +93,10 @@ export type ExamPeriod = {
   code: string;
   label: string;
   period_type: string;
+  academic_year: string;
   start_date: string;
   end_date: string;
+  number_of_notes: 1 | 2;
   weight_note_1: string;
   weight_note_2: string;
   is_locked: boolean;
@@ -219,8 +214,25 @@ export type Notification = {
   message: string;
   payload: Record<string, unknown>;
   status: string;
+  is_read: boolean;
   sent_at: string | null;
   retry_count: number;
+  created_at: string;
+};
+
+export type StudentOfficePass = {
+  id: string;
+  reference: string;
+  student: number;
+  student_detail: Etudiant;
+  issued_by: number | null;
+  issued_by_name: string;
+  kind: 'CONVOCATION' | 'ENTRY' | 'RETURN';
+  reason: string;
+  destination: string;
+  scheduled_for: string | null;
+  status: 'OPEN' | 'USED' | 'CANCELLED';
+  attended_at: string | null;
   created_at: string;
 };
 
@@ -231,14 +243,24 @@ export type ChatGroup = {
   classe: number | null;
   matiere: number | null;
   is_readonly: boolean;
-  members: Array<{
+  members_detail: Array<{
     id: number;
-    group: string;
     user: number;
     is_admin: boolean;
     joined_at: string;
-    user_detail: { id: number; matricule: string; name: string };
+    user_detail: {
+      id: number;
+      username: string;
+      matricule: string;
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone: string;
+      role: string;
+    };
   }>;
+  last_message: ChatMessage | null;
+  member_count: number;
   created_at: string;
   updated_at: string;
 };

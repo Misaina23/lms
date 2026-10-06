@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { api, type PaginatedResponse, type User, type Etudiant, type Note, type Classe, type Matiere, type Enrollment, type StudentOrientation, type ExamPeriod, type Absence, type BudgetItem, type BudgetCategory, type BudgetReport, type BudgetStats, type TimetableSlot, type AuditLog } from '@/lib/api'
+import { api, type PaginatedResponse, type User, type Etudiant, type Note, type Classe, type Matiere, type Enrollment, type StudentOrientation, type ExamPeriod, type Absence, type BudgetItem, type BudgetCategory, type BudgetReport, type BudgetStats, type TimetableSlot, type AuditLog, type Notification, type StudentOfficePass } from '@/lib/api'
 
 export type ScreenKey =
   | 'overview'
@@ -20,6 +20,9 @@ export type ScreenKey =
   | 'audit'
   | 'registrations'
   | 'matieres'
+  | 'periods'
+  | 'notifications'
+  | 'office'
 
 export type AdminData = {
   users: User[]
@@ -38,6 +41,8 @@ export type AdminData = {
   budgetStats: BudgetStats | null
   timetableSlots: TimetableSlot[]
   auditLogs: AuditLog[]
+  notifications: Notification[]
+  officePasses: StudentOfficePass[]
 }
 
 export function useAdminData() {
@@ -45,7 +50,7 @@ export function useAdminData() {
     users: [], allUsers: [], classes: [], matieres: [], etudiants: [], notes: [],
     absences: [], enrollments: [], orientations: [], periods: [],
     budgetItems: [], budgetCategories: [], budgetReports: [], budgetStats: null,
-    timetableSlots: [], auditLogs: [],
+    timetableSlots: [], auditLogs: [], notifications: [], officePasses: [],
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,7 +59,7 @@ export function useAdminData() {
     setIsLoading(true)
     setError(null)
     try {
-      const [u, c, m, e, n, a, en, o, p, bi, bc, br, bs, ts, al] = await Promise.all([
+      const [u, c, m, e, n, a, en, o, p, bi, bc, br, bs, ts, al, no, op] = await Promise.all([
         api.get<PaginatedResponse<User>>('/users/').catch(() => ({ results: [] })),
         api.get<PaginatedResponse<Classe>>('/classes/').catch(() => ({ results: [] })),
         api.get<PaginatedResponse<Matiere>>('/matieres/').catch(() => ({ results: [] })),
@@ -70,6 +75,8 @@ export function useAdminData() {
         api.get<BudgetStats>('/budget/items/stats/?academic_year=2024-2025').catch(() => null),
         api.get<PaginatedResponse<TimetableSlot>>('/timetable/').catch(() => ({ results: [] })),
         api.get<PaginatedResponse<AuditLog>>('/audit/').catch(() => ({ results: [] })),
+        api.get<PaginatedResponse<Notification>>('/notifications/').catch(() => ({ results: [] })),
+        api.get<PaginatedResponse<StudentOfficePass>>('/office-passes/').catch(() => ({ results: [] })),
       ])
       setData({
         users: u.results || [],
@@ -88,6 +95,8 @@ export function useAdminData() {
         budgetStats: bs,
         timetableSlots: ts.results || [],
         auditLogs: al.results || [],
+        notifications: no.results || [],
+        officePasses: op.results || [],
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement')

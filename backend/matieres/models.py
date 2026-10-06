@@ -25,14 +25,20 @@ class ExamPeriod(models.Model):
         TRIMESTRE_1 = 'T1', 'Trimestre 1'
         TRIMESTRE_2 = 'T2', 'Trimestre 2'
         TRIMESTRE_3 = 'T3', 'Trimestre 3'
+        TRIMESTRE_4 = 'T4', 'Trimestre 4'
         SEMESTRE_1 = 'S1', 'Semestre 1'
         SEMESTRE_2 = 'S2', 'Semestre 2'
 
-    code = models.CharField(max_length=10, unique=True)
+    code = models.CharField(max_length=10)
     label = models.CharField(max_length=100)
     period_type = models.CharField(max_length=5, choices=PeriodType.choices)
+    academic_year = models.CharField(max_length=9)
     start_date = models.DateField()
     end_date = models.DateField()
+    number_of_notes = models.PositiveSmallIntegerField(
+        choices=[(1, 'Une note'), (2, 'Deux notes')],
+        default=2,
+    )
     weight_note_1 = models.DecimalField(max_digits=3, decimal_places=2, default=0.3, help_text="Weight of first score (e.g., 0.3 = 30%)")
     weight_note_2 = models.DecimalField(max_digits=3, decimal_places=2, default=0.7, help_text="Weight of second score (e.g., 0.7 = 70%)")
     is_locked = models.BooleanField(default=False, help_text="If True, grades can't be modified without justification")
@@ -44,3 +50,4 @@ class ExamPeriod(models.Model):
 
     class Meta:
         ordering = ['start_date']
+        unique_together = [('academic_year', 'code')]

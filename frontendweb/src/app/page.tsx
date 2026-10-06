@@ -1,287 +1,269 @@
-'use client'
-
-import { useMemo, useState, useEffect } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
 import {
-  ArrowUpRight,
-  Bell,
-  BookOpen,
-  Building2,
+  ArrowRight,
+  BookOpenCheck,
   CalendarDays,
-  CheckCircle2,
+  Check,
   ChevronDown,
-  CircleDollarSign,
-  Clock3,
-  FileText,
+  ClipboardCheck,
   GraduationCap,
-  LayoutDashboard,
-  Menu,
-  MessageSquare,
+  HeartHandshake,
+  MessageCircle,
   ShieldCheck,
-  Users,
-  X,
-  Wallet,
-  TrendingUp,
-  Download,
-  LogOut,
-  UserPlus,
+  Sparkles,
+  UsersRound,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { api, type PaginatedResponse, type User, type Classe, type Matiere, type Etudiant, type Note, type Absence, type Enrollment, type StudentOrientation, type ExamPeriod } from '@/lib/api'
-import { useAdminData, type ScreenKey } from '@/lib/admin-data'
-import { StudentsScreen } from '@/components/screens/students'
-import { EnrollmentsScreen } from '@/components/screens/enrollments'
-import { TeachersScreen, ClassesScreen, MatieresScreen, GradesScreen, AttendanceScreen, ReportsScreen } from '@/components/screens/modules'
-import { BudgetScreen } from '@/components/screens/budget'
-import { TimetableScreen } from '@/components/screens/timetable'
-import { BulletinsScreen } from '@/components/screens/bulletins'
-import { ChatScreen } from '@/components/screens/chat'
-import { AuditScreen } from '@/components/screens/audit'
-import { RegistrationsScreen } from '@/components/screens/registrations'
 
-const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
-  { key: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
-  { key: 'students', label: 'Élèves', icon: GraduationCap },
-  { key: 'enrollments', label: 'Inscriptions', icon: CheckCircle2 },
-  { key: 'classes', label: 'Classes', icon: BookOpen },
-  { key: 'teachers', label: 'Enseignants', icon: Users },
-  { key: 'registrations', label: 'Demandes', icon: UserPlus },
-  { key: 'matieres', label: 'Matières', icon: BookOpen },
-  { key: 'timetable', label: 'Emploi du temps', icon: CalendarDays },
-  { key: 'attendance', label: 'Pointage', icon: Clock3 },
-  { key: 'grades', label: 'Notes', icon: FileText },
-  { key: 'bulletins', label: 'Bulletins', icon: FileText },
-  { key: 'chat', label: 'Messagerie', icon: MessageSquare },
-  { key: 'audit', label: 'Audit', icon: ShieldCheck },
-  { key: 'reports', label: 'Rapports', icon: Building2 },
-  { key: 'budget', label: 'Budget', icon: Wallet },
+const services = [
+  {
+    icon: ClipboardCheck,
+    title: 'Un suivi clair',
+    text: 'Retrouvez les informations scolaires et le suivi de la vie de l’établissement au même endroit.',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Une organisation partagée',
+    text: 'Les équipes consultent les emplois du temps et coordonnent les activités selon leurs responsabilités.',
+  },
+  {
+    icon: MessageCircle,
+    title: 'Une communication utile',
+    text: 'Les espaces privés facilitent les échanges entre les équipes pédagogiques et administratives.',
+  },
 ]
 
-function StatCard({ label, value, detail, trend, icon: Icon, accent }: { label: string; value: string; detail: string; trend: string; icon: typeof Users; accent: string }) {
-  return (
-    <Card className="border-border/70 bg-card/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg rounded-2xl">
-      <CardContent className="p-5">
-        <div className="mb-5 flex items-start justify-between">
-          <div className={`flex size-10 items-center justify-center rounded-xl ${accent}`}><Icon className="size-5" /></div>
-          <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300"><ArrowUpRight className="size-3" />{trend}</span>
-        </div>
-        <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-      </CardContent>
-    </Card>
-  )
-}
+const steps = [
+  ['01', 'Les familles s’informent', 'Consultez les repères de l’établissement et les démarches d’inscription.'],
+  ['02', 'Les équipes se coordonnent', 'Les enseignants et les services scolaires accèdent à leur espace dédié.'],
+  ['03', 'L’administration pilote', 'Les comptes, les périodes scolaires et les services sont gérés par les personnes habilitées.'],
+]
+
+const faqs = [
+  {
+    question: 'Comment accéder à mon espace ?',
+    answer: 'Utilisez le bouton « Se connecter ». Votre compte et vos autorisations sont fournis par l’administration.',
+  },
+  {
+    question: 'Comment devenir enseignant sur la plateforme ?',
+    answer: 'Envoyez une demande d’accès depuis le formulaire enseignant. L’administration doit valider le compte avant son activation.',
+  },
+  {
+    question: 'L’inscription d’un élève dépend-elle du paiement ?',
+    answer: 'Non. L’enregistrement du dossier scolaire est distinct du suivi des règlements. Une situation financière ne bloque pas l’inscription.',
+  },
+  {
+    question: 'Où trouver le règlement officiel ?',
+    answer: 'Les repères ci-dessous ne remplacent pas le règlement intérieur remis par l’établissement. Pour une situation précise, référez-vous au document officiel.',
+  },
+]
 
 export default function Home() {
-  const [active, setActive] = useState<ScreenKey>('overview')
-  const [mobileNav, setMobileNav] = useState(false)
-  const [query, setQuery] = useState('')
-  const [isDark, setIsDark] = useState(true)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  return (
+    <main className="overflow-hidden bg-background text-foreground">
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-card/90 backdrop-blur-xl">
+        <nav className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 sm:px-8" aria-label="Navigation principale">
+          <Link href="/" className="flex items-center gap-3" aria-label="Lycée Midongy Sud, accueil">
+            <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={104} height={50} className="h-10 w-[84px] shrink-0 object-contain sm:h-12 sm:w-24" priority />
+            <span>
+              <span className="block font-display text-sm font-bold tracking-tight sm:text-base">Lycée Midongy Sud</span>
+              <span className="block text-[10px] font-medium uppercase tracking-[.16em] text-muted-foreground">Apprendre · grandir · réussir</span>
+            </span>
+            <Image src="/drapeau.jpeg" alt="Emblème LMS" width={72} height={40} className="ml-2 hidden h-9 w-auto rounded-md object-contain sm:block" />
+          </Link>
+          <div className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
+            <a className="transition-colors hover:text-primary" href="#fonctionnement">Fonctionnement</a>
+            <a className="transition-colors hover:text-primary" href="#reglement">Vie scolaire</a>
+            <a className="transition-colors hover:text-primary" href="#faq">FAQ</a>
+          </div>
+          <Link href="/login" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            Se connecter <ArrowRight className="size-4" />
+          </Link>
+        </nav>
+      </header>
 
-  const { data, isLoading, reload } = useAdminData()
+      <section className="relative isolate">
+        <div className="pointer-events-none absolute -right-40 -top-28 -z-10 size-[480px] rounded-full bg-emerald-100/80 blur-3xl" />
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24 lg:grid-cols-[1.03fr_.97fr] lg:gap-16">
+          <div className="animate-fade-in">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3.5 py-2 text-xs font-semibold text-primary">
+              <Sparkles className="size-3.5" /> Le portail du Lycée Midongy Sud
+            </div>
+            <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.08] tracking-[-.055em] sm:text-5xl lg:text-[62px]">
+              Une école mieux organisée, <span className="text-primary">ensemble.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+              Les informations de l’établissement et les outils de travail des équipes réunis dans un portail simple, clair et sécurisé.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/login" className="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-md transition hover:-translate-y-0.5 hover:shadow-lg">
+                Accéder à mon espace <ArrowRight className="size-4" />
+              </Link>
+              <Link href="/register" className="inline-flex h-12 items-center gap-2 rounded-full border border-border bg-card px-6 text-sm font-semibold text-foreground transition hover:border-primary/40 hover:bg-secondary">
+                Demande enseignant
+              </Link>
+            </div>
+            <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-2"><ShieldCheck className="size-4 text-primary" /> Accès selon votre rôle</span>
+              <span className="inline-flex items-center gap-2"><HeartHandshake className="size-4 text-primary" /> Inscription sans condition de paiement</span>
+            </div>
+          </div>
 
-  useEffect(() => {
-    const theme = localStorage.getItem('theme')
-    setIsDark(theme === null || theme === 'dark')
-    setIsLoggedIn(!!localStorage.getItem('token'))
-  }, [])
-
-  const toggleTheme = () => {
-    const newDark = !isDark
-    setIsDark(newDark)
-    localStorage.setItem('theme', newDark ? 'dark' : 'light')
-    document.documentElement.classList.toggle('dark', newDark)
-    window.dispatchEvent(new Event('theme-change'))
-  }
-
-  const handleLogin = () => { window.location.href = '/login' }
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    setIsLoggedIn(false)
-    window.location.href = '/login'
-  }
-
-  const activeLabel = navigation.find((n) => n.key === active)?.label ?? "Vue d'ensemble"
-
-  const renderScreen = () => {
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p className="text-sm text-muted-foreground">Chargement des données…</p>
+          <div className="relative mx-auto w-full max-w-[540px] lg:justify-self-end">
+            <div className="absolute -left-6 top-10 size-24 rounded-full bg-amber-100 blur-2xl" />
+            <div className="absolute -bottom-8 -right-4 size-36 rounded-full bg-emerald-100 blur-3xl" />
+            <div className="relative rounded-[28px] border border-white bg-white p-3 shadow-[0_32px_90px_-34px_rgba(9,70,48,.32)] sm:p-5">
+              <div className="rounded-[20px] bg-[#f7faf8] p-4 sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">Portail scolaire</p>
+                    <p className="mt-1 font-display text-lg font-bold tracking-tight text-[#0a1e2c]">Une vue d’ensemble</p>
+                  </div>
+                  <div className="grid size-10 place-items-center rounded-xl bg-white text-primary shadow-sm"><BookOpenCheck className="size-5" /></div>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-[#e8edf2] bg-white p-4">
+                    <span className="grid size-9 place-items-center rounded-xl bg-[#e5f5ef] text-primary"><UsersRound className="size-4" /></span>
+                    <p className="mt-4 text-xs text-[#5a6e7c]">Communauté scolaire</p>
+                    <p className="mt-1 font-display text-base font-bold text-[#0a1e2c]">Des équipes réunies</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#e8edf2] bg-white p-4">
+                    <span className="grid size-9 place-items-center rounded-xl bg-[#fff7e5] text-[#a36600]"><CalendarDays className="size-4" /></span>
+                    <p className="mt-4 text-xs text-[#5a6e7c]">Organisation</p>
+                    <p className="mt-1 font-display text-base font-bold text-[#0a1e2c]">Un planning partagé</p>
+                  </div>
+                </div>
+                <div className="mt-3 rounded-2xl border border-[#e8edf2] bg-white p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-10 place-items-center rounded-xl bg-[#e5f5ef] text-primary"><Check className="size-5" /></span>
+                      <div>
+                        <p className="text-sm font-semibold text-[#0a1e2c]">Chaque équipe son espace</p>
+                        <p className="mt-0.5 text-xs text-[#5a6e7c]">Enseignement · Vie scolaire · Administration</p>
+                      </div>
+                    </div>
+                    <span className="hidden rounded-full bg-[#e5f5ef] px-3 py-1 text-[10px] font-bold text-primary sm:inline-flex">SÉCURISÉ</span>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between rounded-2xl bg-primary px-4 py-3.5 text-white">
+                  <div>
+                    <p className="text-xs font-medium text-white/75">Dossiers scolaires</p>
+                    <p className="mt-0.5 text-sm font-semibold">Un suivi qui accompagne chaque élève</p>
+                  </div>
+                  <ArrowRight className="size-5 shrink-0" />
+                </div>
+              </div>
+            </div>
+            <div className="absolute -bottom-5 left-4 hidden items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg sm:flex">
+              <span className="grid size-9 place-items-center rounded-full bg-[#fff7e5] text-[#a36600]"><HeartHandshake className="size-4" /></span>
+              <span className="text-xs font-semibold">Un parcours scolaire sans obstacle financier</span>
+            </div>
           </div>
         </div>
-      )
-    }
-    switch (active) {
-      case 'overview': return <OverviewScreen data={data} />
-      case 'students': return <StudentsScreen etudiants={data.etudiants} classes={data.classes as any} onReload={reload} />
-      case 'enrollments':
-      case 'payments':
-        return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} />
-      case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} onReload={reload} />
-      case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
-      case 'matieres': return <MatieresScreen matieres={data.matieres} classes={data.classes as any} onReload={reload} />
-      case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} />
-      case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} />
-      case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
-      case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} />
-      case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} />
-      case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes as any} matieres={data.matieres} notes={data.notes} />
-      case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} />
-      case 'chat': return <ChatScreen users={data.users} />
-      case 'audit': return <AuditScreen logs={data.auditLogs} />
-    }
-  }
+      </section>
 
-  return (
-    <>
-      <main className="min-h-dvh bg-background text-foreground">
-        <div className="flex min-h-dvh">
-          <aside className={`${mobileNav ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 lg:static lg:translate-x-0`}>
-            <div className="flex h-[82px] shrink-0 items-center justify-between border-b border-sidebar-border px-6">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-md"><GraduationCap className="size-5" /></div>
-                <div><p className="font-semibold tracking-tight text-sidebar-foreground">Lycée Horizon</p><p className="text-[11px] text-sidebar-foreground/55">Administration centrale</p></div>
-              </div>
-              <button onClick={() => setMobileNav(false)} className="text-sidebar-foreground/60 lg:hidden" aria-label="Fermer le menu"><X className="size-5" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-6">
-              <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">Pilotage</p>
-              <nav className="space-y-1" aria-label="Navigation principale">
-                {navigation.map(({ key, label, icon: Icon }) => (
-                  <button key={key} onClick={() => { setActive(key); setMobileNav(false) }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${active === key ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'}`}>
-                    <Icon className="size-[17px] shrink-0" />
-                    <span className="flex-1 text-left">{label}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-            <div className="shrink-0 border-t border-sidebar-border p-4">
-              <div className="flex items-center gap-3 rounded-xl bg-sidebar-accent/65 p-3">
-                <div className="flex size-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">AD</div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-sidebar-foreground">Administrateur</p>
-                  <p className="truncate text-[11px] text-sidebar-foreground/55">En ligne</p>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {mobileNav && <button className="fixed inset-0 z-30 bg-foreground/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileNav(false)} aria-label="Fermer la navigation" />}
-
-          <section className="min-w-0 flex-1">
-            <header className="flex h-[82px] items-center justify-between border-b border-border/70 bg-background/90 px-5 backdrop-blur-md sm:px-8">
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileNav(true)} aria-label="Ouvrir le menu"><Menu className="size-5" /></Button>
-                <div className="min-w-0">
-                  <p className="hidden text-xs text-muted-foreground sm:block">{new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                  <h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">{activeLabel}</h1>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5 sm:gap-4">
-                <div className="relative hidden md:block">
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher..." className="h-9 w-56 rounded-lg border border-border bg-muted/35 pl-3 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                </div>
-                <button className="relative flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted sm:size-10" aria-label="Notifications"><Bell className="size-[18px]" /></button>
-                <button onClick={toggleTheme} className="hidden size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted xs:flex sm:size-10" aria-label={isDark ? 'Mode clair' : 'Mode sombre'}>{isDark ? '☀️' : '🌙'}</button>
-                {isLoggedIn && (
-                  <button onClick={handleLogout} className="flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted sm:size-10" aria-label="Déconnexion">
-                    <LogOut className="size-[18px]" />
-                  </button>
-                )}
-              </div>
-            </header>
-
-            <div className="mx-auto max-w-[1500px] p-5 sm:p-8">
-              {renderScreen()}
-            </div>
-          </section>
+      <section className="border-y border-border/70 bg-card">
+        <div className="mx-auto grid max-w-7xl gap-7 px-5 py-8 sm:grid-cols-3 sm:px-8 sm:py-10">
+          {services.map(({ icon: Icon, title, text }) => (
+            <article key={title} className="flex gap-4">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-secondary text-primary"><Icon className="size-5" /></span>
+              <div><h2 className="font-display text-sm font-bold">{title}</h2><p className="mt-1.5 text-xs leading-5 text-muted-foreground">{text}</p></div>
+            </article>
+          ))}
         </div>
-      </main>
-      <footer className="border-t border-border/70 bg-background/90 px-5 py-4 sm:px-8">
-        <div className="mx-auto max-w-[1500px] text-center">
-          <p className="text-xs text-muted-foreground">Développé par DevMisaina</p>
+      </section>
+
+      <section id="fonctionnement" className="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-28">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">Un fonctionnement lisible</p>
+            <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Les bons outils, au bon endroit.</h2>
+            <p className="mt-4 text-sm leading-7 text-muted-foreground sm:text-base">Un accès unique, puis des espaces distincts afin que chacun retrouve les informations utiles à sa mission.</p>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {steps.map(([number, title, text]) => (
+              <article key={number} className="group rounded-3xl border border-border bg-card p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg sm:p-8">
+                <span className="font-display text-4xl font-extrabold tracking-tight text-primary/20 transition group-hover:text-primary/70">{number}</span>
+                <h3 className="mt-6 font-display text-lg font-bold">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-5 grid gap-3 rounded-3xl bg-[#10251d] p-6 text-white sm:grid-cols-3 sm:p-8">
+            {[
+              ['Enseignants', 'Notes · présences · emploi du temps'],
+              ['Secrétariat & vie scolaire', 'Dossiers élèves · suivi des présences'],
+              ['Administration', 'Comptes · pédagogie · finances'],
+            ].map(([title, text]) => <div key={title} className="border-white/10 sm:border-l sm:pl-5 first:sm:border-0 first:sm:pl-0"><p className="font-display text-sm font-bold">{title}</p><p className="mt-1 text-xs leading-5 text-white/65">{text}</p></div>)}
+          </div>
+        </div>
+      </section>
+
+      <section id="reglement" className="scroll-mt-24 bg-[#f0f6f2] px-5 py-20 sm:px-8 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[.8fr_1.2fr] lg:items-center">
+          <div>
+            <span className="grid size-12 place-items-center rounded-2xl bg-white text-primary shadow-sm"><ShieldCheck className="size-6" /></span>
+            <p className="mt-6 text-xs font-bold uppercase tracking-[.18em] text-primary">Bien vivre l’école</p>
+            <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Des repères partagés, dans le respect de chacun.</h2>
+            <p className="mt-4 text-sm leading-7 text-muted-foreground">La communauté scolaire s’appuie sur un cadre commun pour protéger le temps d’apprentissage et assurer un accueil attentif de chaque élève.</p>
+            <p className="mt-4 text-xs leading-5 text-muted-foreground">Ces repères sont indicatifs. Le règlement intérieur officiel de l’établissement reste la référence.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              ['Respect', 'Adopter une attitude respectueuse envers les élèves, les familles et les équipes.'],
+              ['Ponctualité', 'Se référer aux horaires communiqués par l’établissement et signaler les absences.'],
+              ['Cadre scolaire', 'Prendre soin des espaces, du matériel et des ressources partagées.'],
+              ['Communication', 'Utiliser les canaux adaptés et transmettre les informations avec responsabilité.'],
+            ].map(([title, text]) => (
+              <article key={title} className="rounded-2xl border border-white bg-white p-5 shadow-sm">
+                <span className="grid size-8 place-items-center rounded-full bg-secondary text-primary"><Check className="size-4" /></span>
+                <h3 className="mt-4 font-display text-sm font-bold">{title}</h3>
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{text}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" className="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-28">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-center text-xs font-bold uppercase tracking-[.18em] text-primary">FAQ</p>
+          <h2 className="mt-3 text-center font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Vous avez une question ?</h2>
+          <div className="mt-9 space-y-3">
+            {faqs.map(({ question, answer }) => (
+              <details key={question} className="group rounded-2xl border border-border bg-card px-5 py-4 open:border-primary/30 open:bg-primary/[.025]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
+                  <span className="text-sm">{question}</span>
+                  <ChevronDown className="size-4 shrink-0 text-primary transition-transform group-open:rotate-180" />
+                </summary>
+                <p className="max-w-2xl pb-1 pt-3 text-sm leading-6 text-muted-foreground">{answer}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 pb-20 sm:px-8 sm:pb-24">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[32px] bg-primary px-6 py-12 text-center text-white sm:px-12 sm:py-16">
+          <div className="pointer-events-none absolute -right-20 -top-32 size-72 rounded-full bg-white/10 blur-3xl" />
+          <p className="relative text-xs font-bold uppercase tracking-[.18em] text-white/70">Lycée Midongy Sud</p>
+          <h2 className="relative mx-auto mt-3 max-w-2xl font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Votre espace scolaire vous attend.</h2>
+          <p className="relative mx-auto mt-3 max-w-xl text-sm leading-6 text-white/80">Connectez-vous pour rejoindre votre espace sécurisé et retrouver les outils associés à votre rôle.</p>
+          <Link href="/login" className="relative mt-7 inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-primary transition hover:-translate-y-0.5 hover:shadow-lg">Se connecter <ArrowRight className="size-4" /></Link>
+        </div>
+      </section>
+
+      <footer className="border-t border-border bg-card px-5 py-8 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
+          <Link href="/" className="flex items-center gap-2 font-display text-sm font-bold">
+            <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={72} height={36} className="h-8 w-16 object-contain" />
+            Lycée Midongy Sud
+            <Image src="/drapeau.jpeg" alt="Emblème LMS" width={64} height={36} className="ml-2 h-8 w-auto rounded object-contain" />
+          </Link>
+          <p className="text-center text-xs text-muted-foreground">Portail d’information et de services scolaires</p>
+          <Link href="/login" className="text-xs font-semibold text-primary hover:underline">Accès au portail</Link>
         </div>
       </footer>
-    </>
-  )
-}
-
-function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'] }) {
-  const students = data.etudiants
-  const elevesActifs = students.filter((e) => e.actif).length
-  const enseignantsActifs = data.users.filter((u) => u.role === 'PROFESSEUR' && u.status === 'ACTIVE').length
-  const totalEncaisse = data.enrollments.reduce((s, e) => s + Number(e.frais_verses || 0), 0)
-  const totalDu = data.enrollments.reduce((s, e) => s + Number(e.frais_total || 0), 0)
-
-  return (
-    <div className="space-y-6">
-      <div className="mb-2 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-        <div>
-          <p className="mb-2 font-serif text-sm italic text-primary">Bonjour,</p>
-          <h2 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Voici l'état du lycée.</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Vue d'ensemble des effectifs, des paiements et de la vie scolaire pour piloter votre établissement.</p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium shadow-sm transition-colors hover:bg-muted sm:w-auto"><CalendarDays className="size-4 text-muted-foreground" />{new Date().getFullYear()} — {new Date().getFullYear() + 1}<ChevronDown className="size-4 text-muted-foreground" /></button>
-          <Button className="h-10 w-full gap-2 bg-primary px-4 text-primary-foreground shadow-sm sm:w-auto"><ArrowUpRight className="size-4" />Rapport du jour</Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Élèves actifs" value={elevesActifs.toString()} detail={`${data.users.filter((u) => u.role === 'ELEVE').length} élèves inscrits`} trend="4,8 %" icon={GraduationCap} accent="bg-primary/10 text-primary" />
-        <StatCard label="Enseignants" value={enseignantsActifs.toString()} detail="Personnel actif" trend="2,1 %" icon={Users} accent="bg-sky-500/10 text-sky-700 dark:text-sky-300" />
-        <StatCard label="Classes" value={data.classes.length.toString()} detail={`${data.matieres.length} matières`} trend="0,0 %" icon={BookOpen} accent="bg-amber-500/10 text-amber-700 dark:text-amber-300" />
-        <StatCard label="Encaissé" value={new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalEncaisse) + ' Ar'} detail={`sur ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalDu)} Ar attendus`} trend="7,2 %" icon={CheckCircle2} accent="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" />
-      </div>
-
-      <div className="mt-2 grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <div><CardTitle className="text-base">Dernières notes</CardTitle><p className="mt-1 text-xs text-muted-foreground">Saisies récentes · toutes matières</p></div>
-          </CardHeader>
-          <CardContent>
-            <div className="mt-7 flex h-52 items-end justify-between gap-3 border-b border-border pb-0 sm:gap-6">
-              {data.notes.slice(-6).reverse().map((note) => (
-                <div className="flex h-full flex-1 flex-col items-center justify-end gap-2" key={note.id}>
-                  <span className="text-[10px] font-semibold text-muted-foreground">{note.note}/20</span>
-                  <div className="relative flex h-[78%] w-full items-end justify-center overflow-hidden rounded-t-md bg-muted/60">
-                    <div className={`w-full rounded-t-md ${Number(note.note) >= 10 ? 'bg-primary' : 'bg-destructive'} transition-all duration-500`} style={{ height: `${Math.max(20, (Number(note.note) / 20) * 100)}%` }} />
-                  </div>
-                  <span className="mb-2 text-[11px] text-muted-foreground">{data.matieres.find((m) => m.id === note.matiere)?.code || '—'}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-5 flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 text-muted-foreground"><span className="size-2 rounded-full bg-primary" />Moyenne générale</span>
-              <span className="font-semibold text-foreground">{data.notes.length ? (data.notes.reduce((s, n) => s + Number(n.note), 0) / data.notes.length).toFixed(1) : '—'} /20</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <div><CardTitle className="text-base">À traiter aujourd'hui</CardTitle><p className="mt-1 text-xs text-muted-foreground">Actions prioritaires</p></div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              { n: data.users.filter((u) => u.role === 'PROFESSEUR' && u.status === 'PENDING_VERIFICATION').length, l: "Comptes enseignants à valider", c: "bg-primary/10 text-primary" },
-              { n: data.enrollments.filter((e) => e.payment_status === 'UNPAID').length, l: "Paiements en attente", c: "bg-amber-500/10 text-amber-700" },
-              { n: data.orientations.filter((o) => o.status === 'PROPOSED').length, l: "Orientations IA à confirmer", c: "bg-rose-500/10 text-rose-700" },
-            ].map((item) => (
-              <button key={item.l} className="flex w-full items-center gap-3 rounded-lg border border-border/70 p-3 text-left transition-colors hover:bg-muted/40">
-                <span className={`flex size-9 items-center justify-center rounded-lg text-sm font-bold ${item.c}`}>{item.n}</span>
-                <span className="flex-1 text-sm font-medium">{item.l}</span>
-                <ArrowUpRight className="size-4 text-muted-foreground" />
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    </main>
   )
 }

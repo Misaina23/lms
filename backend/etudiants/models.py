@@ -3,7 +3,7 @@ from users.models import CustomUser
 from classes.models import Classe
 import uuid
 # Note: CustomUser reste utilisé pour AuditLog.actor, StudentOrientation.decided_by, Notification.recipient
-# Les Etudiants NE sont PAS des utilisateurs (pas de compte) - ils sont gérés par admin web et consultés par profs via mobile
+# Les étudiants n'ont pas de compte: leur dossier est géré par l'administration scolaire.
 
 
 class Etudiant(models.Model):
@@ -208,6 +208,7 @@ class Notification(models.Model):
     message = models.TextField()
     payload = models.JSONField(blank=True, help_text="Additional data for the notification")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    is_read = models.BooleanField(default=False)
     sent_at = models.DateTimeField(null=True, blank=True)
     retry_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -217,3 +218,37 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.get_channel_display()} - {self.title} - {self.get_status_display()}"
+
+
+class StudentOfficePass(models.Model):
+    class Kind(models.TextChoices):
+        CONVOCATION = 'CONVOCATION', 'Convocation'
+        ENTRY = 'ENTRY', 'Billet d’entrée'
+        RETURN = 'RETURN', 'Autorisation de retour en classe'
+
+    class Status(models.TextChoices):
+        OPEN = 'OPEN', 'En attente'
+        USED = 'USED', 'Utilisé'
+        CANCELLED = 'CANCELLED', 'Annulé'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(Etudiant, on_delete=models.CASCADE, related_name='office_passes')
+    issued_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='student_office_passes',
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    reason = models.TextField()
+    destination = models.CharField(max_length=120, default='Vie scolaire')
+    scheduled_for = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.OPEN)
+    attended_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.get_kind_display()} — {self.student} ({self.created_at:%Y-%m-%d})"

@@ -9,6 +9,7 @@ class CustomUser(AbstractUser):
         ELEVE = 'ELEVE', 'Élève'
         PARENT = 'PARENT', 'Parent'
         SURVEILLANT = 'SURVEILLANT', 'Surveillant'
+        SECRETARIAT = 'SECRETARIAT', 'Secrétariat'
 
     class TeacherType(models.TextChoices):
         FONCTIONNAIRE = 'FONCTIONNAIRE', 'Fonctionnaire'

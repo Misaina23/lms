@@ -3,7 +3,10 @@ from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 from users.models import CustomUser
 from classes.models import Classe
-from .models import Etudiant
+from classes.models import TeacherAssignment
+from matieres.models import Matiere
+from budget.models import BudgetItem
+from .models import Etudiant, Enrollment, Notification, StudentOfficePass
 
 
 class EtudiantViewSetTests(APITestCase):
@@ -61,3 +64,212 @@ class EtudiantViewSetTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['actif'], True)
+
+    def test_secretariat_can_register_student_without_payment(self):
+        secretary = CustomUser.objects.create_user(
+            username='secretariat',
+            email='secretariat@lycee.com',
+            password='secretariatpass',
+            first_name='Marie',
+            last_name='Secretaire',
+            matricule='SEC001',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=secretary).key}')
+
+        response = self.client.post(reverse('etudiant-register'), {
+            'matricule': 'ELV003',
+            'first_name': 'Aina',
+            'last_name': 'Rasoanaivo',
+            'classe': self.classe.id,
+            'date_inscription': '2026-10-06',
+            'academic_year': '2026-2027',
+        })
+
+        self.assertEqual(response.status_code, 201)
+        student = Etudiant.objects.get(matricule='ELV003')
+        enrollment = Enrollment.objects.get(student=student)
+        self.assertEqual(student.statut, Etudiant.StudentStatus.ENROLLED)
+        self.assertTrue(student.actif)
+        self.assertEqual(enrollment.payment_status, Enrollment.PaymentStatus.UNPAID)
+        self.assertIsNone(enrollment.frais_total)
+        self.assertNotIn('frais_total', response.data)
+
+    def test_secretariat_cannot_read_payment_details_or_manage_budget(self):
+        secretary = CustomUser.objects.create_user(
+            username='secretariat2',
+            email='secretariat2@lycee.com',
+            password='secretariatpass',
+            first_name='Marie',
+            last_name='Secretaire',
+            matricule='SEC002',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        enrollment = Enrollment.objects.create(
+            student=self.etudiant,
+            classe=self.classe,
+            academic_year='2026-2027',
+            frais_total='100000.00',
+            frais_verses='25000.00',
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=secretary).key}')
+
+        enrollment_response = self.client.get(reverse('enrollment-list'))
+        self.assertEqual(enrollment_response.status_code, 200)
+        self.assertNotIn('frais_total', enrollment_response.data['results'][0])
+        self.assertNotIn('frais_verses', enrollment_response.data['results'][0])
+        self.assertNotIn('payment_status', enrollment_response.data['results'][0])
+
+        budget_response = self.client.get(reverse('budget-item-list'))
+        self.assertEqual(budget_response.status_code, 403)
+
+    def test_admin_can_broadcast_in_app_alert_to_selected_staff(self):
+        teacher = CustomUser.objects.create_user(
+            username='teacher-alert',
+            email='teacher-alert@lycee.com',
+            password='teacherpass',
+            first_name='Jean',
+            last_name='Teacher',
+            matricule='TEAALERT',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        response = self.client.post(reverse('notification-broadcast'), {
+            'title': 'Changement de salle',
+            'message': 'Le cours de demain aura lieu en salle 2.',
+            'recipient_roles': ['PROFESSEUR'],
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        notification = Notification.objects.get(recipient=teacher)
+        self.assertEqual(notification.title, 'Changement de salle')
+        self.assertEqual(notification.status, Notification.Status.SENT)
+        self.assertFalse(notification.is_read)
+
+    def test_non_admin_cannot_broadcast_alert(self):
+        secretary = CustomUser.objects.create_user(
+            username='secretariat-alert',
+            email='secretariat-alert@lycee.com',
+            password='secretariatpass',
+            first_name='Marie',
+            last_name='Secretaire',
+            matricule='SECALERT',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=secretary).key}')
+
+        response = self.client.post(reverse('notification-broadcast'), {
+            'title': 'Alerte',
+            'message': 'Message',
+            'recipient_roles': ['PROFESSEUR'],
+        })
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_recipient_can_mark_notification_read(self):
+        secretary = CustomUser.objects.create_user(
+            username='secretariat-read',
+            email='secretariat-read@lycee.com',
+            password='secretariatpass',
+            first_name='Marie',
+            last_name='Secretaire',
+            matricule='SECREAD',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        notification = Notification.objects.create(
+            recipient=secretary,
+            channel=Notification.Channel.PUSH,
+            notification_type='ANNOUNCEMENT',
+            title='Alerte',
+            message='Message important',
+            payload={},
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=secretary).key}')
+
+        response = self.client.post(reverse('notification-mark-read', args=[notification.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['is_read'])
+
+    def test_class_alert_is_limited_to_assigned_teachers(self):
+        assigned_teacher = CustomUser.objects.create_user(
+            username='assigned-teacher',
+            email='assigned-teacher@lycee.com',
+            password='teacherpass',
+            first_name='Jean',
+            last_name='Affecte',
+            matricule='TEAASSIGN',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        unassigned_teacher = CustomUser.objects.create_user(
+            username='unassigned-teacher',
+            email='unassigned-teacher@lycee.com',
+            password='teacherpass',
+            first_name='Paul',
+            last_name='Autre',
+            matricule='TEAUNASSIGN',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        matiere = Matiere.objects.create(nom='Français', code='FR')
+        TeacherAssignment.objects.create(
+            professeur=assigned_teacher,
+            classe=self.classe,
+            matiere=matiere,
+            academic_year='2026-2027',
+        )
+
+        response = self.client.post(reverse('notification-broadcast'), {
+            'title': 'Réunion',
+            'message': 'Réunion de classe à 14 h.',
+            'recipient_roles': ['PROFESSEUR'],
+            'classe': self.classe.id,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(Notification.objects.filter(recipient=assigned_teacher).exists())
+        self.assertFalse(Notification.objects.filter(recipient=unassigned_teacher).exists())
+
+    def test_secretariat_can_issue_and_complete_student_office_pass(self):
+        secretary = CustomUser.objects.create_user(
+            username='secretariat-pass',
+            email='secretariat-pass@lycee.com',
+            password='secretariatpass',
+            first_name='Marie',
+            last_name='Secretaire',
+            matricule='SECPASS',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=secretary).key}')
+        response = self.client.post(reverse('office-pass-list'), {
+            'student': self.etudiant.id,
+            'kind': StudentOfficePass.Kind.CONVOCATION,
+            'reason': 'Entretien avec le surveillant général.',
+            'destination': 'Bureau de vie scolaire',
+            'scheduled_for': '2026-10-07T09:00:00+03:00',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        office_pass = StudentOfficePass.objects.get(id=response.data['id'])
+        self.assertEqual(office_pass.issued_by, secretary)
+        used_response = self.client.post(reverse('office-pass-mark-used', args=[office_pass.id]))
+        self.assertEqual(used_response.status_code, 200)
+        self.assertEqual(used_response.data['status'], StudentOfficePass.Status.USED)
+
+    def test_teacher_cannot_issue_student_office_pass(self):
+        teacher = CustomUser.objects.create_user(
+            username='teacher-pass',
+            email='teacher-pass@lycee.com',
+            password='teacherpass',
+            first_name='Jean',
+            last_name='Teacher',
+            matricule='TEAPASS',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=teacher).key}')
+
+        response = self.client.post(reverse('office-pass-list'), {
+            'student': self.etudiant.id,
+            'kind': StudentOfficePass.Kind.ENTRY,
+            'reason': 'Retard justifié.',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 403)

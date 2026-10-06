@@ -1,5 +1,5 @@
 from django.http import HttpResponse
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -14,13 +14,13 @@ from .serializers import (
     BudgetSummarySerializer, BudgetReportSerializer, BudgetStatsSerializer
 )
 from .exports import export_budget_to_pdf, export_budget_to_excel, export_budget_to_csv
-from users.permissions import IsAdminOrReadOnly, IsAdminOnly
+from users.permissions import IsAdminOnly
 
 
 class BudgetCategoryViewSet(viewsets.ModelViewSet):
     queryset = BudgetCategory.objects.all()
     serializer_class = BudgetCategorySerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['category_type', 'is_system']
 
@@ -37,7 +37,7 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
 
 class BudgetItemViewSet(viewsets.ModelViewSet):
     queryset = BudgetItem.objects.select_related('category', 'created_by', 'validated_by', 'related_enrollment__student', 'related_teacher_assignment__professeur', 'related_teacher_assignment__classe', 'related_teacher_assignment__matiere').all()
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['item_type', 'category', 'academic_year', 'revenue_source', 'expense_type', 'is_validated']
 
@@ -49,7 +49,7 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly])
     def validate_item(self, request, pk=None):
         item = self.get_object()
         if item.is_validated:
@@ -62,7 +62,7 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
         summary.recalculate()
         return Response({'status': 'validated', 'item': BudgetItemSerializer(item).data})
 
-    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly])
     def stats(self, request):
         academic_year = request.query_params.get('academic_year')
         if not academic_year:
@@ -307,9 +307,9 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
 class BudgetSummaryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = BudgetSummary.objects.all()
     serializer_class = BudgetSummarySerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminOnly]
 
-    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminOnly])
     def recalculate_all(self, request):
         summaries = BudgetSummary.objects.all()
         for summary in summaries:
@@ -320,6 +320,6 @@ class BudgetSummaryViewSet(viewsets.ReadOnlyModelViewSet):
 class BudgetReportViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = BudgetReport.objects.select_related('generated_by').all()
     serializer_class = BudgetReportSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['academic_year', 'period_type', 'status']

@@ -7,6 +7,9 @@ from matieres.models import Matiere, ExamPeriod
 class Note(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'DRAFT', 'Brouillon'
+        SUBMITTED = 'SUBMITTED', 'Soumis'
+        APPROVED = 'APPROVED', 'Validé'
+        REJECTED = 'REJECTED', 'À corriger'
         LOCKED = 'LOCKED', 'Verrouillé'
 
     etudiant = models.ForeignKey(Etudiant, on_delete=models.CASCADE, related_name='notes')
@@ -47,7 +50,7 @@ class Note(models.Model):
         if self.exam_period:
             w1 = self.exam_period.weight_note_1
             w2 = self.exam_period.weight_note_2
-            if self.score_2:
+            if self.score_2 is not None:
                 return round(self.score_1 * w1 + self.score_2 * w2, 2)
             return round(self.score_1 * (w1 + w2), 2)
         return round(self.score_1, 2)

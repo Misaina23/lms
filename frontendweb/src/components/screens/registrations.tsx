@@ -17,7 +17,7 @@ export function RegistrationsScreen({ allUsers, onReload }: {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
   const [processing, setProcessing] = useState<number | null>(null)
 
-  const nonActiveUsers = allUsers.filter((u) => u.role === 'PROFESSEUR' || u.role === 'SURVEILLANT' || u.role === 'ADMIN')
+  const nonActiveUsers = allUsers.filter((u) => u.role === 'PROFESSEUR' || u.role === 'SURVEILLANT' || u.role === 'SECRETARIAT' || u.role === 'ADMIN')
   
   const filtered = nonActiveUsers.filter((u) => {
     const q = query.toLowerCase()
@@ -61,6 +61,7 @@ export function RegistrationsScreen({ allUsers, onReload }: {
     ELEVE: 'Élève',
     PARENT: 'Parent',
     SURVEILLANT: 'Surveillant',
+    SECRETARIAT: 'Secrétariat',
   }
 
   const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {

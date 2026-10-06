@@ -1,11 +1,13 @@
 from django.db.models import Q
+from django.db import transaction
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import ChatGroup, ChatGroupMember, ChatMessage
 from .serializers import ChatGroupSerializer, ChatMessageSerializer, ChatGroupMemberSerializer
-from users.permissions import CanParticipateInChat, IsAdminOnly
+from users.models import CustomUser
+from users.permissions import CanParticipateInChat, IsAdminOnly, STAFF_ROLES
 
 
 class ChatGroupViewSet(viewsets.ModelViewSet):
@@ -21,6 +23,29 @@ class ChatGroupViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         group = serializer.save()
         ChatGroupMember.objects.get_or_create(group=group, user=self.request.user, defaults={'is_admin': True})
+
+    @action(detail=False, methods=['post'], url_path='direct')
+    def direct(self, request):
+        try:
+            recipient = CustomUser.objects.get(
+                pk=request.data.get('recipient'),
+                role__in=STAFF_ROLES,
+                status=CustomUser.Status.ACTIVE,
+                is_active=True,
+            )
+        except (CustomUser.DoesNotExist, TypeError, ValueError):
+            return Response({'recipient': 'Choisissez un compte actif du personnel.'}, status=status.HTTP_400_BAD_REQUEST)
+        if recipient.id == request.user.id:
+            return Response({'recipient': 'Vous ne pouvez pas démarrer une conversation avec vous-même.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            group = ChatGroup.objects.create(
+                name=f"{request.user.get_full_name()} — {recipient.get_full_name()}",
+                group_type=ChatGroup.GroupType.PRIVATE,
+            )
+            ChatGroupMember.objects.create(group=group, user=request.user, is_admin=True)
+            ChatGroupMember.objects.create(group=group, user=recipient)
+        return Response(ChatGroupSerializer(group).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
@@ -48,7 +73,16 @@ class ChatGroupViewSet(viewsets.ModelViewSet):
         user_id = request.data.get('user_id')
         if not user_id:
             return Response({'detail': 'user_id requis.'}, status=status.HTTP_400_BAD_REQUEST)
-        ChatGroupMember.objects.get_or_create(group=group, user_id=user_id)
+        try:
+            user = CustomUser.objects.get(
+                pk=user_id,
+                role__in=STAFF_ROLES,
+                status=CustomUser.Status.ACTIVE,
+                is_active=True,
+            )
+        except (CustomUser.DoesNotExist, TypeError, ValueError):
+            return Response({'user_id': 'Choisissez un compte actif du personnel.'}, status=status.HTTP_400_BAD_REQUEST)
+        ChatGroupMember.objects.get_or_create(group=group, user=user)
         return Response({'detail': 'Membre ajouté.'})
 
 

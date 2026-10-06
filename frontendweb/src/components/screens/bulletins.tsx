@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +24,7 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedPeriodId, setSelectedPeriodId] = useState('')
 
   const matiereMap = useMemo(() => {
     const map: Record<number, Matiere> = {}
@@ -30,11 +32,7 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
     return map
   }, [matieres])
 
-  const periodMap = useMemo(() => {
-    const map: Record<number, ExamPeriod> = {}
-    periods.forEach(p => { map[p.id] = p })
-    return map
-  }, [periods])
+  const selectedPeriod = periods.find((period) => period.id === Number(selectedPeriodId))
 
   const filteredEtudiants = useMemo(() => {
     return etudiants.filter(etudiant => {
@@ -49,16 +47,19 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
   }, [etudiants, searchQuery])
 
   const studentNotes = useMemo(() => {
-    if (!selectedStudentId) return []
-    return notes.filter(n => n.etudiant === selectedStudentId)
-  }, [notes, selectedStudentId])
+    if (!selectedStudentId || !selectedPeriodId) return []
+    return notes.filter(n =>
+      n.etudiant === selectedStudentId
+      && n.exam_period === Number(selectedPeriodId)
+      && (n.status === 'APPROVED' || n.status === 'LOCKED')
+    )
+  }, [notes, selectedStudentId, selectedPeriodId])
 
   const bulletinData = useMemo(() => {
     if (!selectedStudentId) return null
     const etudiant = etudiants.find(e => e.id === selectedStudentId)
     if (!etudiant) return null
 
-    const studentNotes = notes.filter(n => n.etudiant === selectedStudentId)
     const byMatiere: Record<number, Note[]> = {}
     studentNotes.forEach(n => {
       if (!byMatiere[n.matiere]) byMatiere[n.matiere] = []
@@ -88,11 +89,11 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
       generalAverage,
       totalCoefficient: rows.reduce((sum, r) => sum + parseFloat(r.coefficient), 0),
     }
-  }, [selectedStudentId, etudiants, notes, matieres])
+  }, [selectedStudentId, etudiants, studentNotes, matiereMap])
 
   const handleGeneratePDF = () => {
     if (!bulletinData) return
-    alert(`Génération PDF du bulletin pour ${bulletinData.student.first_name} ${bulletinData.student.last_name} — moyenne générale: ${bulletinData.generalAverage.toFixed(2)}/20`)
+    window.print()
   }
 
   return (
@@ -111,9 +112,15 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
         <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
           <CardHeader>
             <CardTitle className="text-base">Sélectionner un élève</CardTitle>
-            <p className="text-xs text-muted-foreground">Choisissez un élève pour afficher son bulletin</p>
+            <p className="text-xs text-muted-foreground">Choisissez une période pour n’afficher que les notes validées.</p>
           </CardHeader>
           <CardContent>
+            <label className="mb-4 grid max-w-sm gap-1.5 text-xs font-semibold">Période
+              <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
+                <option value="">Choisir une période</option>
+                {periods.map((period) => <option key={period.id} value={period.id}>{period.label} — {period.academic_year}</option>)}
+              </select>
+            </label>
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -130,14 +137,15 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
                   <button
                     key={etudiant.id}
                     onClick={() => setSelectedStudentId(etudiant.id)}
-                    className="flex items-center gap-3 rounded-lg border border-border/70 p-4 text-left transition-colors hover:bg-muted/40"
+                    disabled={!selectedPeriodId || !notes.some((note) => note.etudiant === etudiant.id && note.exam_period === Number(selectedPeriodId) && (note.status === 'APPROVED' || note.status === 'LOCKED'))}
+                    className="flex items-center gap-3 rounded-lg border border-border/70 p-4 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                       {etudiant.first_name?.[0]}{etudiant.last_name?.[0]}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{etudiant.first_name} {etudiant.last_name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{etudiant.matricule}</p>
+                      <p className="truncate text-xs text-muted-foreground">{etudiant.matricule}{selectedPeriodId && !notes.some((note) => note.etudiant === etudiant.id && note.exam_period === Number(selectedPeriodId) && (note.status === 'APPROVED' || note.status === 'LOCKED')) ? ' · Aucune note validée' : ''}</p>
                     </div>
                     <FileText className="size-4 text-muted-foreground" />
                   </button>
@@ -163,13 +171,20 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
             </Button>
           </div>
 
-          <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
+          <Card className="print-bulletin border-border/70 bg-card/80 shadow-sm rounded-2xl">
             <CardHeader>
+              <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={80} height={40} className="h-9 w-[72px] shrink-0 object-contain" />
+                  <span className="font-display text-sm font-bold">Lycée Midongy Sud</span>
+                </div>
+                <Image src="/drapeau.jpeg" alt="Emblème LMS" width={74} height={42} className="h-10 w-auto object-contain" />
+              </div>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">Bulletin — {bulletinData.student.first_name} {bulletinData.student.last_name}</CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    {bulletinData.student.matricule} · Année scolaire 2024-2025
+                    {bulletinData.student.matricule} · {selectedPeriod?.label} · Année scolaire {selectedPeriod?.academic_year}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1">

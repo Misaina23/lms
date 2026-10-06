@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
 from users.models import CustomUser
-from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification
+from classes.models import Classe
+from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification, StudentOfficePass
 
 
 class UserNestedSerializer(serializers.ModelSerializer):
@@ -20,7 +21,7 @@ class ClasseNestedSerializer(serializers.Serializer):
 
 
 class EtudiantSerializer(serializers.ModelSerializer):
-    """Eleve n'est PAS un utilisateur - c'est une entite geree par l'admin."""
+    """Eleve n'est PAS un utilisateur - c'est un dossier scolaire."""
     full_name = serializers.CharField(source='get_full_name', read_only=True)
     classe_detail = ClasseNestedSerializer(source='classe', read_only=True)
     moyenne_generale = serializers.SerializerMethodField()
@@ -35,8 +36,15 @@ class EtudiantSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'moyenne_generale']
 
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        if request and request.user.role in ('SURVEILLANT', 'SECRETARIAT'):
+            fields.pop('moyenne_generale', None)
+        return fields
+
     def get_moyenne_generale(self, obj):
-        notes = obj.notes.all() if hasattr(obj, 'notes') else []
+        notes = obj.notes.filter(status__in=['APPROVED', 'LOCKED']) if hasattr(obj, 'notes') else []
         if not notes:
             return None
         try:
@@ -47,6 +55,25 @@ class EtudiantSerializer(serializers.ModelSerializer):
         if total_coefficient == 0:
             return None
         return round(total_weighted / total_coefficient, 2)
+
+
+class StudentRegistrationSerializer(serializers.Serializer):
+    matricule = serializers.CharField(max_length=50)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.ChoiceField(choices=Etudiant.Gender.choices, required=False, allow_null=True)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    email_parent = serializers.EmailField(required=False, allow_blank=True)
+    phone_parent = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    classe = serializers.PrimaryKeyRelatedField(
+        queryset=Classe.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    date_inscription = serializers.DateField()
+    academic_year = serializers.CharField(max_length=9)
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):
@@ -63,6 +90,22 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             'receipt_file', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'receipt_number', 'created_at', 'updated_at', 'reste_a_payer']
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        if request and request.user.role != 'ADMIN':
+            for field_name in (
+                'payment_status',
+                'frais_total',
+                'frais_verses',
+                'reste_a_payer',
+                'devise',
+                'receipt_number',
+                'receipt_file',
+            ):
+                fields.pop(field_name, None)
+        return fields
 
     def get_reste_a_payer(self, obj):
         if obj.frais_total is None:
@@ -108,6 +151,29 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = [
             'id', 'recipient', 'recipient_detail', 'channel', 'notification_type',
-            'title', 'message', 'payload', 'status', 'sent_at', 'retry_count', 'created_at',
+            'title', 'message', 'payload', 'status', 'is_read', 'sent_at', 'retry_count', 'created_at',
         ]
-        read_only_fields = ['id', 'status', 'sent_at', 'retry_count', 'created_at']
+        read_only_fields = ['id', 'status', 'is_read', 'sent_at', 'retry_count', 'created_at']
+
+
+class StudentOfficePassSerializer(serializers.ModelSerializer):
+    student_detail = EtudiantSerializer(source='student', read_only=True)
+    issued_by_name = serializers.CharField(source='issued_by.get_full_name', read_only=True)
+    reference = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentOfficePass
+        fields = [
+            'id', 'reference', 'student', 'student_detail', 'issued_by',
+            'issued_by_name', 'kind', 'reason', 'destination',
+            'scheduled_for', 'status', 'attended_at', 'created_at',
+        ]
+        read_only_fields = ['id', 'issued_by', 'status', 'attended_at', 'created_at']
+
+    def get_reference(self, obj):
+        return str(obj.id).split('-')[0].upper()
+
+    def validate(self, attrs):
+        if not attrs.get('reason', getattr(self.instance, 'reason', '')).strip():
+            raise serializers.ValidationError({'reason': 'Indiquez le motif de la convocation ou du billet.'})
+        return attrs

@@ -10,7 +10,6 @@ class UserListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
             'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status',
-            'base_salary',
         ]
 
 
@@ -27,11 +26,20 @@ class CustomUserSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+    def validate(self, attrs):
+        if self.instance is None and not attrs.get('password'):
+            raise serializers.ValidationError({'password': 'Définissez un mot de passe initial pour ce compte.'})
+        return attrs
+
     def create(self, validated_data):
-        password = validated_data.pop('password', None) or 'changeme123'
+        password = validated_data.pop('password')
         user = CustomUser(**validated_data)
         user.set_password(password)
-        if user.role in [CustomUser.Role.PROFESSEUR, CustomUser.Role.SURVEILLANT]:
+        if user.role in [
+            CustomUser.Role.PROFESSEUR,
+            CustomUser.Role.SURVEILLANT,
+            CustomUser.Role.SECRETARIAT,
+        ]:
             user.status = CustomUser.Status.PENDING_VERIFICATION
             user.is_active = False
         user.save()

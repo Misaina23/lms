@@ -7,6 +7,70 @@ import { Search, UsersRound } from 'lucide-react'
 import type { Etudiant, Enrollment, Classe } from '@/lib/api'
 import { initials, formatCurrency } from '@/lib/admin-data'
 
+export function EnrollmentRegistryScreen({ enrollments, etudiants, classes }: {
+  enrollments: Enrollment[]
+  etudiants: Etudiant[]
+  classes: Classe[]
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-extrabold tracking-tight text-foreground">Inscriptions scolaires</h2>
+        <p className="text-sm text-muted-foreground">{enrollments.length} dossiers d’inscription enregistrés.</p>
+      </div>
+      <Card className="border-border/70 bg-card/80 rounded-2xl">
+        <CardHeader><CardTitle className="text-base">Dossiers élèves</CardTitle></CardHeader>
+        <CardContent className="px-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-3 sm:px-6 font-semibold">Élève</th>
+                  <th className="px-3 py-3 sm:px-4 font-semibold">Classe</th>
+                  <th className="px-3 py-3 sm:px-4 font-semibold">Année scolaire</th>
+                  <th className="px-3 py-3 sm:px-6 font-semibold">Dossier</th>
+                </tr>
+              </thead>
+              <tbody>
+                {enrollments.map((enrollment) => {
+                  const student = etudiants.find((item) => item.id === enrollment.student)
+                  const classe = classes.find((item) => item.id === enrollment.classe)
+                  return (
+                    <tr key={enrollment.id} className="border-b border-border/60 last:border-0 hover:bg-muted/25">
+                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="grid size-8 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                            {student ? initials(`${student.first_name} ${student.last_name}`) : '?'}
+                          </span>
+                          <span>
+                            <strong className="block font-semibold">{student ? `${student.first_name} ${student.last_name}` : '—'}</strong>
+                            <small className="text-xs text-muted-foreground">{student?.matricule || '—'}</small>
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-muted-foreground sm:px-4 sm:py-4">{classe?.nom || '—'}</td>
+                      <td className="px-3 py-3 sm:px-4 sm:py-4">{enrollment.academic_year}</td>
+                      <td className="px-3 py-3 sm:px-6 sm:py-4">
+                        <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Inscrit</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {enrollments.length === 0 && (
+                  <tr><td colSpan={4} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucun dossier d’inscription.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="mx-5 mt-3 rounded-xl bg-secondary px-4 py-3 text-xs leading-5 text-secondary-foreground">
+            Cette liste concerne uniquement l’inscription scolaire. Les frais et règlements sont gérés séparément par l’administration.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
   enrollments: Enrollment[]
   etudiants: Etudiant[]

@@ -5,11 +5,8 @@ from django.db import migrations, models
 
 
 def _column_exists(cursor, table_name, column_name):
-    cursor.execute("""
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = %s AND column_name = %s
-    """, [table_name, column_name])
-    return cursor.fetchone() is not None
+    columns = cursor.db.introspection.get_table_description(cursor, table_name)
+    return column_name in {column.name for column in columns}
 
 
 def _migrate_from_user(apps, schema_editor):
@@ -38,7 +35,8 @@ def _drop_user_column(apps, schema_editor):
     """Supprime la colonne user_id si elle existe."""
     cursor = schema_editor.connection.cursor()
     if _column_exists(cursor, 'etudiants_etudiant', 'user_id'):
-        cursor.execute('ALTER TABLE etudiants_etudiant DROP COLUMN user_id')
+        Etudiant = apps.get_model('etudiants', 'Etudiant')
+        schema_editor.remove_field(Etudiant, Etudiant._meta.get_field('user'))
 
 
 def _cleanup_eleve_users(apps, schema_editor):
