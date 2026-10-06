@@ -1,7 +1,7 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || (
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000/api'
-    : ''
+    : 'https://lms-dfs2.onrender.com/api'
 );
 
 export type PaginatedResponse<T> = {
