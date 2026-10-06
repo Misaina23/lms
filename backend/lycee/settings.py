@@ -5,6 +5,7 @@ Django settings for lycee project.
 from pathlib import Path
 import os
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -67,15 +68,55 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'lycee.wsgi.application'
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', 'postgresql://misaina:xA2lH2dPc1AGxNoMCwDU1bKfFROpItbk@dpg-dab0cejtqb8s73edp0e0-a.frankfurt-postgres.render.com/lycee_tibs'),
-        conn_max_age=600,
+DATABASE_VARIABLES = ('DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT')
+DATABASE_SETTINGS = {name: os.environ.get(name) for name in DATABASE_VARIABLES}
+configured_database_variables = {
+    name: value for name, value in DATABASE_SETTINGS.items() if value
+}
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if configured_database_variables:
+    missing_database_variables = [
+        name for name, value in DATABASE_SETTINGS.items() if not value
+    ]
+    if missing_database_variables:
+        raise ImproperlyConfigured(
+            'Database configuration is incomplete; missing: '
+            + ', '.join(missing_database_variables)
+        )
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DATABASE_SETTINGS['DB_NAME'],
+            'USER': DATABASE_SETTINGS['DB_USER'],
+            'PASSWORD': DATABASE_SETTINGS['DB_PASSWORD'],
+            'HOST': DATABASE_SETTINGS['DB_HOST'],
+            'PORT': DATABASE_SETTINGS['DB_PORT'],
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {
+                'client_encoding': 'UTF8',
+                'sslmode': 'require',
+            },
+        },
+    }
+elif DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600),
+    }
+    DATABASES['default'].setdefault('OPTIONS', {})
+    DATABASES['default']['OPTIONS'].setdefault('client_encoding', 'UTF8')
+elif DEBUG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        },
+    }
+else:
+    raise ImproperlyConfigured(
+        'Configure DATABASE_URL or all DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, and DB_PORT '
+        'variables when DEBUG is disabled.'
     )
-}
-DATABASES['default']['OPTIONS'] = {
-    'client_encoding': 'UTF8',
-}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
