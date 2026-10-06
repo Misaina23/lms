@@ -1,7 +1,7 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || (
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000/api'
-    : 'https://lycee-backend.onrender.com/api'
+    : ''
 );
 
 export type PaginatedResponse<T> = {
@@ -12,6 +12,10 @@ export type PaginatedResponse<T> = {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (!API_BASE) {
+    throw new Error('L’API n’est pas configurée. Définissez NEXT_PUBLIC_API_URL dans Vercel.')
+  }
+
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   const headers: HeadersInit = {
