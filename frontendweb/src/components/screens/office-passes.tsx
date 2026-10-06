@@ -130,7 +130,7 @@ export function OfficePassesScreen({ students, records, role, onReload }: {
                   <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={96} height={46} className="h-11 w-20 shrink-0 object-contain" />
                   <div><p className="font-bold">Lycée Midongy Sud</p><p className="text-xs text-slate-500">Vie scolaire</p></div>
                 </div>
-                <Image src="/drapeau.jpeg" alt="Emblème LMS" width={78} height={44} className="h-10 w-auto object-contain" />
+                <Image src="/drapeau.jpeg" alt="Emblème LMS" width={48} height={48} className="size-12 rounded-full object-contain" />
               </div>
               <p className="mt-5 text-center text-xs font-bold uppercase tracking-[.18em] text-primary">Réf. {printing.reference}</p>
               <h3 className="mt-2 text-center font-display text-xl font-extrabold">{kinds[printing.kind]}</h3>

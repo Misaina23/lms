@@ -54,7 +54,7 @@ export default function TeacherRegistrationPage() {
             <div className="mb-3 flex items-center gap-3">
               <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={96} height={46} className="h-11 w-20 shrink-0 object-contain" />
               <p className="font-display text-sm font-bold">Lycée Midongy Sud</p>
-              <Image src="/drapeau.jpeg" alt="Emblème LMS" width={66} height={38} className="ml-auto h-9 w-auto object-contain" />
+              <Image src="/drapeau.jpeg" alt="Emblème LMS" width={48} height={48} className="ml-auto size-12 shrink-0 rounded-full border border-border bg-white object-contain p-0.5" />
             </div>
             <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Espace enseignant</p>
             <CardTitle className="text-2xl">Demande d’accès</CardTitle>

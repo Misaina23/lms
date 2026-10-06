@@ -63,20 +63,20 @@ export default function Home() {
     <main className="overflow-hidden bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border/80 bg-card/90 backdrop-blur-xl">
         <nav className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 sm:px-8" aria-label="Navigation principale">
-          <Link href="/" className="flex items-center gap-3" aria-label="Lycée Midongy Sud, accueil">
-            <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={104} height={50} className="h-10 w-[84px] shrink-0 object-contain sm:h-12 sm:w-24" priority />
-            <span>
-              <span className="block font-display text-sm font-bold tracking-tight sm:text-base">Lycée Midongy Sud</span>
-              <span className="block text-[10px] font-medium uppercase tracking-[.16em] text-muted-foreground">Apprendre · grandir · réussir</span>
+          <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3" aria-label="Lycée Midongy Sud, accueil">
+            <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={104} height={50} className="h-8 w-16 shrink-0 object-contain sm:h-12 sm:w-24" priority />
+            <span className="min-w-0">
+              <span className="block truncate font-display text-xs font-bold tracking-tight sm:text-base">Lycée Midongy Sud</span>
+              <span className="hidden text-[10px] font-medium uppercase tracking-[.16em] text-muted-foreground sm:block">Apprendre · grandir · réussir</span>
             </span>
-            <Image src="/drapeau.jpeg" alt="Emblème LMS" width={72} height={40} className="ml-2 hidden h-9 w-auto rounded-md object-contain sm:block" />
+            <Image src="/drapeau.jpeg" alt="Emblème LMS" width={56} height={56} className="ml-1 size-10 shrink-0 rounded-full border border-border bg-white object-contain p-0.5 sm:ml-2 sm:size-14" />
           </Link>
           <div className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
             <a className="transition-colors hover:text-primary" href="#fonctionnement">Fonctionnement</a>
             <a className="transition-colors hover:text-primary" href="#reglement">Vie scolaire</a>
             <a className="transition-colors hover:text-primary" href="#faq">FAQ</a>
           </div>
-          <Link href="/login" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <Link href="/login" className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:px-5 sm:text-sm">
             Se connecter <ArrowRight className="size-4" />
           </Link>
         </nav>
@@ -258,7 +258,7 @@ export default function Home() {
           <Link href="/" className="flex items-center gap-2 font-display text-sm font-bold">
             <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={72} height={36} className="h-8 w-16 object-contain" />
             Lycée Midongy Sud
-            <Image src="/drapeau.jpeg" alt="Emblème LMS" width={64} height={36} className="ml-2 h-8 w-auto rounded object-contain" />
+            <Image src="/drapeau.jpeg" alt="Emblème LMS" width={40} height={40} className="ml-2 size-10 rounded-full border border-border bg-white object-contain p-0.5" />
           </Link>
           <p className="text-center text-xs text-muted-foreground">Portail d’information et de services scolaires</p>
           <Link href="/login" className="text-xs font-semibold text-primary hover:underline">Accès au portail</Link>

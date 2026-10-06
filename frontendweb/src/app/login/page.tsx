@@ -47,7 +47,7 @@ export default function LoginPage() {
                 <p className="text-xs text-muted-foreground">Administration centrale</p>
               </div>
             </div>
-            <Image src="/drapeau.jpeg" alt="Emblème du lycée" width={56} height={56} className="ml-auto size-10 shrink-0 object-contain sm:size-12" />
+            <Image src="/drapeau.jpeg" alt="Emblème du lycée" width={64} height={64} className="ml-auto size-12 shrink-0 rounded-full border border-border bg-white object-contain p-0.5 sm:size-14" />
           </div>
         </CardHeader>
         <CardContent>

@@ -6,9 +6,9 @@ export const metadata: Metadata = {
   title: 'Lycée Midongy Sud — La vie scolaire, simplement',
   description: 'Informations, inscriptions et services numériques du Lycée Midongy Sud.',
   icons: {
-    icon: [{ url: '/logo%20%282%29.jpeg', type: 'image/jpeg' }],
-    shortcut: '/logo%20%282%29.jpeg',
-    apple: '/logo%20%282%29.jpeg',
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
   },
 }
 

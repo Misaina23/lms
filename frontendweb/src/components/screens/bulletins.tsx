@@ -178,7 +178,7 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
                   <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={80} height={40} className="h-9 w-[72px] shrink-0 object-contain" />
                   <span className="font-display text-sm font-bold">Lycée Midongy Sud</span>
                 </div>
-                <Image src="/drapeau.jpeg" alt="Emblème LMS" width={74} height={42} className="h-10 w-auto object-contain" />
+                <Image src="/drapeau.jpeg" alt="Emblème LMS" width={48} height={48} className="size-12 rounded-full object-contain" />
               </div>
               <div className="flex items-center justify-between">
                 <div>
