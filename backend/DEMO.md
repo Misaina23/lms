@@ -8,17 +8,19 @@ python manage.py seed_demo_portal --allow-insecure-passwords
 
 La commande est refusée lorsque `DEBUG=False`. Elle ne vide pas la base de données ; les comptes déjà présents ne voient pas leur mot de passe remplacé.
 
-## Seed explicite sur Render
+## Seed automatique sur Render
 
-Pour créer les classes et élèves de démonstration sur la base Render, ouvrez le Shell du service backend et lancez manuellement :
+Après le redéploiement, `start.sh` lance automatiquement les migrations puis le seed sécurisé, car `SEED_DEMO_DATA=true` est configuré dans `render.yaml`. Il est réexécutable sans dupliquer les données. Pour désactiver les seeds au démarrage après leur création, définissez `SEED_DEMO_DATA=false` dans les variables Render.
+
+Le seed de production :
 
 ```text
 python manage.py seed_demo_portal --production
 ```
 
-Cette option ne fonctionne qu'avec `DEBUG=False`. Elle crée les mêmes neuf classes et 45 élèves, et génère un mot de passe aléatoire fort pour chaque compte de démonstration nouvellement créé. Les mots de passe sont affichés une seule fois dans la sortie de la commande : conservez-les de manière sûre et transmettez-les aux personnes autorisées. Ne copiez pas cette sortie dans le dépôt ou dans un journal public. Les mots de passe des comptes préexistants ne sont pas modifiés. Le seed est réexécutable sans dupliquer classes, élèves ou affectations.
+Cette option ne fonctionne qu'avec `DEBUG=False`. Elle crée neuf classes et 45 élèves, et génère un mot de passe aléatoire fort pour chaque compte de démonstration nouvellement créé. Les mots de passe sont affichés une seule fois dans les journaux du premier démarrage : conservez-les de manière sûre et transmettez-les aux personnes autorisées. Ne copiez pas cette sortie dans le dépôt ou dans un journal public. Les mots de passe des comptes préexistants ne sont pas modifiés.
 
-Le seed de production ajoute des dossiers explicitement identifiés comme données de démonstration dans la base réelle. Exécutez-le uniquement si vous souhaitez que ces données apparaissent dans le portail public.
+Le seed de production ajoute des dossiers explicitement identifiés comme données de démonstration dans la base réelle.
 
 Comptes créés sur une base locale vide :
 

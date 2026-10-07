@@ -3,8 +3,8 @@ services:
     name: lycee-backend
     plan: free
     region: frankfurt
-    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput
-    startCommand: gunicorn lycee.wsgi:application --bind 0.0.0.0:$PORT --log-file -
+    buildCommand: pip install -r requirements.txt
+    startCommand: sh ./start.sh
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true
@@ -24,6 +24,8 @@ services:
         value: .onrender.com
       - key: FRONTEND_URL
         value: https://lyceemidongysud.vercel.app
+      - key: SEED_DEMO_DATA
+        value: "true"
       - key: EMAIL_HOST
         sync: false
       - key: EMAIL_PORT
