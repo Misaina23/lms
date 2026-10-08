@@ -12,6 +12,36 @@ class Matiere(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def get_coefficient_for_class(self, classe):
+        from decimal import Decimal
+        from classes.models import MatiereCoefficient
+
+        if classe is None:
+            return Decimal(str(self.coefficient))
+
+        stream_value = getattr(classe, 'stream', None)
+        niveau_value = getattr(classe, 'niveau', None)
+
+        if niveau_value and stream_value:
+            coefficient = MatiereCoefficient.objects.filter(
+                matiere=self,
+                niveau=niveau_value,
+                stream=stream_value,
+            ).order_by('-coefficient').first()
+            if coefficient:
+                return coefficient.coefficient
+
+        if niveau_value:
+            fallback = MatiereCoefficient.objects.filter(
+                matiere=self,
+                niveau=niveau_value,
+                stream='',
+            ).order_by('-coefficient').first()
+            if fallback:
+                return fallback.coefficient
+
+        return Decimal(str(self.coefficient))
+
     def __str__(self):
         return self.nom
 

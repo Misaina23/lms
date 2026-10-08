@@ -27,6 +27,12 @@ class Etudiant(models.Model):
     email_parent = models.EmailField(blank=True, help_text="Email du parent/tuteur")
     phone_parent = models.CharField(max_length=20, blank=True, help_text="Téléphone du parent/tuteur")
     address = models.TextField(blank=True)
+    photo = models.ImageField(
+        upload_to='photos/etudiants/',
+        null=True,
+        blank=True,
+        help_text='Photo de l’élève pour l’affichage du badge',
+    )
 
     classe = models.ForeignKey(Classe, on_delete=models.SET_NULL, null=True, related_name='etudiants')
     date_inscription = models.DateField()

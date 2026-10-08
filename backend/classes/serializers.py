@@ -17,7 +17,7 @@ class ClasseSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
     def get_effectif(self, obj):
-        return obj.etudiant_set.filter(actif=True).count()
+        return obj.etudiants.filter(actif=True).count()
 
 
 class RoomSerializer(serializers.ModelSerializer):

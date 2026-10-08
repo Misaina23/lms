@@ -51,6 +51,10 @@ class Classe(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def is_general_subdivision(self):
+        return self.stream == self.Stream.GENERAL or self.stream is None
+
     def __str__(self):
         return f"{self.nom} - {self.niveau}"
 

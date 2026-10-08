@@ -52,6 +52,12 @@ class CustomUser(AbstractUser):
     )
     date_of_birth = models.DateField(null=True, blank=True)
     address = models.TextField(blank=True)
+    photo = models.ImageField(
+        upload_to='photos/users/',
+        null=True,
+        blank=True,
+        help_text='Photo du titulaire de compte pour l’affichage du badge',
+    )
     base_salary = models.DecimalField(
         max_digits=12,
         decimal_places=2,

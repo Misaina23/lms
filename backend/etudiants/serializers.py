@@ -30,7 +30,7 @@ class EtudiantSerializer(serializers.ModelSerializer):
         model = Etudiant
         fields = [
             'id', 'matricule', 'first_name', 'last_name', 'full_name',
-            'date_of_birth', 'gender', 'phone', 'email_parent', 'phone_parent', 'address',
+            'date_of_birth', 'gender', 'phone', 'email_parent', 'phone_parent', 'address', 'photo',
             'classe', 'classe_detail', 'date_inscription',
             'statut', 'actif', 'moyenne_generale', 'created_at', 'updated_at',
         ]
@@ -42,6 +42,12 @@ class EtudiantSerializer(serializers.ModelSerializer):
         if request and request.user.role in ('SURVEILLANT', 'SECRETARIAT'):
             fields.pop('moyenne_generale', None)
         return fields
+
+    def validate(self, attrs):
+        photo = attrs.get('photo', getattr(self.instance, 'photo', None))
+        if not photo:
+            raise serializers.ValidationError({'photo': 'La photo de l’élève est obligatoire pour afficher correctement le badge.'})
+        return attrs
 
     def get_moyenne_generale(self, obj):
         notes = obj.notes.filter(status__in=['APPROVED', 'LOCKED']) if hasattr(obj, 'notes') else []
@@ -72,6 +78,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
+    photo = serializers.ImageField(required=False, allow_null=True)
     date_inscription = serializers.DateField()
     academic_year = serializers.CharField(max_length=9)
 

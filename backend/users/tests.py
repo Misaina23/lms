@@ -1,11 +1,22 @@
+from io import BytesIO
+
 from django.contrib.auth import authenticate
 from django.core.cache import cache
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
+from PIL import Image
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 from .models import CustomUser
+from .serializers import CustomUserSerializer
+
+
+def create_valid_photo(name='avatar.png'):
+    buffer = BytesIO()
+    Image.new('RGB', (10, 10), color='white').save(buffer, format='PNG')
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type='image/png')
 
 
 class CustomUserViewSetTests(APITestCase):
@@ -41,6 +52,7 @@ class CustomUserViewSetTests(APITestCase):
             'email': 'jean@lycee.com',
             'role': CustomUser.Role.PROFESSEUR,
             'password': 'TeacherPassword123!',
+            'photo': create_valid_photo('teacher.png'),
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
@@ -58,6 +70,21 @@ class CustomUserViewSetTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(CustomUser.objects.filter(email='marie@lycee.com').exists())
+
+    def test_account_holder_requires_photo_for_staff_roles(self):
+        serializer = CustomUserSerializer(data={
+            'username': 'photo-missing',
+            'matricule': 'PRFPHOTO',
+            'first_name': 'No',
+            'last_name': 'Photo',
+            'email': 'no-photo@lycee.com',
+            'password': 'StrongPassw0rd!',
+            'role': CustomUser.Role.PROFESSEUR,
+            'phone': '+261331234567',
+        })
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('photo', serializer.errors)
 
     def test_admin_can_suspend_staff_account(self):
         teacher = CustomUser.objects.create_user(
@@ -93,6 +120,7 @@ class CustomUserViewSetTests(APITestCase):
             'email': 'selfadmin@lycee.com',
             'password': 'SafePassword123!',
             'role': CustomUser.Role.ADMIN,
+            'photo': create_valid_photo('admin.png'),
         })
         self.assertEqual(response.status_code, 201)
         self.assertTrue(CustomUser.objects.filter(email='selfadmin@lycee.com').exists())

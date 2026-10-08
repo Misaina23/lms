@@ -9,7 +9,7 @@ class UserListSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
-            'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status',
+            'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status', 'photo',
         ]
 
 
@@ -21,7 +21,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
             'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status',
-            'date_of_birth', 'address', 'base_salary', 'password',
+            'date_of_birth', 'address', 'photo', 'base_salary', 'password',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -29,6 +29,16 @@ class CustomUserSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance is None and not attrs.get('password'):
             raise serializers.ValidationError({'password': 'Définissez un mot de passe initial pour ce compte.'})
+
+        role = attrs.get('role', getattr(self.instance, 'role', None))
+        photo = attrs.get('photo', getattr(self.instance, 'photo', None))
+        if role in {
+            CustomUser.Role.ADMIN,
+            CustomUser.Role.PROFESSEUR,
+            CustomUser.Role.SURVEILLANT,
+            CustomUser.Role.SECRETARIAT,
+        } and not photo:
+            raise serializers.ValidationError({'photo': 'La photo est obligatoire pour ce compte afin d’afficher le badge.'})
         return attrs
 
     def create(self, validated_data):
