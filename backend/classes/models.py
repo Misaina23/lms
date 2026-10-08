@@ -77,6 +77,16 @@ class TeacherAssignment(models.Model):
         default=False,
         help_text="Professeur principal de la classe (accès à toutes les matières pour cette classe)",
     )
+    is_substitute = models.BooleanField(
+        default=False,
+        help_text="Affectation de remplacement ou d’aide pour couvrir une matière tant qu’un prof titulaire manque.",
+    )
+    coverage_reason = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="Raison du remplacement (ex. manque de prof, congé, activité de remplacement)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -85,7 +95,8 @@ class TeacherAssignment(models.Model):
 
     def __str__(self):
         role = ' (PP)' if self.is_main_teacher else ''
-        return f"{self.professeur.get_full_name()} → {self.classe.nom} / {self.matiere.nom}{role}"
+        substitute = ' (remplacement)' if self.is_substitute else ''
+        return f"{self.professeur.get_full_name()} → {self.classe.nom} / {self.matiere.nom}{role}{substitute}"
 
 
 class MatiereCoefficient(models.Model):

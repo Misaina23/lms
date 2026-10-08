@@ -3,6 +3,20 @@ import csv
 from datetime import datetime
 from decimal import Decimal
 
+
+def _resolve_category_name(category, categories):
+    if isinstance(categories, dict):
+        key = getattr(category, 'id', category)
+        value = categories.get(key)
+        if isinstance(value, dict):
+            return value.get('name', '—')
+        if hasattr(category, 'name'):
+            return category.name
+        return '—'
+    if hasattr(category, 'name'):
+        return category.name
+    return '—'
+
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
@@ -82,7 +96,7 @@ def export_budget_to_pdf(budget_items, categories, report_period='Mensuel', acad
     if budget_items:
         items_data = [['Date', 'Type', 'Catégorie', 'Description', 'Montant (Ar)']]
         for item in budget_items[:100]:
-            cat_name = categories.get(item.category, {}).get('name', '—') if isinstance(categories, dict) else '—'
+            cat_name = _resolve_category_name(item.category, categories)
             items_data.append([
                 item.date,
                 'Recette' if item.item_type == 'REVENUE' else 'Dépense',
@@ -156,7 +170,7 @@ def export_budget_to_excel(budget_items, categories, report_period='Mensuel', ac
     total_expense = Decimal('0')
     
     for row_num, item in enumerate(budget_items[:500], start=5):
-        cat_name = categories.get(item.category, {}).get('name', '—') if isinstance(categories, dict) else '—'
+        cat_name = _resolve_category_name(item.category, categories)
         amount = Decimal(str(item.amount))
         
         if item.item_type == 'REVENUE':
@@ -229,7 +243,7 @@ def export_budget_to_csv(budget_items, categories, report_period='Mensuel', acad
     total_expense = Decimal('0')
     
     for item in budget_items[:1000]:
-        cat_name = categories.get(item.category, {}).get('name', '—') if isinstance(categories, dict) else '—'
+        cat_name = _resolve_category_name(item.category, categories)
         amount = Decimal(str(item.amount))
         
         if item.item_type == 'REVENUE':

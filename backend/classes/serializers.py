@@ -36,9 +36,15 @@ class TeacherAssignmentSerializer(serializers.ModelSerializer):
         model = TeacherAssignment
         fields = [
             'id', 'professeur', 'professeur_detail', 'classe', 'classe_detail',
-            'matiere', 'matiere_detail', 'academic_year', 'is_main_teacher', 'created_at',
+            'matiere', 'matiere_detail', 'academic_year', 'is_main_teacher',
+            'is_substitute', 'coverage_reason', 'created_at',
         ]
         read_only_fields = ['created_at']
+
+    def validate(self, attrs):
+        if attrs.get('is_substitute') and not attrs.get('coverage_reason', '').strip():
+            raise serializers.ValidationError({'coverage_reason': 'Indiquez la raison du remplacement ou de l’aide enseignante.'})
+        return attrs
 
     def get_professeur_detail(self, obj):
         return {

@@ -39,7 +39,7 @@ class TeacherAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = TeacherAssignmentSerializer
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['professeur', 'classe', 'matiere', 'academic_year', 'is_main_teacher']
+    filterset_fields = ['professeur', 'classe', 'matiere', 'academic_year', 'is_main_teacher', 'is_substitute']
 
     def perform_create(self, serializer):
         assignment = serializer.save()

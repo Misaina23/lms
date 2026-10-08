@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 from matieres.models import Matiere
 from users.models import CustomUser
-from .models import Classe, MatiereCoefficient
+from .models import Classe, MatiereCoefficient, TeacherAssignment
 
 
 class ClasseViewSetTests(APITestCase):
@@ -72,3 +72,31 @@ class ClasseBusinessRuleTests(APITestCase):
         self.assertTrue(seconde_a.is_general_subdivision)
         self.assertTrue(seconde_b.is_general_subdivision)
         self.assertEqual(Classe.objects.filter(niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.GENERAL).count(), 2)
+
+    def test_substitute_teacher_assignment_can_cover_missing_subject(self):
+        teacher = CustomUser.objects.create_user(
+            username='math-cover',
+            email='math-cover@lycee.com',
+            password='StrongPassw0rd!',
+            first_name='Math',
+            last_name='Cover',
+            matricule='TCHCOV1',
+            role=CustomUser.Role.PROFESSEUR,
+            status=CustomUser.Status.ACTIVE,
+        )
+        classe = Classe.objects.create(nom='Première S', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.SCIENTIFIQUE, capacite=30)
+        physique = Matiere.objects.create(code='PHY', nom='Physique', coefficient=4)
+
+        assignment = TeacherAssignment.objects.create(
+            professeur=teacher,
+            classe=classe,
+            matiere=physique,
+            academic_year='2024-2025',
+            is_main_teacher=False,
+            is_substitute=True,
+            coverage_reason='Manque de prof titulaire en physique',
+        )
+
+        self.assertTrue(assignment.is_substitute)
+        self.assertEqual(assignment.coverage_reason, 'Manque de prof titulaire en physique')
+        self.assertIn('remplacement', str(assignment))
