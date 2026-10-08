@@ -38,3 +38,13 @@ services:
         value: "True"
       - key: DEFAULT_FROM_EMAIL
         value: noreply@lyceemidongysud.mg
+      - key: SUPERUSER_EMAIL
+        value: admin@gmail.com
+      - key: SUPERUSER_PASSWORD
+        value: "123456"
+      - key: SUPERUSER_FIRST_NAME
+        value: Admin
+      - key: SUPERUSER_LAST_NAME
+        value: Portal
+      - key: SUPERUSER_MATRICULE
+        value: ADM-ROOT-001

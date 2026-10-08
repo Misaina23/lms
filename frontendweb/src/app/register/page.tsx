@@ -17,6 +17,7 @@ export default function TeacherRegistrationPage() {
     matricule: '',
     email: '',
     phone: '',
+    role: 'PROFESSEUR',
     teacher_type: 'FONCTIONNAIRE',
     password: '',
   })
@@ -34,7 +35,10 @@ export default function TeacherRegistrationPage() {
     setLoading(true)
 
     try {
-      await api.post('/register/', { ...form, role: 'PROFESSEUR' })
+      await api.post('/register/', {
+        ...form,
+        role: form.role,
+      })
       setSubmitted(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible d’envoyer la demande.')
@@ -56,9 +60,9 @@ export default function TeacherRegistrationPage() {
               <p className="font-display text-sm font-bold">Lycée Midongy Sud</p>
               <Image src="/drapeau.jpeg" alt="Emblème LMS" width={48} height={48} className="ml-auto size-12 shrink-0 rounded-full border border-border bg-white object-contain p-0.5" />
             </div>
-            <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Espace enseignant</p>
+            <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Portail LMS</p>
             <CardTitle className="text-2xl">Demande d’accès</CardTitle>
-            <p className="text-sm leading-6 text-muted-foreground">Les demandes sont vérifiées par l’administration avant l’activation du compte.</p>
+            <p className="text-sm leading-6 text-muted-foreground">Choisissez votre rôle puis soumettez votre demande. L’administration valide l’accès avant activation.</p>
           </CardHeader>
           <CardContent className="px-6 pb-7 sm:px-9 sm:pb-9">
             {submitted ? (
@@ -77,7 +81,14 @@ export default function TeacherRegistrationPage() {
                 <label className="grid gap-1.5 text-xs font-semibold">Identifiant
                   <Input required autoComplete="username" value={form.username} onChange={(event) => update('username', event.target.value)} />
                 </label>
-                <label className="grid gap-1.5 text-xs font-semibold">Matricule enseignant
+                <label className="grid gap-1.5 text-xs font-semibold">Rôle demandé
+                  <select className="h-10 rounded-xl border border-input px-3 text-sm font-normal" value={form.role} onChange={(event) => update('role', event.target.value)}>
+                    <option value="PROFESSEUR">Professeur</option>
+                    <option value="ADMIN">Administrateur</option>
+                    <option value="SURVEILLANT">Surveillant</option>
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-xs font-semibold">Matricule
                   <Input required value={form.matricule} onChange={(event) => update('matricule', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-xs font-semibold">Adresse e-mail
@@ -86,12 +97,14 @@ export default function TeacherRegistrationPage() {
                 <label className="grid gap-1.5 text-xs font-semibold">Téléphone <span className="font-normal text-muted-foreground">Facultatif</span>
                   <Input autoComplete="tel" value={form.phone} onChange={(event) => update('phone', event.target.value)} />
                 </label>
-                <label className="grid gap-1.5 text-xs font-semibold">Statut professionnel
-                  <select className="h-10 rounded-xl border border-input px-3 text-sm font-normal" value={form.teacher_type} onChange={(event) => update('teacher_type', event.target.value)}>
-                    <option value="FONCTIONNAIRE">Fonctionnaire</option>
-                    <option value="SUPPLEANT">Suppléant</option>
-                  </select>
-                </label>
+                {(form.role === 'PROFESSEUR' || form.role === 'ADMIN') && (
+                  <label className="grid gap-1.5 text-xs font-semibold">Statut professionnel
+                    <select className="h-10 rounded-xl border border-input px-3 text-sm font-normal" value={form.teacher_type} onChange={(event) => update('teacher_type', event.target.value)}>
+                      <option value="FONCTIONNAIRE">Fonctionnaire</option>
+                      <option value="SUPPLEANT">Suppléant</option>
+                    </select>
+                  </label>
+                )}
                 <label className="grid gap-1.5 text-xs font-semibold">Mot de passe
                   <Input required type="password" minLength={8} autoComplete="new-password" value={form.password} onChange={(event) => update('password', event.target.value)} />
                 </label>

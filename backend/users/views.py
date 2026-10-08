@@ -16,6 +16,18 @@ from .models import CustomUser
 from .serializers import CustomUserSerializer, UserListSerializer
 from .permissions import IsAdminOnly, IsStaffUser, STAFF_ROLES
 
+PORTAL_ACCESS_ROLES = {
+    CustomUser.Role.ADMIN,
+    CustomUser.Role.PROFESSEUR,
+    CustomUser.Role.SURVEILLANT,
+    CustomUser.Role.SECRETARIAT,
+}
+PUBLIC_SIGNUP_ROLES = {
+    CustomUser.Role.ADMIN,
+    CustomUser.Role.PROFESSEUR,
+    CustomUser.Role.SURVEILLANT,
+}
+
 
 class PasswordResetRateThrottle(AnonRateThrottle):
     scope = 'password_reset'
@@ -98,7 +110,11 @@ def registration_options(request):
     return Response({
         'classes': ClasseSerializer(classes, many=True).data,
         'matieres': MatiereSerializer(matieres, many=True).data,
-        'roles': [{'value': CustomUser.Role.PROFESSEUR, 'label': 'Professeur'}],
+        'roles': [
+            {'value': CustomUser.Role.PROFESSEUR, 'label': 'Professeur'},
+            {'value': CustomUser.Role.ADMIN, 'label': 'Administrateur'},
+            {'value': CustomUser.Role.SURVEILLANT, 'label': 'Surveillant'},
+        ],
         'teacher_types': [
             {'value': tt[0], 'label': tt[1]}
             for tt in CustomUser.TeacherType.choices
@@ -110,9 +126,10 @@ def registration_options(request):
 @permission_classes([permissions.AllowAny])
 @authentication_classes([])
 def register_view(request):
-    if request.data.get('role') != CustomUser.Role.PROFESSEUR:
+    role = request.data.get('role')
+    if role not in PUBLIC_SIGNUP_ROLES:
         return Response(
-            {'role': ['Les inscriptions publiques sont réservées aux enseignants.']},
+            {'role': ['Les inscriptions publiques sont réservées aux enseignants, administrateurs et surveillants.']},
             status=status.HTTP_400_BAD_REQUEST,
         )
     if not request.data.get('password'):
@@ -138,6 +155,11 @@ def login_view(request):
     password = request.data.get('password')
     user = authenticate(request, username=email, password=password)
     if user is not None:
+        if user.role not in PORTAL_ACCESS_ROLES:
+            return Response({
+                'detail': 'Ce compte n\'est pas autorisé à accéder au portail.',
+                'status': 'unauthorized_role'
+            }, status=status.HTTP_403_FORBIDDEN)
         if user.status == CustomUser.Status.PENDING_VERIFICATION:
             return Response({
                 'detail': 'Votre compte est en attente de validation par l\'administration.',

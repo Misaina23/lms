@@ -83,7 +83,7 @@ class CustomUserViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['email'], 'admin@lycee.com')
 
-    def test_public_registration_only_accepts_teacher_role(self):
+    def test_public_registration_accepts_portal_roles(self):
         self.client.credentials()
         response = self.client.post(reverse('register'), {
             'username': 'selfadmin',
@@ -94,22 +94,49 @@ class CustomUserViewSetTests(APITestCase):
             'password': 'SafePassword123!',
             'role': CustomUser.Role.ADMIN,
         })
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(CustomUser.objects.filter(email='selfadmin@lycee.com').exists())
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(CustomUser.objects.filter(email='selfadmin@lycee.com').exists())
+        self.assertEqual(CustomUser.objects.get(email='selfadmin@lycee.com').status, CustomUser.Status.PENDING_VERIFICATION)
 
-    def test_registration_options_only_exposes_teacher_signup(self):
+    def test_registration_options_exposes_all_portal_signup_roles(self):
         self.client.credentials()
         response = self.client.get(reverse('registration-options'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.data['roles'],
-            [{'value': CustomUser.Role.PROFESSEUR, 'label': 'Professeur'}],
+            [
+                {'value': CustomUser.Role.PROFESSEUR, 'label': 'Professeur'},
+                {'value': CustomUser.Role.ADMIN, 'label': 'Administrateur'},
+                {'value': CustomUser.Role.SURVEILLANT, 'label': 'Surveillant'},
+            ],
         )
 
     def test_user_directory_requires_staff_authentication(self):
         self.client.credentials()
         response = self.client.get(reverse('user-list'))
         self.assertEqual(response.status_code, 401)
+
+    def test_login_rejects_non_portal_roles(self):
+        self.client.credentials()
+        student = CustomUser.objects.create_user(
+            username='student-portal-block',
+            email='student-portal-block@lycee.com',
+            password='StrongPassw0rd!',
+            first_name='Student',
+            last_name='User',
+            matricule='ELEVE001',
+            role=CustomUser.Role.ELEVE,
+            status=CustomUser.Status.ACTIVE,
+        )
+
+        response = self.client.post(reverse('login'), {
+            'email': student.email,
+            'password': 'StrongPassw0rd!',
+        })
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn('autorisé', response.data['detail'])
+        self.assertFalse(Token.objects.filter(user=student).exists())
 
 
 @override_settings(

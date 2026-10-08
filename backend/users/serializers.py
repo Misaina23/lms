@@ -36,6 +36,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
         user = CustomUser(**validated_data)
         user.set_password(password)
         if user.role in [
+            CustomUser.Role.ADMIN,
             CustomUser.Role.PROFESSEUR,
             CustomUser.Role.SURVEILLANT,
             CustomUser.Role.SECRETARIAT,
