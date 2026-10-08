@@ -116,6 +116,13 @@ class CustomUserViewSetTests(APITestCase):
         response = self.client.get(reverse('user-list'))
         self.assertEqual(response.status_code, 401)
 
+    def test_backend_root_endpoint_is_available(self):
+        response = self.client.get('/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'ok')
+        self.assertIn('api', response.data['message'])
+
     def test_login_rejects_non_portal_roles(self):
         self.client.credentials()
         student = CustomUser.objects.create_user(

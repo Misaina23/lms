@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
+import { clearSession, isValidPortalRole } from '@/lib/auth'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -32,6 +33,10 @@ export default function LoginPage() {
       const response = await api.post<{ token: string; user: import('@/lib/api').User }>('/login/', { email, password })
       if (!response.token || !response.user) {
         throw new Error('La réponse du serveur est incomplète. Réessayez ou contactez l’administration.')
+      }
+      if (!isValidPortalRole(response.user.role)) {
+        clearSession()
+        throw new Error('Ce compte n’est pas autorisé à accéder au portail.')
       }
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))

@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api, type PaginatedResponse, type User, type Classe, type Matiere, type Etudiant, type Note, type Absence, type Enrollment, type StudentOrientation, type ExamPeriod } from '@/lib/api'
 import { useAdminData, type ScreenKey } from '@/lib/admin-data'
+import { clearSession, getStoredUser, isValidPortalRole } from '@/lib/auth'
 import { StudentsScreen } from '@/components/screens/students'
 import { EnrollmentRegistryScreen, EnrollmentsScreen } from '@/components/screens/enrollments'
 import { TeachersScreen, ClassesScreen, MatieresScreen, GradesScreen, AttendanceScreen, ReportsScreen, ExamPeriodsScreen } from '@/components/screens/modules'
@@ -106,34 +107,26 @@ export default function Home() {
 
   useEffect(() => {
     const token = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('user')
-    if (!token || !savedUser) {
+    const user = getStoredUser()
+    if (!token || !user || !isValidPortalRole(user.role)) {
+      clearSession()
       window.location.replace('/login')
       return
     }
 
-    try {
-      const user = JSON.parse(savedUser) as User
-      if (!roleScreenKeys[user.role]) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        window.location.replace('/login')
-        return
-      }
-      setRole(user.role)
-      setDisplayName(`${user.first_name} ${user.last_name}`.trim() || roleLabels[user.role])
-      setActive(user.role === 'ADMIN' ? 'overview' : roleScreenKeys[user.role][0])
-      setIsLoggedIn(true)
-    } catch {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+    if (!roleScreenKeys[user.role]) {
+      clearSession()
       window.location.replace('/login')
+      return
     }
+    setRole(user.role)
+    setDisplayName(`${user.first_name} ${user.last_name}`.trim() || roleLabels[user.role])
+    setActive(user.role === 'ADMIN' ? 'overview' : roleScreenKeys[user.role][0])
+    setIsLoggedIn(true)
   }, [])
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    clearSession()
     setIsLoggedIn(false)
     window.location.href = '/'
   }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { api, type PaginatedResponse, type User, type Etudiant, type Note, type Classe, type Matiere, type Enrollment, type StudentOrientation, type ExamPeriod, type Absence, type BudgetItem, type BudgetCategory, type BudgetReport, type BudgetStats, type TimetableSlot, type AuditLog, type Notification, type StudentOfficePass } from '@/lib/api'
+import { getStoredUser, isValidPortalRole } from '@/lib/auth'
 
 export type ScreenKey =
   | 'overview'
@@ -58,6 +59,19 @@ export function useAdminData() {
   const reload = async () => {
     setIsLoading(true)
     setError(null)
+
+    const currentUser = getStoredUser()
+    if (!currentUser || !isValidPortalRole(currentUser.role)) {
+      setData({
+        users: [], allUsers: [], classes: [], matieres: [], etudiants: [], notes: [],
+        absences: [], enrollments: [], orientations: [], periods: [],
+        budgetItems: [], budgetCategories: [], budgetReports: [], budgetStats: null,
+        timetableSlots: [], auditLogs: [], notifications: [], officePasses: [],
+      })
+      setIsLoading(false)
+      return
+    }
+
     try {
       const [u, c, m, e, n, a, en, o, p, bi, bc, br, bs, ts, al, no, op] = await Promise.all([
         api.get<PaginatedResponse<User>>('/users/').catch(() => ({ results: [] })),
