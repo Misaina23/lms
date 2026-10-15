@@ -9,6 +9,8 @@ from django.urls import reverse
 from PIL import Image
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
+from matieres.models import Matiere
+from classes.models import Classe, TeacherAssignment
 from .models import CustomUser
 from .serializers import CustomUserSerializer
 
@@ -137,6 +139,45 @@ class CustomUserViewSetTests(APITestCase):
                 {'value': CustomUser.Role.ADMIN, 'label': 'Administrateur'},
                 {'value': CustomUser.Role.SURVEILLANT, 'label': 'Surveillant'},
             ],
+        )
+
+    def test_public_registration_requires_matiere_for_teacher_and_creates_coverage_assignment_on_approval(self):
+        self.client.credentials()
+        matiere = Matiere.objects.create(nom='Physique', code='PHY', coefficient=1)
+        classe = Classe.objects.create(
+            nom='Terminale A',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            academic_year='2024-2025',
+            capacite=30,
+        )
+
+        response = self.client.post(reverse('register'), {
+            'username': 'teacher-matiere',
+            'matricule': 'PRF010',
+            'first_name': 'Alice',
+            'last_name': 'Martin',
+            'email': 'teacher-matiere@lycee.com',
+            'password': 'SafePassword123!',
+            'role': CustomUser.Role.PROFESSEUR,
+            'teacher_type': CustomUser.TeacherType.FONCTIONNAIRE,
+            'matiere': matiere.id,
+            'photo': create_valid_photo('teacher-subject.png'),
+        })
+
+        self.assertEqual(response.status_code, 201)
+        user = CustomUser.objects.get(email='teacher-matiere@lycee.com')
+        self.assertEqual(user.matiere_id, matiere.id)
+
+        approval_response = self.client.post(reverse('user-approve', args=[user.id]), HTTP_AUTHORIZATION=f'Token {self.admin_user.auth_token.key}')
+        self.assertEqual(approval_response.status_code, 200)
+        self.assertTrue(
+            TeacherAssignment.objects.filter(
+                professeur=user,
+                classe=classe,
+                matiere=matiere,
+                is_substitute=True,
+            ).exists()
         )
 
     def test_user_directory_requires_staff_authentication(self):

@@ -9,9 +9,10 @@ from rest_framework.authtoken.models import Token
 from users.models import CustomUser
 from classes.models import Classe
 from classes.models import TeacherAssignment
-from matieres.models import Matiere
+from matieres.models import Matiere, ExamPeriod
+from notes.models import Note
 from budget.models import BudgetItem
-from .models import Etudiant, Enrollment, Notification, StudentOfficePass
+from .models import Etudiant, Enrollment, Notification, StudentOfficePass, CertificateRequest, Deliberation
 
 
 class DemoPortalSeedCommandTests(TestCase):
@@ -67,6 +68,133 @@ class DemoPortalSeedCommandTests(TestCase):
         self.assertTrue(CustomUser.objects.get(email='admin@gmail.com').check_password(admin_password))
         self.assertEqual(Classe.objects.filter(academic_year=academic_year).count(), 9)
         self.assertEqual(Etudiant.objects.filter(classe__academic_year=academic_year).count(), 45)
+
+
+class AdmissionAndCertificateWorkflowTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = CustomUser.objects.create_user(
+            username='admin-workflow',
+            email='admin-workflow@lycee.com',
+            password='adminpass',
+            first_name='Admin',
+            last_name='Workflow',
+            matricule='ADMWF001',
+            role=CustomUser.Role.ADMIN,
+        )
+        Token.objects.create(user=cls.admin_user)
+        cls.classe = Classe.objects.create(
+            nom='1ère S',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream='S',
+            capacite=35,
+        )
+        cls.period = ExamPeriod.objects.create(
+            code='T1',
+            label='Trimestre 1',
+            period_type=ExamPeriod.PeriodType.TRIMESTRE_1,
+            academic_year='2026-2027',
+            start_date='2026-10-01',
+            end_date='2026-12-31',
+        )
+        cls.math = Matiere.objects.create(nom='Mathématiques', code='MATH')
+        cls.fr = Matiere.objects.create(nom='Français', code='FR')
+        cls.ses = Matiere.objects.create(nom='SES', code='SES')
+
+    def setUp(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.admin_user.auth_token.key}')
+
+    def test_bulk_import_and_export_students_for_class(self):
+        response = self.client.post(reverse('etudiant-import'), {
+            'classe_id': self.classe.id,
+            'students': [
+                {'matricule': 'IMP-001', 'first_name': 'Rija', 'last_name': 'Rakoto', 'date_inscription': '2026-09-01'},
+                {'matricule': 'IMP-002', 'first_name': 'Solo', 'last_name': 'Ravel', 'date_inscription': '2026-09-01'},
+            ],
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Etudiant.objects.filter(classe=self.classe).count(), 2)
+
+        export_response = self.client.get(reverse('etudiant-export'), {'classe_id': self.classe.id, 'format': 'xls'})
+        self.assertEqual(export_response.status_code, 200)
+        self.assertIn('application/vnd.ms-excel', export_response['Content-Type'])
+
+    def test_deliberation_analyze_uses_threshold_and_decides_admission(self):
+        candidate = Etudiant.objects.create(
+            matricule='DEL-01',
+            first_name='Lina',
+            last_name='A',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        repeater = Etudiant.objects.create(
+            matricule='DEL-02',
+            first_name='Tom',
+            last_name='B',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+
+        for etudiant, scores in [
+            (candidate, {'MATH': 16.0, 'FR': 12.0, 'SES': 11.0}),
+            (repeater, {'MATH': 7.0, 'FR': 8.5, 'SES': 9.0}),
+        ]:
+            for code, score in scores.items():
+                matiere = Matiere.objects.get(code=code)
+                Note.objects.create(
+                    etudiant=etudiant,
+                    matiere=matiere,
+                    professeur=self.admin_user,
+                    exam_period=self.period,
+                    score_1=score,
+                    coefficient=1,
+                    date_evaluation='2026-11-15',
+                    status=Note.Status.APPROVED,
+                )
+
+        response = self.client.post(reverse('deliberation-analyze'), {
+            'threshold': '9.75',
+            'academic_year': '2026-2027',
+            'stream': 'S',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Deliberation.objects.filter(student=candidate, decision='ADMITTED').exists())
+        self.assertTrue(Deliberation.objects.filter(student=repeater, decision='REPEATER').exists())
+
+    def test_certificate_request_verifies_school_fees_and_allows_negotiation(self):
+        student = Etudiant.objects.create(
+            matricule='CERT-01',
+            first_name='Nadia',
+            last_name='C',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        Enrollment.objects.create(
+            student=student,
+            classe=self.classe,
+            academic_year='2026-2027',
+            frais_total='150000.00',
+            frais_verses='150000.00',
+            payment_status=Enrollment.PaymentStatus.PAID,
+        )
+
+        create_response = self.client.post(reverse('certificate-request-list'), {
+            'student': student.id,
+            'academic_year': '2026-2027',
+        }, format='json')
+        self.assertEqual(create_response.status_code, 201)
+        request_obj = CertificateRequest.objects.get(student=student)
+        self.assertEqual(request_obj.status, CertificateRequest.Status.PENDING)
+
+        review_response = self.client.post(reverse('certificate-request-review', args=[request_obj.id]), {
+            'status': CertificateRequest.Status.APPROVED,
+            'fee_verified': True,
+            'decision_reason': 'Frais validés et classe conforme.',
+        }, format='json')
+        self.assertEqual(review_response.status_code, 200)
+        self.assertEqual(review_response.data['status'], CertificateRequest.Status.APPROVED)
 
 
 class EtudiantViewSetTests(APITestCase):

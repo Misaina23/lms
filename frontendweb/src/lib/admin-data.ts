@@ -11,6 +11,7 @@ export type ScreenKey =
   | 'payments'
   | 'classes'
   | 'teachers'
+  | 'coverage'
   | 'timetable'
   | 'attendance'
   | 'grades'

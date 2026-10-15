@@ -20,7 +20,7 @@ export function TeachersScreen({ users, etudiants, notes, matieres, periods, onR
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<User | null>(null)
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', matricule: '', role: 'PROFESSEUR' as StaffRole, teacher_type: 'FONCTIONNAIRE' as 'FONCTIONNAIRE' | 'SUPPLEANT', surveillant_type: 'GENERAL', phone: '', password: '' })
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', matricule: '', role: 'PROFESSEUR' as StaffRole, teacher_type: 'FONCTIONNAIRE' as 'FONCTIONNAIRE' | 'SUPPLEANT', matiere: '', surveillant_type: 'GENERAL', phone: '', password: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -31,7 +31,7 @@ export function TeachersScreen({ users, etudiants, notes, matieres, periods, onR
   })
 
   const resetForm = () => {
-    setForm({ first_name: '', last_name: '', email: '', matricule: '', role: 'PROFESSEUR', teacher_type: 'FONCTIONNAIRE', surveillant_type: 'GENERAL', phone: '', password: '' })
+    setForm({ first_name: '', last_name: '', email: '', matricule: '', role: 'PROFESSEUR', teacher_type: 'FONCTIONNAIRE', matiere: '', surveillant_type: 'GENERAL', phone: '', password: '' })
     setFormError('')
     setEditingTeacher(null)
     setShowForm(false)
@@ -51,6 +51,7 @@ export function TeachersScreen({ users, etudiants, notes, matieres, periods, onR
       matricule: teacher.matricule,
       role: teacher.role as StaffRole,
       teacher_type: (teacher.teacher_type as 'FONCTIONNAIRE' | 'SUPPLEANT') || 'FONCTIONNAIRE',
+      matiere: '',
       surveillant_type: teacher.surveillant_type || 'GENERAL',
       phone: teacher.phone || '',
       password: '',
@@ -63,10 +64,14 @@ export function TeachersScreen({ users, etudiants, notes, matieres, periods, onR
     setFormError('')
     try {
       const { password, ...fields } = form
+      const payload: Record<string, unknown> = { ...fields, ...(password ? { password } : {}) }
+      if (form.role !== 'PROFESSEUR') {
+        delete payload.matiere
+      }
       if (editingTeacher) {
-        await api.patch(`/users/${editingTeacher.id}/`, { ...fields, ...(password ? { password } : {}) })
+        await api.patch(`/users/${editingTeacher.id}/`, payload)
       } else {
-        await api.post('/users/', { ...fields, username: form.email, password, status: 'PENDING_VERIFICATION' })
+        await api.post('/users/', { ...payload, username: form.email, status: 'PENDING_VERIFICATION' })
       }
       onReload()
       resetForm()
@@ -164,13 +169,24 @@ export function TeachersScreen({ users, etudiants, notes, matieres, periods, onR
                   <option value="SECRETARIAT">Secrétariat</option>
                 </select>
               </div>
-              {form.role === 'PROFESSEUR' && <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Type</label>
-                <select className="h-9 w-full rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none" value={form.teacher_type} onChange={(e) => setForm({ ...form, teacher_type: e.target.value as any })}>
-                  <option value="FONCTIONNAIRE">Fonctionnaire</option>
-                  <option value="SUPPLEANT">Suppléant</option>
-                </select>
-              </div>}
+              {form.role === 'PROFESSEUR' && <>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Type</label>
+                  <select className="h-9 w-full rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none" value={form.teacher_type} onChange={(e) => setForm({ ...form, teacher_type: e.target.value as any })}>
+                    <option value="FONCTIONNAIRE">Fonctionnaire</option>
+                    <option value="SUPPLEANT">Suppléant</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Matière *</label>
+                  <select className="h-9 w-full rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none" value={form.matiere} onChange={(e) => setForm({ ...form, matiere: e.target.value })}>
+                    <option value="">Choisir une matière</option>
+                    {matieres.map((m) => (
+                      <option key={m.id} value={m.id}>{m.nom} ({m.code})</option>
+                    ))}
+                  </select>
+                </div>
+              </>}
               {form.role === 'SURVEILLANT' && <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Type de surveillant</label>
                 <select className="h-9 w-full rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none" value={form.surveillant_type} onChange={(e) => setForm({ ...form, surveillant_type: e.target.value })}>
@@ -557,6 +573,124 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+export function CoverageScreen({ classes, matieres, users }: { classes: any[]; matieres: Matiere[]; users: User[] }) {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [assigningId, setAssigningId] = useState<number | null>(null)
+
+  const loadCoverage = async () => {
+    try {
+      setLoading(true)
+      const response = await api.get<{ count: number; missing_subjects: any[] }>('/classes/coverage/')
+      setItems(response.missing_subjects || [])
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de charger les couverures pédagogiques.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadCoverage()
+  }, [])
+
+  const assignTeacher = async (coverageItem: any, teacher: any) => {
+    setAssigningId(teacher.id)
+    try {
+      await api.post('/teacher-assignments/', {
+        professeur: teacher.id,
+        classe: coverageItem.classe.id,
+        matiere: coverageItem.matiere.id,
+        academic_year: coverageItem.academic_year || '2024-2025',
+        is_main_teacher: false,
+        is_substitute: true,
+        coverage_reason: teacher.is_primary_match
+          ? 'Matière principale compatible / couverture pédagogique prioritaire'
+          : 'Aide enseignante / manque de prof sur la matière',
+      })
+      await loadCoverage()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’affecter ce professeur.')
+    } finally {
+      setAssigningId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Couverture pédagogique</p>
+          <h2 className="mt-1 text-lg font-extrabold tracking-tight text-foreground">Matières non couvertes</h2>
+        </div>
+        <Button variant="outline" onClick={() => void loadCoverage()} disabled={loading}>Actualiser</Button>
+      </div>
+
+      {error && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">{error}</p>}
+
+      {loading ? (
+        <Card className="rounded-2xl"><CardContent className="p-8 text-center text-sm text-muted-foreground">Recherche des matières non couvertes…</CardContent></Card>
+      ) : items.length === 0 ? (
+        <Card className="rounded-2xl"><CardContent className="p-8 text-center text-sm text-muted-foreground">Aucune matière non couverte pour l’instant.</CardContent></Card>
+      ) : (
+        <div className="space-y-4">
+          {items.map((item) => (
+            <Card key={`${item.classe.id}-${item.matiere.id}`} className="rounded-2xl border-border/70 bg-card/80 shadow-sm">
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-2 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-base font-semibold">{item.classe.nom}</p>
+                    <p className="text-sm text-muted-foreground">{item.classe.niveau}{item.classe.stream ? ` · ${item.classe.stream}` : ''} · {item.matiere.nom} ({item.matiere.code})</p>
+                  </div>
+                  <span className="inline-flex w-fit items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700">{item.academic_year}</span>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {item.suggested_teachers?.length ? item.suggested_teachers.map((teacher: any, index: number) => {
+                    const score = Math.min(100, Math.max(0, Number(teacher.priority_score ?? 50)))
+                    const isTopRecommendation = index === 0
+                    return (
+                      <div key={teacher.id} className="flex flex-col gap-3 rounded-xl border border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{teacher.first_name} {teacher.last_name}</p>
+                            {isTopRecommendation && (
+                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Meilleur match</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{teacher.matricule} · {teacher.email}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                            <span className={`rounded-full px-2 py-0.5 font-medium ${teacher.is_primary_match ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-700'}`}>
+                              {teacher.is_primary_match ? 'Matière principale compatible' : 'Aide enseignante / couverture'}
+                            </span>
+                            <span className="rounded-full bg-muted px-2 py-0.5 font-medium">Score {score}</span>
+                          </div>
+                          <div className="mt-2 h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${score}%` }} />
+                          </div>
+                        </div>
+                        <Button size="sm" onClick={() => void assignTeacher(item, teacher)} disabled={assigningId === teacher.id}>
+                          {assigningId === teacher.id ? 'Affectation…' : 'Affecter'}
+                        </Button>
+                      </div>
+                    )
+                  }) : (
+                    <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                      Aucun enseignant disponible détecté pour cette matière.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

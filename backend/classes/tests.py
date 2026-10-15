@@ -100,3 +100,93 @@ class ClasseBusinessRuleTests(APITestCase):
         self.assertTrue(assignment.is_substitute)
         self.assertEqual(assignment.coverage_reason, 'Manque de prof titulaire en physique')
         self.assertIn('remplacement', str(assignment))
+
+    def test_coverage_endpoint_lists_missing_subjects_and_suggested_teachers(self):
+        classe = Classe.objects.create(
+            nom='Terminale A',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            academic_year='2024-2025',
+            capacite=30,
+        )
+        physique = Matiere.objects.create(code='PHY', nom='Physique', coefficient=4)
+        maths = Matiere.objects.create(code='MATH', nom='Mathématiques', coefficient=5)
+        teacher = CustomUser.objects.create_user(
+            username='math-teacher-cover',
+            email='math-teacher-cover@lycee.com',
+            password='StrongPassw0rd!',
+            first_name='Marie',
+            last_name='Ndiaye',
+            matricule='TCHMATH1',
+            role=CustomUser.Role.PROFESSEUR,
+            status=CustomUser.Status.ACTIVE,
+            matiere=maths,
+        )
+
+        response = self.client.get(reverse('classe-coverage'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.data['missing_subjects']) >= 1)
+        self.assertIn('suggested_teachers', response.data['missing_subjects'][0])
+        self.assertTrue(any(t['id'] == teacher.id for t in response.data['missing_subjects'][0]['suggested_teachers']))
+        self.assertTrue(any(item['matiere']['nom'] == 'Physique' for item in response.data['missing_subjects']))
+
+    def test_coverage_endpoint_prioritizes_best_match_teachers(self):
+        classe = Classe.objects.create(
+            nom='Première C',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            academic_year='2024-2025',
+            capacite=30,
+        )
+        physique = Matiere.objects.create(code='PHY', nom='Physique', coefficient=4)
+        maths = Matiere.objects.create(code='MATH', nom='Mathématiques', coefficient=5)
+        matching_teacher = CustomUser.objects.create_user(
+            username='physicist-main',
+            email='physicist-main@lycee.com',
+            password='StrongPassw0rd!',
+            first_name='Jean',
+            last_name='Lemoine',
+            matricule='TCHPHY1',
+            role=CustomUser.Role.PROFESSEUR,
+            status=CustomUser.Status.ACTIVE,
+            matiere=physique,
+        )
+        fallback_teacher = CustomUser.objects.create_user(
+            username='fallback-physic',
+            email='fallback-physic@lycee.com',
+            password='StrongPassw0rd!',
+            first_name='Alice',
+            last_name='Dupont',
+            matricule='TCHPHY2',
+            role=CustomUser.Role.PROFESSEUR,
+            status=CustomUser.Status.ACTIVE,
+            matiere=maths,
+        )
+
+        response = self.client.get(reverse('classe-coverage'))
+        physics_gap = next(
+            item for item in response.data['missing_subjects']
+            if item['matiere']['nom'] == 'Physique' and item['classe']['id'] == classe.id
+        )
+
+        self.assertTrue(physics_gap['suggested_teachers'])
+        self.assertEqual(physics_gap['suggested_teachers'][0]['id'], matching_teacher.id)
+        self.assertGreater(physics_gap['suggested_teachers'][0]['priority_score'], physics_gap['suggested_teachers'][1]['priority_score'])
+
+    def test_coverage_alerts_detect_urgent_missing_subjects(self):
+        classe = Classe.objects.create(
+            nom='Terminale B',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            academic_year='2024-2025',
+            capacite=30,
+        )
+        Matiere.objects.create(code='CHM', nom='Chimie', coefficient=4)
+
+        response = self.client.get(reverse('classe-coverage-alerts'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(response.data['count'], 1)
+        self.assertIn('severity', response.data['alerts'][0])
+        self.assertIn('recommended_action', response.data['alerts'][0])

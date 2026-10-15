@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from users.models import CustomUser
 from classes.models import Classe
-from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification, StudentOfficePass
+from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification, StudentOfficePass, CertificateRequest, Deliberation
 
 
 class UserNestedSerializer(serializers.ModelSerializer):
@@ -44,9 +44,6 @@ class EtudiantSerializer(serializers.ModelSerializer):
         return fields
 
     def validate(self, attrs):
-        photo = attrs.get('photo', getattr(self.instance, 'photo', None))
-        if not photo:
-            raise serializers.ValidationError({'photo': 'La photo de l’élève est obligatoire pour afficher correctement le badge.'})
         return attrs
 
     def get_moyenne_generale(self, obj):
@@ -184,3 +181,32 @@ class StudentOfficePassSerializer(serializers.ModelSerializer):
         if not attrs.get('reason', getattr(self.instance, 'reason', '')).strip():
             raise serializers.ValidationError({'reason': 'Indiquez le motif de la convocation ou du billet.'})
         return attrs
+
+
+class CertificateRequestSerializer(serializers.ModelSerializer):
+    student_detail = EtudiantSerializer(source='student', read_only=True)
+    decided_by_detail = UserNestedSerializer(source='decided_by', read_only=True)
+
+    class Meta:
+        model = CertificateRequest
+        fields = [
+            'id', 'student', 'student_detail', 'academic_year', 'status',
+            'fee_verified', 'negotiation_approved', 'decision_reason',
+            'requested_by', 'decided_by', 'decided_by_detail',
+            'created_at', 'decided_at',
+        ]
+        read_only_fields = ['id', 'status', 'requested_by', 'decided_by', 'decided_by_detail', 'created_at', 'decided_at']
+
+
+class DeliberationSerializer(serializers.ModelSerializer):
+    student_detail = EtudiantSerializer(source='student', read_only=True)
+    target_class_detail = ClasseNestedSerializer(source='target_class', read_only=True)
+
+    class Meta:
+        model = Deliberation
+        fields = [
+            'id', 'student', 'student_detail', 'exam_period', 'average',
+            'admission_threshold', 'decision', 'recommended_stream',
+            'target_class', 'target_class_detail', 'decided_by', 'applied_at', 'created_at',
+        ]
+        read_only_fields = ['id', 'student_detail', 'target_class_detail', 'created_at', 'applied_at']

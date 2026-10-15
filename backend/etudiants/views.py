@@ -1,16 +1,237 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, content_negotiation_class, permission_classes
 from rest_framework.response import Response
+from rest_framework.negotiation import DefaultContentNegotiation
+from django.http import FileResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Avg, F, Q
 from django.db import transaction
 from django.utils import timezone
 import datetime
-from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification, StudentOfficePass
-from .serializers import EtudiantSerializer, EnrollmentSerializer, StudentOrientationSerializer, AuditLogSerializer, NotificationSerializer, StudentRegistrationSerializer, StudentOfficePassSerializer
+import io
+from decimal import Decimal
+from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification, StudentOfficePass, CertificateRequest, Deliberation
+from .serializers import EtudiantSerializer, EnrollmentSerializer, StudentOrientationSerializer, AuditLogSerializer, NotificationSerializer, StudentRegistrationSerializer, StudentOfficePassSerializer, CertificateRequestSerializer, DeliberationSerializer
 from users.permissions import IsAdminOnly, IsAdminOrReadOnly, IsStaffUser, CanManageStudents, CanManageEnrollment, CanManageOfficePass, CanViewSchedule
 from users.models import CustomUser
-from classes.models import TeacherAssignment
+from classes.models import Classe, TeacherAssignment
+from matieres.models import ExamPeriod
+
+
+class StudentExportContentNegotiation(DefaultContentNegotiation):
+    def filter_renderers(self, renderers, format):
+        if format in {'xls', 'xlsx', 'pdf'}:
+            return renderers
+        return super().filter_renderers(renderers, format)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminOnly])
+def import_students_endpoint(request):
+    classe_id = request.data.get('classe_id')
+    students = request.data.get('students', [])
+    if not classe_id or not isinstance(students, list):
+        return Response({'detail': 'classe_id et students sont obligatoires.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    classe = Classe.objects.filter(id=classe_id).first()
+    if classe is None:
+        return Response({'detail': 'Classe introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    created = []
+    for raw_student in students:
+        matricule = (raw_student.get('matricule') or '').strip()
+        if not matricule:
+            continue
+        student, created_flag = Etudiant.objects.get_or_create(
+            matricule=matricule,
+            defaults={
+                'first_name': raw_student.get('first_name', '').strip(),
+                'last_name': raw_student.get('last_name', '').strip(),
+                'classe': classe,
+                'date_inscription': raw_student.get('date_inscription') or datetime.date.today(),
+                'statut': Etudiant.StudentStatus.ENROLLED,
+                'actif': True,
+            },
+        )
+        if created_flag:
+            created.append(student)
+        else:
+            student.classe = classe
+            student.actif = True
+            student.save(update_fields=['classe', 'actif'])
+    return Response({'created': len(created), 'updated': len(students) - len(created), 'classe_id': classe.id}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@content_negotiation_class(StudentExportContentNegotiation)
+@permission_classes([IsAdminOnly])
+def export_students_endpoint(request):
+    classe_id = request.query_params.get('classe_id')
+    fmt = (request.query_params.get('format') or 'xls').lower()
+    qs = Etudiant.objects.select_related('classe').all()
+    if classe_id:
+        qs = qs.filter(classe_id=classe_id)
+
+    rows = [['Matricule', 'Nom', 'Prénom', 'Classe', 'Statut', 'Date inscription']]
+    for student in qs:
+        rows.append([
+            student.matricule,
+            student.last_name,
+            student.first_name,
+            getattr(student.classe, 'nom', ''),
+            student.get_statut_display() if hasattr(student, 'get_statut_display') else student.statut,
+            student.date_inscription,
+        ])
+
+    if fmt == 'pdf':
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.lib.units import cm
+        buffer = io.BytesIO()
+        pdf = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5 * cm, leftMargin=1.5 * cm)
+        styles = getSampleStyleSheet()
+        title = ParagraphStyle('title', parent=styles['Title'], fontSize=16, spaceAfter=20)
+        story = [Paragraph('Liste des élèves', title), Spacer(1, 0.5 * cm)]
+        table = Table(rows)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A3A36')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ]))
+        story.append(table)
+        pdf.build(story)
+        buffer.seek(0)
+        return FileResponse(buffer, as_attachment=True, filename='liste_eleves.pdf', content_type='application/pdf')
+
+    import openpyxl
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = 'Etudiants'
+    for row in rows:
+        sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename='liste_eleves.xls', content_type='application/vnd.ms-excel')
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminOnly])
+def transfer_student_endpoint(request, pk=None):
+    etudiant = Etudiant.objects.filter(id=pk).first()
+    if etudiant is None:
+        return Response({'detail': 'Étudiant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    target_class_id = request.data.get('target_class_id')
+    if not target_class_id:
+        return Response({'detail': 'target_class_id est obligatoire.'}, status=status.HTTP_400_BAD_REQUEST)
+    target_class = Classe.objects.filter(id=target_class_id).first()
+    if target_class is None:
+        return Response({'detail': 'Classe cible introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    etudiant.classe = target_class
+    etudiant.statut = Etudiant.StudentStatus.ENROLLED
+    etudiant.save(update_fields=['classe', 'statut'])
+    AuditLog.objects.create(
+        actor=request.user,
+        entity_type='Etudiant',
+        entity_id=str(etudiant.id),
+        action=AuditLog.Action.STATUS_CHANGE,
+        new_value={'classe': target_class.id, 'statut': etudiant.statut, 'reason': request.data.get('reason', '')},
+        reason=request.data.get('reason', 'Transfert administratif validé.'),
+    )
+    return Response({'status': 'transferred', 'student_id': etudiant.id, 'target_class_id': target_class.id})
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminOnly])
+def review_certificate_request_endpoint(request, pk=None):
+    certificate = CertificateRequest.objects.filter(id=pk).first()
+    if certificate is None:
+        return Response({'detail': 'Demande de certificat introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    status_value = request.data.get('status', certificate.status)
+    if status_value not in dict(CertificateRequest.Status.choices):
+        return Response({'detail': 'Statut de certificat invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+    certificate.status = status_value
+    certificate.fee_verified = bool(request.data.get('fee_verified', certificate.fee_verified))
+    certificate.negotiation_approved = bool(request.data.get('negotiation_approved', certificate.negotiation_approved))
+    certificate.decision_reason = request.data.get('decision_reason', certificate.decision_reason)
+    certificate.decided_by = request.user
+    certificate.decided_at = timezone.now()
+    certificate.save()
+    return Response({'status': certificate.status, 'fee_verified': certificate.fee_verified, 'decision_reason': certificate.decision_reason})
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminOnly])
+def analyze_deliberations_endpoint(request):
+    threshold = Decimal(request.data.get('threshold', '9.75'))
+    academic_year = request.data.get('academic_year')
+    stream = request.data.get('stream')
+    period_id = request.data.get('exam_period_id')
+    period = None
+    if period_id:
+        period = ExamPeriod.objects.filter(id=period_id).first()
+    if period is None:
+        period = ExamPeriod.objects.filter(academic_year=academic_year).order_by('-start_date').first() if academic_year else ExamPeriod.objects.order_by('-start_date').first()
+    if not period:
+        return Response({'detail': 'Aucune période d’examen n’est disponible.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    students = Etudiant.objects.select_related('classe').filter(actif=True)
+    if academic_year:
+        students = students.filter(Q(classe__academic_year=academic_year) | Q(classe__academic_year__isnull=True))
+    if stream:
+        students = students.filter(classe__stream=stream)
+
+    analyses = []
+    for student in students:
+        notes = student.notes.filter(status__in=['APPROVED', 'LOCKED'])
+        if not notes.exists():
+            continue
+
+        weighted_total = Decimal('0')
+        coefficient_total = Decimal('0')
+        for note in notes.select_related('matiere'):
+            value = Decimal(str(note.note))
+            coeff = Decimal(str(note.coefficient or 1))
+            weighted_total += value * coeff
+            coefficient_total += coeff
+        if coefficient_total == 0:
+            continue
+        average = (weighted_total / coefficient_total).quantize(Decimal('0.01'))
+        decision = Deliberation.Decision.ADMITTED if average >= threshold else Deliberation.Decision.REPEATER
+        recommended_stream = stream or (student.classe.stream if student.classe else None)
+        target_class = None
+        if recommended_stream:
+            target_academic_year = academic_year or (student.classe.academic_year if student.classe and student.classe.academic_year else academic_year)
+            target_class = Classe.objects.filter(academic_year=target_academic_year, stream=recommended_stream).order_by('nom').first()
+        if decision == Deliberation.Decision.ADMITTED and target_class:
+            student.classe = target_class
+            student.save(update_fields=['classe'])
+        deliberation, _ = Deliberation.objects.update_or_create(
+            student=student,
+            exam_period=period,
+            defaults={
+                'average': average,
+                'admission_threshold': threshold,
+                'decision': decision,
+                'recommended_stream': recommended_stream,
+                'target_class': target_class,
+                'decided_by': request.user,
+                'applied_at': timezone.now(),
+            },
+        )
+        analyses.append({
+            'student_id': student.id,
+            'matricule': student.matricule,
+            'average': str(average),
+            'decision': decision,
+            'recommended_stream': recommended_stream,
+            'target_class_id': target_class.id if target_class else None,
+        })
+
+    return Response({'count': len(analyses), 'results': analyses}, status=status.HTTP_200_OK)
 
 
 class EtudiantViewSet(viewsets.ModelViewSet):
@@ -101,6 +322,116 @@ class EtudiantViewSet(viewsets.ModelViewSet):
         )
         return Response({'status': 'statut updated', 'old': old_statut, 'new': new_statut})
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminOnly], url_path='import', url_name='import')
+    def import_students(self, request):
+        classe_id = request.data.get('classe_id')
+        students = request.data.get('students', [])
+        if not classe_id or not isinstance(students, list):
+            return Response({'detail': 'classe_id et students sont obligatoires.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        classe = Classe.objects.filter(id=classe_id).first()
+        if classe is None:
+            return Response({'detail': 'Classe introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+        created = []
+        for raw_student in students:
+            matricule = (raw_student.get('matricule') or '').strip()
+            if not matricule:
+                continue
+            student, created_flag = Etudiant.objects.get_or_create(
+                matricule=matricule,
+                defaults={
+                    'first_name': raw_student.get('first_name', '').strip(),
+                    'last_name': raw_student.get('last_name', '').strip(),
+                    'classe': classe,
+                    'date_inscription': raw_student.get('date_inscription') or datetime.date.today(),
+                    'statut': Etudiant.StudentStatus.ENROLLED,
+                    'actif': True,
+                },
+            )
+            if created_flag:
+                created.append(student)
+            else:
+                student.classe = classe
+                student.actif = True
+                student.save(update_fields=['classe', 'actif'])
+        return Response({'created': len(created), 'updated': len(students) - len(created), 'classe_id': classe.id}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly], url_path='export', url_name='export')
+    def export_students(self, request):
+        classe_id = request.query_params.get('classe_id')
+        fmt = (request.query_params.get('format') or 'xls').lower()
+        qs = Etudiant.objects.select_related('classe').all()
+        if classe_id:
+            qs = qs.filter(classe_id=classe_id)
+
+        rows = [['Matricule', 'Nom', 'Prénom', 'Classe', 'Statut', 'Date inscription']]
+        for student in qs:
+            rows.append([
+                student.matricule,
+                student.last_name,
+                student.first_name,
+                getattr(student.classe, 'nom', ''),
+                student.get_statut_display() if hasattr(student, 'get_statut_display') else student.statut,
+                student.date_inscription,
+            ])
+
+        if fmt == 'pdf':
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+            from reportlab.lib.units import cm
+            buffer = io.BytesIO()
+            pdf = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5 * cm, leftMargin=1.5 * cm)
+            styles = getSampleStyleSheet()
+            title = ParagraphStyle('title', parent=styles['Title'], fontSize=16, spaceAfter=20)
+            story = [Paragraph('Liste des élèves', title), Spacer(1, 0.5 * cm)]
+            table = Table(rows)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A3A36')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ]))
+            story.append(table)
+            pdf.build(story)
+            buffer.seek(0)
+            return FileResponse(buffer, as_attachment=True, filename='liste_eleves.pdf', content_type='application/pdf')
+
+        import openpyxl
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = 'Etudiants'
+        for row in rows:
+            sheet.append(row)
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+        return FileResponse(buffer, as_attachment=True, filename='liste_eleves.xls', content_type='application/vnd.ms-excel')
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly], url_path='transfer', url_name='transfer')
+    def transfer_student(self, request, pk=None):
+        etudiant = self.get_object()
+        target_class_id = request.data.get('target_class_id')
+        if not target_class_id:
+            return Response({'detail': 'target_class_id est obligatoire.'}, status=status.HTTP_400_BAD_REQUEST)
+        target_class = Classe.objects.filter(id=target_class_id).first()
+        if target_class is None:
+            return Response({'detail': 'Classe cible introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        etudiant.classe = target_class
+        etudiant.statut = Etudiant.StudentStatus.ENROLLED
+        etudiant.save(update_fields=['classe', 'statut'])
+        AuditLog.objects.create(
+            actor=request.user,
+            entity_type='Etudiant',
+            entity_id=str(etudiant.id),
+            action=AuditLog.Action.STATUS_CHANGE,
+            new_value={'classe': target_class.id, 'statut': etudiant.statut, 'reason': request.data.get('reason', '')},
+            reason=request.data.get('reason', 'Transfert administratif validé.'),
+        )
+        return Response({'status': 'transferred', 'student_id': etudiant.id, 'target_class_id': target_class.id})
+
 
 class EnrollmentViewSet(viewsets.ModelViewSet):
     serializer_class = EnrollmentSerializer
@@ -178,6 +509,119 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             payload={'enrollment_id': enrollment.id, 'receipt_number': enrollment.receipt_number},
         )
         return Response({'status': 'payment confirmed', 'receipt_number': enrollment.receipt_number})
+
+
+class CertificateRequestViewSet(viewsets.ModelViewSet):
+    queryset = CertificateRequest.objects.select_related('student', 'student__classe', 'requested_by', 'decided_by')
+    serializer_class = CertificateRequestSerializer
+    permission_classes = [IsAdminOnly]
+
+    def create(self, request, *args, **kwargs):
+        student_id = request.data.get('student')
+        academic_year = request.data.get('academic_year')
+        if not student_id or not academic_year:
+            return Response({'detail': 'student et academic_year sont obligatoires.'}, status=status.HTTP_400_BAD_REQUEST)
+        student = Etudiant.objects.filter(id=student_id).first()
+        if student is None:
+            return Response({'detail': 'Étudiant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        instance = CertificateRequest.objects.create(
+            student=student,
+            academic_year=academic_year,
+            requested_by=request.user,
+            status=CertificateRequest.Status.PENDING,
+        )
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly], url_path='review')
+    def review(self, request, pk=None):
+        certificate = self.get_object()
+        status_value = request.data.get('status', certificate.status)
+        if status_value not in dict(CertificateRequest.Status.choices):
+            return Response({'detail': 'Statut de certificat invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+        certificate.status = status_value
+        certificate.fee_verified = bool(request.data.get('fee_verified', certificate.fee_verified))
+        certificate.negotiation_approved = bool(request.data.get('negotiation_approved', certificate.negotiation_approved))
+        certificate.decision_reason = request.data.get('decision_reason', certificate.decision_reason)
+        certificate.decided_by = request.user
+        certificate.decided_at = timezone.now()
+        certificate.save()
+        return Response({'status': certificate.status, 'fee_verified': certificate.fee_verified, 'decision_reason': certificate.decision_reason})
+
+
+class DeliberationViewSet(viewsets.ModelViewSet):
+    queryset = Deliberation.objects.select_related('student', 'student__classe', 'exam_period', 'target_class')
+    serializer_class = DeliberationSerializer
+    permission_classes = [IsAdminOnly]
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminOnly], url_path='analyze')
+    def analyze(self, request):
+        threshold = Decimal(request.data.get('threshold', '9.75'))
+        academic_year = request.data.get('academic_year')
+        stream = request.data.get('stream')
+        period_id = request.data.get('exam_period_id')
+        period = None
+        if period_id:
+            period = ExamPeriod.objects.filter(id=period_id).first()
+        if period is None:
+            period = ExamPeriod.objects.filter(academic_year=academic_year).order_by('-start_date').first() if academic_year else ExamPeriod.objects.order_by('-start_date').first()
+        if not period:
+            return Response({'detail': 'Aucune période d’examen n’est disponible.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        students = Etudiant.objects.select_related('classe').filter(actif=True)
+        if academic_year:
+            students = students.filter(Q(classe__academic_year=academic_year) | Q(classe__academic_year__isnull=True))
+        if stream:
+            students = students.filter(classe__stream=stream)
+
+        analyses = []
+        for student in students:
+            notes = student.notes.filter(status__in=['APPROVED', 'LOCKED'])
+            if not notes.exists():
+                continue
+
+            weighted_total = Decimal('0')
+            coefficient_total = Decimal('0')
+            for note in notes.select_related('matiere'):
+                value = Decimal(str(note.note))
+                coeff = Decimal(str(note.coefficient or 1))
+                weighted_total += value * coeff
+                coefficient_total += coeff
+            if coefficient_total == 0:
+                continue
+            average = (weighted_total / coefficient_total).quantize(Decimal('0.01'))
+            decision = Deliberation.Decision.ADMITTED if average >= threshold else Deliberation.Decision.REPEATER
+            recommended_stream = stream or (student.classe.stream if student.classe else None)
+            target_class = None
+            if recommended_stream:
+                target_academic_year = academic_year or (student.classe.academic_year if student.classe and student.classe.academic_year else academic_year)
+                target_class = Classe.objects.filter(academic_year=target_academic_year, stream=recommended_stream).order_by('nom').first()
+            if decision == Deliberation.Decision.ADMITTED and target_class:
+                student.classe = target_class
+                student.save(update_fields=['classe'])
+            deliberation, _ = Deliberation.objects.update_or_create(
+                student=student,
+                exam_period=period,
+                defaults={
+                    'average': average,
+                    'admission_threshold': threshold,
+                    'decision': decision,
+                    'recommended_stream': recommended_stream,
+                    'target_class': target_class,
+                    'decided_by': request.user,
+                    'applied_at': timezone.now(),
+                },
+            )
+            analyses.append({
+                'student_id': student.id,
+                'matricule': student.matricule,
+                'average': str(average),
+                'decision': decision,
+                'recommended_stream': recommended_stream,
+                'target_class_id': target_class.id if target_class else None,
+            })
+
+        return Response({'count': len(analyses), 'results': analyses}, status=status.HTTP_200_OK)
 
 
 class StudentOrientationViewSet(viewsets.ModelViewSet):

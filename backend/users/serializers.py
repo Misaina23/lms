@@ -1,26 +1,30 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 
+from matieres.models import Matiere
 from .models import CustomUser
 
 
 class UserListSerializer(serializers.ModelSerializer):
+    matiere = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = CustomUser
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
-            'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status', 'photo',
+            'email', 'phone', 'role', 'teacher_type', 'matiere', 'surveillant_type', 'status', 'photo',
         ]
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
+    matiere = serializers.PrimaryKeyRelatedField(queryset=Matiere.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = CustomUser
         fields = [
             'id', 'username', 'matricule', 'first_name', 'last_name',
-            'email', 'phone', 'role', 'teacher_type', 'surveillant_type', 'status',
+            'email', 'phone', 'role', 'teacher_type', 'matiere', 'surveillant_type', 'status',
             'date_of_birth', 'address', 'photo', 'base_salary', 'password',
             'created_at', 'updated_at',
         ]
@@ -39,6 +43,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
             CustomUser.Role.SECRETARIAT,
         } and not photo:
             raise serializers.ValidationError({'photo': 'La photo est obligatoire pour ce compte afin d’afficher le badge.'})
+
         return attrs
 
     def create(self, validated_data):

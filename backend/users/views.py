@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from classes.models import Classe, Matiere
+from classes.models import Classe, Matiere, TeacherAssignment
 from classes.serializers import ClasseSerializer, MatiereSerializer
 from .models import CustomUser
 from .serializers import CustomUserSerializer, UserListSerializer
@@ -71,6 +71,30 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         user.status = CustomUser.Status.ACTIVE
         user.is_active = True
         user.save()
+
+        if user.role == CustomUser.Role.PROFESSEUR and user.matiere_id:
+            classes = Classe.objects.filter(academic_year__isnull=False).exclude(academic_year='')
+            if not classes.exists():
+                classes = Classe.objects.all()
+            for classe in classes:
+                if TeacherAssignment.objects.filter(
+                    professeur=user,
+                    classe=classe,
+                    matiere=user.matiere,
+                    academic_year=classe.academic_year or '2024-2025',
+                ).exists():
+                    continue
+                if TeacherAssignment.objects.filter(classe=classe, matiere=user.matiere, academic_year=classe.academic_year or '2024-2025').exists():
+                    continue
+                TeacherAssignment.objects.create(
+                    professeur=user,
+                    classe=classe,
+                    matiere=user.matiere,
+                    academic_year=classe.academic_year or '2024-2025',
+                    is_substitute=True,
+                    coverage_reason='Aide enseignante / manque de prof sur la matière',
+                )
+
         return Response({'status': 'approved', 'user': CustomUserSerializer(user).data})
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly])
@@ -135,6 +159,11 @@ def register_view(request):
     if not request.data.get('password'):
         return Response(
             {'password': ['Ce champ est obligatoire.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if role == CustomUser.Role.PROFESSEUR and not request.data.get('matiere'):
+        return Response(
+            {'matiere': ['La matière est obligatoire pour un professeur.']},
             status=status.HTTP_400_BAD_REQUEST,
         )
     serializer = CustomUserSerializer(data=request.data)

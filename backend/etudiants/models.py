@@ -160,6 +160,56 @@ class StudentOrientation(models.Model):
         return f"{self.student} → {self.get_recommended_stream_display()} ({self.ai_confidence_score}%)"
 
 
+class CertificateRequest(models.Model):
+    """Demande de certificat de scolarité, vérifiée par l'administration."""
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'En attente de vérification'
+        APPROVED = 'APPROVED', 'Autorisé'
+        REJECTED = 'REJECTED', 'Refusé'
+
+    student = models.ForeignKey(Etudiant, on_delete=models.PROTECT, related_name='certificate_requests')
+    academic_year = models.CharField(max_length=9)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    fee_verified = models.BooleanField(default=False)
+    negotiation_approved = models.BooleanField(default=False)
+    decision_reason = models.TextField(blank=True)
+    requested_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, related_name='certificates_requested', blank=True)
+    decided_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, related_name='certificates_decided', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Certificat {self.student} - {self.academic_year} ({self.get_status_display()})"
+
+
+class Deliberation(models.Model):
+    """Décision de délibération à la fin d'un trimestre ou d'un bimestre."""
+    class Decision(models.TextChoices):
+        ADMITTED = 'ADMITTED', 'Admis'
+        REPEATER = 'REPEATER', 'Redoublant'
+
+    student = models.ForeignKey(Etudiant, on_delete=models.CASCADE, related_name='deliberations')
+    exam_period = models.ForeignKey('matieres.ExamPeriod', on_delete=models.PROTECT, related_name='deliberations')
+    average = models.DecimalField(max_digits=5, decimal_places=2)
+    admission_threshold = models.DecimalField(max_digits=4, decimal_places=2, default=10)
+    decision = models.CharField(max_length=10, choices=Decision.choices)
+    recommended_stream = models.CharField(max_length=5, choices=StudentOrientation.Stream.choices, null=True, blank=True)
+    target_class = models.ForeignKey(Classe, on_delete=models.SET_NULL, null=True, blank=True, related_name='deliberation_results')
+    decided_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, related_name='deliberations_decided')
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['student__last_name', 'student__first_name']
+        unique_together = [('student', 'exam_period')]
+
+    def __str__(self):
+        return f"{self.student} - {self.exam_period.label} -> {self.get_decision_display()}"
+
+
 class AuditLog(models.Model):
     """Journal d'audit pour tracer toutes les actions sensibles."""
     class Action(models.TextChoices):

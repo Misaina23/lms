@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,11 +19,26 @@ export default function TeacherRegistrationPage() {
     phone: '',
     role: 'PROFESSEUR',
     teacher_type: 'FONCTIONNAIRE',
+    matiere: '',
     password: '',
   })
+  const [matieres, setMatieres] = useState<Array<{ id: number; nom: string; code: string }>>([])
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const response = await api.get<{ matieres: Array<{ id: number; nom: string; code: string }> }>('/registration-options/')
+        setMatieres(response.matieres || [])
+      } catch {
+        setMatieres([])
+      }
+    }
+    fetchOptions()
+  }, [])
 
   const update = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -32,13 +47,25 @@ export default function TeacherRegistrationPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
+
+    if (form.role === 'PROFESSEUR' && !form.matiere) {
+      setError('Veuillez préciser la matière enseignée pour ce professeur.')
+      return
+    }
+
     setLoading(true)
 
     try {
-      await api.post('/register/', {
+      const payload: Record<string, string | number> = {
         ...form,
         role: form.role,
-      })
+      }
+      if (payload.role !== 'PROFESSEUR') {
+        delete payload.matiere
+      } else {
+        payload.matiere = Number(form.matiere)
+      }
+      await api.post('/register/', payload)
       setSubmitted(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible d’envoyer la demande.')
@@ -105,8 +132,28 @@ export default function TeacherRegistrationPage() {
                     </select>
                   </label>
                 )}
+                {form.role === 'PROFESSEUR' && (
+                  <label className="grid gap-1.5 text-xs font-semibold">Matière enseignée
+                    <select className="h-10 rounded-xl border border-input px-3 text-sm font-normal" value={form.matiere} onChange={(event) => update('matiere', event.target.value)} required>
+                      <option value="">Choisir une matière</option>
+                      {matieres.map((matiere) => (
+                        <option key={matiere.id} value={matiere.id}>{matiere.nom} ({matiere.code})</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="grid gap-1.5 text-xs font-semibold">Mot de passe
-                  <Input required type="password" minLength={8} autoComplete="new-password" value={form.password} onChange={(event) => update('password', event.target.value)} />
+                  <div className="relative">
+                    <Input required type={showPassword ? 'text' : 'password'} minLength={8} autoComplete="new-password" value={form.password} onChange={(event) => update('password', event.target.value)} className="pr-10" />
+                    <button
+                      type="button"
+                      aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
                 </label>
                 {error && <p className="sm:col-span-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
                 <div className="sm:col-span-2 mt-2 flex flex-col-reverse items-stretch justify-between gap-3 border-t border-border pt-5 sm:flex-row sm:items-center">

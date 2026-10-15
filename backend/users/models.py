@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from matieres.models import Matiere
+
 
 class CustomUser(AbstractUser):
     class Role(models.TextChoices):
@@ -38,6 +40,14 @@ class CustomUser(AbstractUser):
         choices=TeacherType.choices,
         null=True,
         blank=True,
+    )
+    matiere = models.ForeignKey(
+        Matiere,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='teachers',
+        help_text='Matière principale pour les professeurs.',
     )
     surveillant_type = models.CharField(
         max_length=20,

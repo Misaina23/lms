@@ -32,7 +32,7 @@ import { useAdminData, type ScreenKey } from '@/lib/admin-data'
 import { clearSession, getStoredUser, isValidPortalRole } from '@/lib/auth'
 import { StudentsScreen } from '@/components/screens/students'
 import { EnrollmentRegistryScreen, EnrollmentsScreen } from '@/components/screens/enrollments'
-import { TeachersScreen, ClassesScreen, MatieresScreen, GradesScreen, AttendanceScreen, ReportsScreen, ExamPeriodsScreen } from '@/components/screens/modules'
+import { TeachersScreen, ClassesScreen, MatieresScreen, GradesScreen, AttendanceScreen, ReportsScreen, ExamPeriodsScreen, CoverageScreen } from '@/components/screens/modules'
 import { BudgetScreen } from '@/components/screens/budget'
 import { TimetableScreen } from '@/components/screens/timetable'
 import { BulletinsScreen } from '@/components/screens/bulletins'
@@ -50,6 +50,7 @@ const navigation: { key: ScreenKey; label: string; icon: typeof Users }[] = [
   { key: 'payments', label: 'Finances & règlements', icon: CircleDollarSign },
   { key: 'classes', label: 'Classes', icon: BookOpen },
   { key: 'teachers', label: 'Personnel', icon: Users },
+  { key: 'coverage', label: 'Couverture', icon: ShieldCheck },
   { key: 'registrations', label: 'Demandes', icon: UserPlus },
   { key: 'matieres', label: 'Matières', icon: BookOpen },
   { key: 'timetable', label: 'Emploi du temps', icon: CalendarDays },
@@ -160,6 +161,7 @@ export default function Home() {
       case 'payments': return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} />
       case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} onReload={reload} />
       case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
+      case 'coverage': return <CoverageScreen classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'matieres': return <MatieresScreen matieres={data.matieres} classes={data.classes as any} onReload={reload} />
       case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} onReload={reload} canScan={role === 'ADMIN' || role === 'PROFESSEUR'} />
       case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} role={role} onReload={reload} />
@@ -276,11 +278,30 @@ export default function Home() {
 }
 
 function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'] }) {
+  const [coverageAlerts, setCoverageAlerts] = useState<any[]>([])
+  const [loadingAlerts, setLoadingAlerts] = useState(true)
+
+  useEffect(() => {
+    const loadAlerts = async () => {
+      try {
+        const response = await api.get<{ count: number; alerts: any[] }>('/classes/coverage-alerts/')
+        setCoverageAlerts(response.alerts || [])
+      } catch {
+        setCoverageAlerts([])
+      } finally {
+        setLoadingAlerts(false)
+      }
+    }
+
+    void loadAlerts()
+  }, [])
+
   const students = data.etudiants
   const elevesActifs = students.filter((e) => e.actif).length
   const enseignantsActifs = data.users.filter((u) => u.role === 'PROFESSEUR' && u.status === 'ACTIVE').length
   const totalEncaisse = data.enrollments.reduce((s, e) => s + Number(e.frais_verses || 0), 0)
   const totalDu = data.enrollments.reduce((s, e) => s + Number(e.frais_total || 0), 0)
+  const urgentCoverageCount = coverageAlerts.filter((alert) => ['critical', 'high'].includes(alert.severity)).length
 
   return (
     <div className="space-y-6">
@@ -336,6 +357,7 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
               { n: data.users.filter((u) => u.role === 'PROFESSEUR' && u.status === 'PENDING_VERIFICATION').length, l: "Comptes enseignants à valider", c: "bg-primary/10 text-primary" },
               { n: data.enrollments.filter((e) => e.payment_status === 'UNPAID').length, l: "Paiements en attente", c: "bg-amber-500/10 text-amber-700" },
               { n: data.orientations.filter((o) => o.status === 'PROPOSED').length, l: "Orientations IA à confirmer", c: "bg-rose-500/10 text-rose-700" },
+              { n: urgentCoverageCount, l: "Couvertures pédagogiques urgentes", c: "bg-emerald-500/10 text-emerald-700" },
             ].map((item) => (
               <button key={item.l} className="flex w-full items-center gap-3 rounded-lg border border-border/70 p-3 text-left transition-colors hover:bg-muted/40">
                 <span className={`flex size-9 items-center justify-center rounded-lg text-sm font-bold ${item.c}`}>{item.n}</span>
@@ -346,6 +368,42 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
           </CardContent>
         </Card>
       </div>
+
+      {!loadingAlerts && coverageAlerts.length > 0 && (
+        <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Alertes de couverture</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Priorité immédiate pour les matières non couvertes</p>
+              </div>
+              <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-700">{coverageAlerts.length} alertes</span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {coverageAlerts.slice(0, 3).map((alert) => (
+              <div key={`${alert.classe.id}-${alert.matiere.id}`} className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-foreground">{alert.classe.nom} · {alert.matiere.nom}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    alert.severity === 'critical' ? 'bg-rose-500/10 text-rose-700' :
+                    alert.severity === 'high' ? 'bg-amber-500/10 text-amber-700' :
+                    'bg-sky-500/10 text-sky-700'
+                  }`}>
+                    {alert.severity}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{alert.recommended_action}</p>
+                {alert.best_match && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Meilleur match : {alert.best_match.first_name} {alert.best_match.last_name} · score {alert.best_match.priority_score}
+                  </p>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
