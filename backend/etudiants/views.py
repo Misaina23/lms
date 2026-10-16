@@ -147,20 +147,136 @@ def transfer_student_endpoint(request, pk=None):
 @api_view(['POST'])
 @permission_classes([IsAdminOnly])
 def review_certificate_request_endpoint(request, pk=None):
-    certificate = CertificateRequest.objects.filter(id=pk).first()
-    if certificate is None:
-        return Response({'detail': 'Demande de certificat introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    status_value = request.data.get('status', certificate.status)
-    if status_value not in dict(CertificateRequest.Status.choices):
-        return Response({'detail': 'Statut de certificat invalide.'}, status=status.HTTP_400_BAD_REQUEST)
-    certificate.status = status_value
-    certificate.fee_verified = bool(request.data.get('fee_verified', certificate.fee_verified))
-    certificate.negotiation_approved = bool(request.data.get('negotiation_approved', certificate.negotiation_approved))
-    certificate.decision_reason = request.data.get('decision_reason', certificate.decision_reason)
-    certificate.decided_by = request.user
-    certificate.decided_at = timezone.now()
-    certificate.save()
-    return Response({'status': certificate.status, 'fee_verified': certificate.fee_verified, 'decision_reason': certificate.decision_reason})
+    return _review_certificate_request(request, pk)
+
+
+def _review_certificate_request(request, pk):
+    with transaction.atomic():
+        certificate = CertificateRequest.objects.select_for_update().select_related(
+            'student',
+            'student__classe',
+        ).filter(pk=pk).first()
+        if certificate is None:
+            return Response(
+                {'detail': 'Demande de certificat introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        status_value = request.data.get('status', certificate.status)
+        if status_value not in dict(CertificateRequest.Status.choices):
+            return Response(
+                {'detail': 'Statut de certificat invalide.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        negotiation_approved = request.data.get(
+            'negotiation_approved',
+            False,
+        )
+        if not isinstance(negotiation_approved, bool):
+            return Response(
+                {'negotiation_approved': 'Ce champ doit être un booléen.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        decision_reason = request.data.get('decision_reason', certificate.decision_reason)
+        if not isinstance(decision_reason, str):
+            return Response(
+                {'decision_reason': 'La justification doit être un texte.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        decision_reason = decision_reason.strip()
+
+        fee_verified = False
+        if status_value == CertificateRequest.Status.APPROVED:
+            student = certificate.student
+            classe = student.classe
+            if (
+                not student.actif
+                or student.statut != Etudiant.StudentStatus.ENROLLED
+                or classe is None
+                or (classe.academic_year and classe.academic_year != certificate.academic_year)
+            ):
+                return Response(
+                    {'detail': 'Le certificat exige un élève actif et inscrit dans une classe de cette année scolaire.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            enrollment = Enrollment.objects.select_for_update().filter(
+                student=student,
+                academic_year=certificate.academic_year,
+            ).first()
+            if enrollment is None:
+                return Response(
+                    {'detail': 'Aucune inscription n’existe pour cet élève et cette année scolaire.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            fee_verified = bool(
+                (
+                    enrollment.payment_status == Enrollment.PaymentStatus.PAID
+                    or (
+                        enrollment.frais_total is not None
+                        and (enrollment.frais_verses or Decimal('0')) >= enrollment.frais_total
+                    )
+                )
+            )
+            if not fee_verified and not negotiation_approved:
+                return Response(
+                    {'detail': 'Les frais ne sont pas soldés. Une dérogation de négociation est requise.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not fee_verified and (
+                not decision_reason
+                or 'decision_reason' not in request.data
+            ):
+                return Response(
+                    {'decision_reason': 'Une justification est obligatoire pour autoriser le certificat malgré les frais dus.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        old_values = {
+            'status': certificate.status,
+            'fee_verified': certificate.fee_verified,
+            'negotiation_approved': certificate.negotiation_approved,
+            'decision_reason': certificate.decision_reason,
+        }
+        certificate.status = status_value
+        certificate.fee_verified = fee_verified
+        certificate.negotiation_approved = negotiation_approved
+        certificate.decision_reason = decision_reason
+        certificate.decided_by = request.user
+        certificate.decided_at = timezone.now()
+        certificate.save(update_fields=[
+            'status',
+            'fee_verified',
+            'negotiation_approved',
+            'decision_reason',
+            'decided_by',
+            'decided_at',
+        ])
+        AuditLog.objects.create(
+            actor=request.user,
+            entity_type='CertificateRequest',
+            entity_id=str(certificate.pk),
+            action=AuditLog.Action.STATUS_CHANGE,
+            old_value=old_values,
+            new_value={
+                'status': certificate.status,
+                'fee_verified': certificate.fee_verified,
+                'negotiation_approved': certificate.negotiation_approved,
+                'decision_reason': certificate.decision_reason,
+            },
+            reason=certificate.decision_reason,
+        )
+
+    return Response({
+        'status': certificate.status,
+        'fee_verified': certificate.fee_verified,
+        'negotiation_approved': certificate.negotiation_approved,
+        'decision_reason': certificate.decision_reason,
+        'decided_by': certificate.decided_by_id,
+        'decided_at': certificate.decided_at,
+    })
 
 
 @api_view(['POST'])
@@ -535,18 +651,7 @@ class CertificateRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly], url_path='review')
     def review(self, request, pk=None):
-        certificate = self.get_object()
-        status_value = request.data.get('status', certificate.status)
-        if status_value not in dict(CertificateRequest.Status.choices):
-            return Response({'detail': 'Statut de certificat invalide.'}, status=status.HTTP_400_BAD_REQUEST)
-        certificate.status = status_value
-        certificate.fee_verified = bool(request.data.get('fee_verified', certificate.fee_verified))
-        certificate.negotiation_approved = bool(request.data.get('negotiation_approved', certificate.negotiation_approved))
-        certificate.decision_reason = request.data.get('decision_reason', certificate.decision_reason)
-        certificate.decided_by = request.user
-        certificate.decided_at = timezone.now()
-        certificate.save()
-        return Response({'status': certificate.status, 'fee_verified': certificate.fee_verified, 'decision_reason': certificate.decision_reason})
+        return _review_certificate_request(request, pk)
 
 
 class DeliberationViewSet(viewsets.ModelViewSet):

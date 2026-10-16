@@ -13,7 +13,7 @@ from classes.models import TeacherAssignment
 from matieres.models import Matiere, ExamPeriod
 from notes.models import Note
 from budget.models import BudgetItem
-from .models import Etudiant, Enrollment, Notification, StudentOfficePass, CertificateRequest, Deliberation
+from .models import AuditLog, Etudiant, Enrollment, Notification, StudentOfficePass, CertificateRequest, Deliberation
 
 
 class DemoPortalSeedCommandTests(TestCase):
@@ -196,6 +196,147 @@ class AdmissionAndCertificateWorkflowTests(APITestCase):
         }, format='json')
         self.assertEqual(review_response.status_code, 200)
         self.assertEqual(review_response.data['status'], CertificateRequest.Status.APPROVED)
+        self.assertTrue(review_response.data['fee_verified'])
+        self.assertEqual(review_response.data['decided_by'], self.admin_user.id)
+        audit_log = AuditLog.objects.get(entity_type='CertificateRequest', entity_id=str(request_obj.id))
+        self.assertEqual(audit_log.actor, self.admin_user)
+        self.assertEqual(audit_log.new_value['status'], CertificateRequest.Status.APPROVED)
+
+    def test_certificate_cannot_be_approved_with_unpaid_fees_without_negotiation(self):
+        student = Etudiant.objects.create(
+            matricule='CERT-UNPAID',
+            first_name='Lina',
+            last_name='D',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        Enrollment.objects.create(
+            student=student,
+            classe=self.classe,
+            academic_year='2026-2027',
+            frais_total='150000.00',
+            frais_verses='25000.00',
+            payment_status=Enrollment.PaymentStatus.PARTIAL,
+        )
+        certificate = CertificateRequest.objects.create(
+            student=student,
+            academic_year='2026-2027',
+        )
+
+        response = self.client.post(
+            reverse('certificate-request-review', args=[certificate.id]),
+            {'status': CertificateRequest.Status.APPROVED},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(AuditLog.objects.filter(entity_type='CertificateRequest').exists())
+        certificate.refresh_from_db()
+        self.assertEqual(certificate.status, CertificateRequest.Status.PENDING)
+        self.assertIsNone(certificate.decided_by)
+
+    def test_certificate_negotiation_override_requires_reason_and_is_audited(self):
+        student = Etudiant.objects.create(
+            matricule='CERT-OVERRIDE',
+            first_name='Nadia',
+            last_name='E',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        Enrollment.objects.create(
+            student=student,
+            classe=self.classe,
+            academic_year='2026-2027',
+            frais_total='150000.00',
+            frais_verses='25000.00',
+            payment_status=Enrollment.PaymentStatus.PARTIAL,
+        )
+        certificate = CertificateRequest.objects.create(
+            student=student,
+            academic_year='2026-2027',
+        )
+        url = reverse('certificate-request-detail', args=[certificate.id])
+
+        missing_reason = self.client.post(
+            f'{url}review/',
+            {
+                'status': CertificateRequest.Status.APPROVED,
+                'negotiation_approved': True,
+            },
+            format='json',
+        )
+        self.assertEqual(missing_reason.status_code, 400)
+        self.assertIn('decision_reason', missing_reason.data)
+
+        approved = self.client.post(
+            reverse('certificate-request-review', args=[certificate.id]),
+            {
+                'status': CertificateRequest.Status.APPROVED,
+                'negotiation_approved': True,
+                'decision_reason': 'Échéancier validé par la direction.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(approved.status_code, 200)
+        self.assertFalse(approved.data['fee_verified'])
+        self.assertTrue(approved.data['negotiation_approved'])
+        self.assertEqual(approved.data['decided_by'], self.admin_user.id)
+        self.assertIsNotNone(approved.data['decided_at'])
+        audit_log = AuditLog.objects.get(entity_type='CertificateRequest', entity_id=str(certificate.id))
+        self.assertEqual(audit_log.reason, 'Échéancier validé par la direction.')
+        self.assertEqual(audit_log.new_value['negotiation_approved'], True)
+
+    def test_certificate_review_rejects_truthy_string_as_negotiation_approval(self):
+        student = Etudiant.objects.create(
+            matricule='CERT-BOOL',
+            first_name='Sara',
+            last_name='F',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        certificate = CertificateRequest.objects.create(
+            student=student,
+            academic_year='2026-2027',
+        )
+
+        response = self.client.post(
+            reverse('certificate-request-review', args=[certificate.id]),
+            {
+                'status': CertificateRequest.Status.APPROVED,
+                'negotiation_approved': 'false',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('negotiation_approved', response.data)
+
+    def test_certificate_approval_requires_enrollment_in_matching_school_year(self):
+        student = Etudiant.objects.create(
+            matricule='CERT-WRONG-YEAR',
+            first_name='Mia',
+            last_name='G',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        certificate = CertificateRequest.objects.create(
+            student=student,
+            academic_year='2025-2026',
+        )
+
+        response = self.client.post(
+            reverse('certificate-request-review', args=[certificate.id]),
+            {
+                'status': CertificateRequest.Status.APPROVED,
+                'negotiation_approved': True,
+                'decision_reason': 'Test',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(AuditLog.objects.filter(entity_type='CertificateRequest').exists())
 
 
 class EtudiantViewSetTests(APITestCase):
