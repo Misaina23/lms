@@ -51,6 +51,44 @@ class ClasseViewSetTests(APITestCase):
 
 
 class ClasseBusinessRuleTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = CustomUser.objects.create_user(
+            username='coverage-admin',
+            email='coverage-admin@lycee.com',
+            password='AdminPassword123!',
+            first_name='Admin',
+            last_name='Coverage',
+            matricule='COVADM1',
+            role=CustomUser.Role.ADMIN,
+        )
+        cls.teacher_user = CustomUser.objects.create_user(
+            username='coverage-teacher',
+            email='coverage-teacher@lycee.com',
+            password='TeacherPassword123!',
+            first_name='Teacher',
+            last_name='Coverage',
+            matricule='COVTCH1',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        cls.admin_token = Token.objects.create(user=cls.admin_user)
+        cls.teacher_token = Token.objects.create(user=cls.teacher_user)
+
+    def setUp(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.admin_token.key}')
+
+    def test_coverage_endpoints_are_not_public_and_reject_non_admins(self):
+        for url_name in ('classe-coverage', 'classe-coverage-alerts'):
+            with self.subTest(url_name=url_name, role='anonymous'):
+                self.client.credentials()
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, 401)
+
+            with self.subTest(url_name=url_name, role='teacher'):
+                self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.teacher_token.key}')
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, 403)
+
     def test_matiere_coefficient_is_resolved_by_class_stream(self):
         matiere = Matiere.objects.create(code='MATH', nom='Mathématiques', coefficient=1)
         classe_s = Classe.objects.create(nom='Première S', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.SCIENTIFIQUE, capacite=30)

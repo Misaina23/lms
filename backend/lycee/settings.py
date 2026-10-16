@@ -9,11 +9,40 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-mnrlrkp9xj@o4lk&vhlv)r#sr1r49e8@pi^g3^9f)6ku&*h1px')
+debug_value = os.environ.get('DEBUG', 'False').strip().lower()
+if debug_value not in {'true', 'false', '1', '0', 'yes', 'no', 'on', 'off'}:
+    raise ImproperlyConfigured('DEBUG must be set to a boolean value.')
+DEBUG = debug_value in {'true', '1', 'yes', 'on'}
 
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-local-development-only'
+    else:
+        raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DEBUG is disabled.')
+elif not DEBUG and (
+    len(SECRET_KEY) < 50
+    or len(set(SECRET_KEY)) < 5
+    or SECRET_KEY.startswith('django-insecure-')
+):
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must be a strong production secret.')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+allowed_hosts_value = os.environ.get('ALLOWED_HOSTS')
+if not allowed_hosts_value:
+    if DEBUG:
+        ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+    else:
+        raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG is disabled.')
+else:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_value.split(',') if host.strip()]
+    if not ALLOWED_HOSTS or (not DEBUG and '*' in ALLOWED_HOSTS):
+        raise ImproperlyConfigured('ALLOWED_HOSTS must contain specific hosts; wildcards are not allowed.')
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = not DEBUG
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -174,6 +203,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_RATES': {
+        'login': '20/hour',
         'password_reset': '5/hour',
     },
 }

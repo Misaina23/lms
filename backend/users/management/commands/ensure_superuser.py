@@ -1,15 +1,16 @@
-from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError
+from django.core.management.base import BaseCommand, CommandError
 
 from users.models import CustomUser
 
 
 class Command(BaseCommand):
-    help = 'Crée ou met à jour le super-admin du portail (email admin@gmail.com / mot de passe 123456 par défaut).'
+    help = 'Crée ou met à jour le super-admin du portail.'
 
     def add_arguments(self, parser):
         parser.add_argument('--email', default='admin@gmail.com')
-        parser.add_argument('--password', default='123456')
+        parser.add_argument('--password', required=True)
         parser.add_argument('--first-name', default='Admin')
         parser.add_argument('--last-name', default='Portal')
         parser.add_argument('--matricule', default='ADM-ROOT-001')
@@ -20,28 +21,27 @@ class Command(BaseCommand):
         password = options['password']
 
         if not email:
-            raise ValueError('Un email est requis pour le super-admin.')
+            raise CommandError('Un email est requis pour le super-admin.')
         if not password:
-            raise ValueError('Un mot de passe est requis pour le super-admin.')
+            raise CommandError('Un mot de passe est requis pour le super-admin.')
 
-        user, created = CustomUser.objects.get_or_create(
-            email=email,
-            defaults={
-                'username': email,
-                'first_name': options['first_name'],
-                'last_name': options['last_name'],
-                'matricule': options['matricule'],
-                'role': CustomUser.Role.ADMIN,
-                'status': CustomUser.Status.ACTIVE,
-                'is_active': True,
-                'is_staff': True,
-                'is_superuser': True,
-            },
-        )
-
-        if created:
+        user = CustomUser.objects.filter(email=email).first()
+        if user is None:
+            user = CustomUser(
+                username=email,
+                email=email,
+                first_name=options['first_name'],
+                last_name=options['last_name'],
+                matricule=options['matricule'],
+                role=CustomUser.Role.ADMIN,
+                status=CustomUser.Status.ACTIVE,
+                is_active=True,
+                is_staff=True,
+                is_superuser=True,
+            )
+            self._validate_password(password, user)
             user.set_password(password)
-            user.save(update_fields=['password'])
+            user.save()
             self.stdout.write(self.style.SUCCESS(f'Compte admin créé : {email}'))
             return
 
@@ -49,6 +49,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f'Le compte {email} existe déjà. Aucun changement n’a été appliqué.'))
             return
 
+        self._validate_password(password, user)
         user.username = email
         user.first_name = options['first_name']
         user.last_name = options['last_name']
@@ -61,3 +62,13 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
         self.stdout.write(self.style.SUCCESS(f'Compte admin mis à jour : {email}'))
+
+    @staticmethod
+    def _validate_password(password, user):
+        try:
+            password_validation.validate_password(password, user)
+        except ValidationError as error:
+            raise CommandError(
+                'Le mot de passe du super-admin ne respecte pas la politique de sécurité : '
+                + '; '.join(error.messages)
+            ) from error

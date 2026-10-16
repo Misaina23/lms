@@ -60,6 +60,8 @@ class CustomUser(AbstractUser):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
+    login_failed_attempts = models.PositiveSmallIntegerField(default=0, editable=False)
+    login_locked_until = models.DateTimeField(null=True, blank=True, editable=False)
     date_of_birth = models.DateField(null=True, blank=True)
     address = models.TextField(blank=True)
     photo = models.ImageField(

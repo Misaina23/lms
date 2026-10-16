@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -28,7 +28,7 @@ class ClasseViewSet(viewsets.ModelViewSet):
             return [IsAdminOnly()]
         return super().get_permissions()
 
-    @action(detail=False, methods=['get'], url_path='coverage', permission_classes=[permissions.AllowAny])
+    @action(detail=False, methods=['get'], url_path='coverage', permission_classes=[IsAdminOnly])
     def coverage(self, request):
         academic_year = request.query_params.get('academic_year') or '2024-2025'
         classes = self.get_queryset().filter(academic_year=academic_year) if academic_year else self.get_queryset()
@@ -104,7 +104,7 @@ class ClasseViewSet(viewsets.ModelViewSet):
             'missing_subjects': missing_subjects,
         })
 
-    @action(detail=False, methods=['get'], url_path='coverage-alerts', permission_classes=[permissions.AllowAny])
+    @action(detail=False, methods=['get'], url_path='coverage-alerts', permission_classes=[IsAdminOnly])
     def coverage_alerts(self, request):
         coverage = self.coverage(request).data
         alerts = []

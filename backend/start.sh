@@ -1,10 +1,11 @@
 #!/bin/sh
 set -e
 
+: "${SUPERUSER_PASSWORD:?Set SUPERUSER_PASSWORD to a strong secret before starting the service}"
 python manage.py migrate --noinput
 python manage.py ensure_superuser \
   --email "${SUPERUSER_EMAIL:-admin@gmail.com}" \
-  --password "${SUPERUSER_PASSWORD:-123456}" \
+  --password "$SUPERUSER_PASSWORD" \
   --first-name "${SUPERUSER_FIRST_NAME:-Admin}" \
   --last-name "${SUPERUSER_LAST_NAME:-Portal}" \
   --matricule "${SUPERUSER_MATRICULE:-ADM-ROOT-001}" \

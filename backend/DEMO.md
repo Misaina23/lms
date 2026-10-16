@@ -22,6 +22,10 @@ Cette option ne fonctionne qu'avec `DEBUG=False`. Elle crée neuf classes et 45 
 
 Le seed de production ajoute des dossiers explicitement identifiés comme données de démonstration dans la base réelle.
 
+## Variables de sécurité en production
+
+Configurez `DJANGO_SECRET_KEY` avec un secret généré d'au moins 50 caractères, `DEBUG=False` et `ALLOWED_HOSTS` avec les noms d'hôte exacts. Le mode production active la redirection HTTPS, HSTS et les cookies sécurisés ; le proxy doit définir `X-Forwarded-Proto` conformément à sa configuration de confiance. Le démarrage exige aussi un `SUPERUSER_PASSWORD` qui respecte les validateurs Django ; aucun mot de passe par défaut n'est utilisé. Dans Render, définissez ces valeurs comme secrets et ne les publiez pas dans le dépôt.
+
 Comptes créés sur une base locale vide :
 
 | Rôle | Adresse | Mot de passe initial |

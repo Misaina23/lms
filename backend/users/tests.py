@@ -1,16 +1,19 @@
-from io import BytesIO
+from datetime import timedelta
+from io import BytesIO, StringIO
 
 from django.contrib.auth import authenticate
-from django.core.cache import cache
 from django.core import mail
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.core.management import call_command, CommandError
+from django.test import TestCase, override_settings
+from django.utils import timezone
 from django.urls import reverse
 from PIL import Image
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
-from matieres.models import Matiere
 from classes.models import Classe, TeacherAssignment
+from matieres.models import Matiere
 from .models import CustomUser
 from .serializers import CustomUserSerializer
 
@@ -19,6 +22,88 @@ def create_valid_photo(name='avatar.png'):
     buffer = BytesIO()
     Image.new('RGB', (10, 10), color='white').save(buffer, format='PNG')
     return SimpleUploadedFile(name, buffer.getvalue(), content_type='image/png')
+
+
+class EnsureSuperuserCommandTests(TestCase):
+    def test_weak_password_is_rejected_without_creating_admin(self):
+        with self.assertRaises(CommandError):
+            call_command(
+                'ensure_superuser',
+                email='new-admin@lycee.com',
+                password='123456',
+                stdout=StringIO(),
+            )
+
+        self.assertFalse(CustomUser.objects.filter(email='new-admin@lycee.com').exists())
+
+    def test_strong_password_creates_admin(self):
+        call_command(
+            'ensure_superuser',
+            email='new-admin@lycee.com',
+            password='K7v!nR4$wZ9#qL2p',
+            stdout=StringIO(),
+        )
+
+        admin = CustomUser.objects.get(email='new-admin@lycee.com')
+        self.assertTrue(admin.is_superuser)
+        self.assertTrue(admin.check_password('K7v!nR4$wZ9#qL2p'))
+
+
+@override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
+class LoginProtectionTests(APITestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username='login-protection',
+            email='login-protection@lycee.com',
+            password='StrongPassw0rd!',
+            first_name='Login',
+            last_name='Protection',
+            matricule='LOGIN001',
+            role=CustomUser.Role.ADMIN,
+        )
+        self.url = reverse('login')
+
+    def test_five_failed_attempts_temporarily_lock_account(self):
+        for attempt in range(4):
+            response = self.client.post(self.url, {
+                'email': self.user.email,
+                'password': 'wrong-password',
+            })
+            self.assertEqual(response.status_code, 400, msg=f'failed attempt {attempt + 1}')
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.login_failed_attempts, 4)
+        response = self.client.post(self.url, {
+            'email': self.user.email,
+            'password': 'wrong-password',
+        })
+
+        self.assertEqual(response.status_code, 429)
+        self.assertGreater(int(response['Retry-After']), 0)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.login_failed_attempts, 0)
+        self.assertIsNotNone(self.user.login_locked_until)
+
+        valid_login = self.client.post(self.url, {
+            'email': self.user.email,
+            'password': 'StrongPassw0rd!',
+        })
+        self.assertEqual(valid_login.status_code, 429)
+
+    def test_lock_expires_and_successful_login_resets_failed_attempts(self):
+        self.user.login_failed_attempts = 3
+        self.user.login_locked_until = timezone.now() - timedelta(seconds=1)
+        self.user.save(update_fields=['login_failed_attempts', 'login_locked_until'])
+
+        response = self.client.post(self.url, {
+            'email': self.user.email,
+            'password': 'StrongPassw0rd!',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.login_failed_attempts, 0)
+        self.assertIsNone(self.user.login_locked_until)
 
 
 class CustomUserViewSetTests(APITestCase):

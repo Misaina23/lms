@@ -41,7 +41,7 @@ services:
       - key: SUPERUSER_EMAIL
         value: admin@gmail.com
       - key: SUPERUSER_PASSWORD
-        value: "123456"
+        sync: false
       - key: SUPERUSER_FIRST_NAME
         value: Admin
       - key: SUPERUSER_LAST_NAME

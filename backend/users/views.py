@@ -8,6 +8,8 @@ from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from classes.models import Classe, Matiere, TeacherAssignment
@@ -31,6 +33,10 @@ PUBLIC_SIGNUP_ROLES = {
 
 class PasswordResetRateThrottle(AnonRateThrottle):
     scope = 'password_reset'
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -179,10 +185,65 @@ def register_view(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @authentication_classes([])
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
     email = request.data.get('email')
     password = request.data.get('password')
+    if not isinstance(email, str) or not isinstance(password, str) or not email or not password:
+        return Response({'detail': 'Identifiants invalides'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email = email.strip()
+    now = timezone.now()
+    account = CustomUser.objects.filter(email__iexact=email).first()
+    if account and account.login_locked_until:
+        if account.login_locked_until > now:
+            retry_after = max(1, int((account.login_locked_until - now).total_seconds()))
+            response = Response(
+                {'detail': 'Compte temporairement verrouillé après plusieurs tentatives. Réessayez plus tard.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+            response['Retry-After'] = str(retry_after)
+            return response
+        CustomUser.objects.filter(pk=account.pk).update(
+            login_failed_attempts=0,
+            login_locked_until=None,
+        )
     user = authenticate(request, username=email, password=password)
+    if user is None:
+        if account:
+            with transaction.atomic():
+                account = CustomUser.objects.select_for_update().get(pk=account.pk)
+                if account.login_locked_until and account.login_locked_until > now:
+                    retry_after = max(1, int((account.login_locked_until - now).total_seconds()))
+                    response = Response(
+                        {'detail': 'Compte temporairement verrouillé après plusieurs tentatives. Réessayez plus tard.'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+                    response['Retry-After'] = str(retry_after)
+                    return response
+                attempts = account.login_failed_attempts + 1
+                if attempts >= 5:
+                    account.login_failed_attempts = 0
+                    account.login_locked_until = now + timezone.timedelta(minutes=15)
+                else:
+                    account.login_failed_attempts = attempts
+                account.save(update_fields=['login_failed_attempts', 'login_locked_until'])
+                if account.login_locked_until:
+                    response = Response(
+                        {'detail': 'Compte temporairement verrouillé après plusieurs tentatives. Réessayez plus tard.'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+                    response['Retry-After'] = str(
+                        max(1, int((account.login_locked_until - now).total_seconds()))
+                    )
+                    return response
+        return Response({'detail': 'Identifiants invalides'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if user.login_failed_attempts or user.login_locked_until:
+        CustomUser.objects.filter(pk=user.pk).update(
+            login_failed_attempts=0,
+            login_locked_until=None,
+        )
     if user is not None:
         if user.role not in PORTAL_ACCESS_ROLES:
             return Response({
