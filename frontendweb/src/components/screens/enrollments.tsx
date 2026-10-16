@@ -117,7 +117,7 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
         <p className="text-sm text-muted-foreground">{stats.count} dossiers · {formatCurrency(stats.verse)} sur {formatCurrency(stats.total)}</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 sm:grid-cols-3">
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Encaissé</p><p className="mt-1 text-2xl font-semibold">{formatCurrency(stats.verse)}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Reste à payer</p><p className="mt-1 text-2xl font-semibold text-rose-600">{formatCurrency(stats.reste)}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Payé / Partiel / Impayé</p><p className="mt-1 text-lg font-semibold">{stats.paid} · {stats.partial} · {stats.unpaid}</p></CardContent></Card>

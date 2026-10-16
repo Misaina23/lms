@@ -184,7 +184,7 @@ export default function Home() {
     <>
       <main className="min-h-dvh bg-background text-foreground">
         <div className="flex min-h-dvh">
-          <aside className={`${mobileNav ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 lg:static lg:translate-x-0`}>
+          <aside className={`${mobileNav ? 'translate-x-0' : '-translate-x-full'} mobile-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(88vw,320px)] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 lg:static lg:w-[272px] lg:translate-x-0`}>
             <div className="flex h-[82px] shrink-0 items-center justify-between border-b border-sidebar-border px-6">
               <div className="flex items-center gap-3">
                 <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={80} height={40} className="h-9 w-[72px] shrink-0 object-contain" />
@@ -319,7 +319,7 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mobile-stat-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Élèves actifs" value={elevesActifs.toString()} detail={`${data.users.filter((u) => u.role === 'ELEVE').length} élèves inscrits`} trend="4,8 %" icon={GraduationCap} accent="bg-primary/10 text-primary" />
         <StatCard label="Enseignants" value={enseignantsActifs.toString()} detail="Personnel actif" trend="2,1 %" icon={Users} accent="bg-sky-500/10 text-sky-700 dark:text-sky-300" />
         <StatCard label="Classes" value={data.classes.length.toString()} detail={`${data.matieres.length} matières`} trend="0,0 %" icon={BookOpen} accent="bg-amber-500/10 text-amber-700 dark:text-amber-300" />

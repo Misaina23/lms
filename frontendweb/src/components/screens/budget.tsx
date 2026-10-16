@@ -174,7 +174,7 @@ export function BudgetScreen({
       {activeTab === 'overview' && (
         <>
           {/* Stats */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mobile-stat-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Scolarité"
               value={formatCurrency(totalTuition)}

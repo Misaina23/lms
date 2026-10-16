@@ -730,7 +730,7 @@ export function GradesScreen({ notes, users, etudiants, matieres, periods, role,
         <p className="text-sm text-muted-foreground">{notes.length} notes · {periods.length} périodes d'examen configurées</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 sm:grid-cols-3">
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Moyenne générale</p><p className="mt-1 text-2xl font-semibold">{notes.length ? (notes.reduce((s, n) => s + Number(n.note), 0) / notes.length).toFixed(2) : '—'}/20</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Notes verrouillées</p><p className="mt-1 text-2xl font-semibold">{notes.filter((n) => n.status === 'LOCKED').length}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">En brouillon</p><p className="mt-1 text-2xl font-semibold">{notes.filter((n) => n.status === 'DRAFT').length}</p></CardContent></Card>
@@ -1066,7 +1066,7 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
           </CardContent>
         </Card>
       )}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 sm:grid-cols-3">
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Présents</p><p className="mt-1 text-2xl font-semibold text-emerald-600">{absences.filter((a) => a.statut === 'PRESENT').length}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">En retard</p><p className="mt-1 text-2xl font-semibold text-amber-600">{absences.filter((a) => a.statut === 'LATE').length}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Absents</p><p className="mt-1 text-2xl font-semibold text-rose-600">{absences.filter((a) => a.statut === 'ABSENT').length}</p></CardContent></Card>
@@ -1244,14 +1244,14 @@ export function ReportsScreen({ users, etudiants, classes, matieres, periods }: 
           {loading && <p className="py-6 text-center text-sm text-muted-foreground">Calcul du rapport…</p>}
           {!loading && report && (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mobile-stat-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Élèves évalués</p><p className="mt-1 text-xl font-semibold">{report.summary.student_count}</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Moyenne générale</p><p className="mt-1 text-xl font-semibold">{report.summary.average}/20</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Taux de réussite</p><p className="mt-1 text-xl font-semibold">{report.summary.pass_rate}%</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Notes au-dessus du seuil</p><p className="mt-1 text-xl font-semibold">{report.summary.passed_count}/{report.summary.note_count}</p></CardContent></Card>
               </div>
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full min-w-[720px] text-left text-sm">
+                <table className="mobile-card-table w-full min-w-[720px] text-left text-sm">
                   <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Classe</th>
@@ -1265,12 +1265,12 @@ export function ReportsScreen({ users, etudiants, classes, matieres, periods }: 
                   <tbody>
                     {report.results.map((row) => (
                       <tr key={`${row.class_id ?? 'none'}-${row.subject_id}`} className="border-t border-border">
-                        <td className="px-4 py-3 font-medium">{row.class_name}</td>
-                        <td className="px-4 py-3">{row.subject_name}</td>
-                        <td className="px-4 py-3 text-right">{row.student_count}</td>
-                        <td className="px-4 py-3 text-right">{row.average}/20</td>
-                        <td className="px-4 py-3 text-right">{row.passed_count}/{row.student_count}</td>
-                        <td className="px-4 py-3 text-right">{row.pass_rate}%</td>
+                        <td data-label="Classe" className="px-4 py-3 font-medium">{row.class_name}</td>
+                        <td data-label="Matière" className="px-4 py-3">{row.subject_name}</td>
+                        <td data-label="Élèves" className="px-4 py-3 text-right">{row.student_count}</td>
+                        <td data-label="Moyenne" className="px-4 py-3 text-right">{row.average}/20</td>
+                        <td data-label="Admis" className="px-4 py-3 text-right">{row.passed_count}/{row.student_count}</td>
+                        <td data-label="Réussite" className="px-4 py-3 text-right">{row.pass_rate}%</td>
                       </tr>
                     ))}
                     {report.results.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Aucune note validée pour cette période.</td></tr>}

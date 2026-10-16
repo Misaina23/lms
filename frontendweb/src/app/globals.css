@@ -280,7 +280,7 @@ tbody tr {
   .mobile-card-table tbody tr {
     display: block;
     overflow: hidden;
-    padding: 8px 14px;
+    padding: 6px 14px;
     border: 1px solid var(--border);
     border-radius: 16px;
     background: var(--card);
@@ -304,7 +304,7 @@ tbody tr {
     overflow-wrap: anywhere;
   }
 
-  .mobile-card-table td:not([colspan])::before {
+  .mobile-card-table td[data-label]::before {
     content: attr(data-label);
     color: var(--muted-foreground);
     font-size: 11px;
@@ -312,11 +312,12 @@ tbody tr {
     line-height: 1.5;
   }
 
-  .mobile-card-table td:not([colspan]):last-child {
+  .mobile-card-table td[data-label]:last-child {
     border-bottom: 0;
   }
 
-  .mobile-card-table td.hidden {
+  .mobile-card-table td.hidden,
+  .mobile-card-table th.hidden {
     display: none !important;
   }
 
@@ -333,6 +334,62 @@ tbody tr {
   .mobile-card-table td > div {
     min-width: 0;
   }
+
+  .mobile-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mobile-stat-grid [data-slot="card"] {
+    min-width: 0;
+    border-radius: 16px;
+  }
+
+  .mobile-stat-grid [data-slot="card-content"] {
+    padding: 14px !important;
+  }
+
+  .mobile-stat-grid [data-slot="card-content"] > p:nth-of-type(2) {
+    overflow-wrap: anywhere;
+    font-size: clamp(1.05rem, 5vw, 1.35rem);
+  }
+
+  .mobile-sidebar {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-tab-bar {
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+
+  [data-slot="button"],
+  button:not(.mobile-tab-bar button),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  [data-slot="button"],
+  button:not(.mobile-tab-bar button) {
+    min-width: 44px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    max-width: 100%;
+  }
+
+  .overflow-x-auto:not(:has(> .mobile-card-table)) {
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [role="dialog"] > div {
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
 }
 
 footer {
@@ -347,11 +404,7 @@ footer {
   }
 
   main section > header {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-
-  .mobile-tab-bar {
-    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    min-height: calc(68px + env(safe-area-inset-top, 0px));
   }
 }
 

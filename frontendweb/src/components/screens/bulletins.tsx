@@ -194,7 +194,7 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
               </div>
             </CardHeader>
             <CardContent>
-              <div className="mb-6 grid gap-4 sm:grid-cols-3">
+              <div className="mobile-stat-grid mb-6 grid gap-4 sm:grid-cols-3">
                 <Card className="border-border/60 rounded-2xl">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2">
