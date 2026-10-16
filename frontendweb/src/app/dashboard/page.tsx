@@ -158,7 +158,7 @@ export default function Home() {
     }
     switch (active) {
       case 'overview': return <OverviewScreen data={data} />
-      case 'students': return <StudentsScreen etudiants={data.etudiants} classes={data.classes as any} onReload={reload} canManage={role === 'ADMIN' || role === 'SECRETARIAT'} canReviewTransfers={role === 'ADMIN'} showGrades={role === 'ADMIN'} />
+      case 'students': return <StudentsScreen etudiants={data.etudiants} classes={data.classes as any} onReload={reload} canManage={role === 'ADMIN' || role === 'SECRETARIAT'} canReviewTransfers={role === 'ADMIN'} canManageCertificates={role === 'ADMIN'} showGrades={role === 'ADMIN'} />
       case 'enrollments': return <EnrollmentRegistryScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} />
       case 'payments': return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} />
       case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} onReload={reload} />

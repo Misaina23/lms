@@ -3,19 +3,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import QRCode from 'qrcode'
-import { Search, CheckCircle2, UserPlus, X, UsersRound, Printer, IdCard, ArrowRightLeft, History } from 'lucide-react'
+import { Search, CheckCircle2, UserPlus, X, UsersRound, Printer, IdCard, ArrowRightLeft, History, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { api, type Etudiant, type Classe, type PaginatedResponse, type StudentClassHistory, type StudentTransferRequest } from '@/lib/api'
+import { api, type Etudiant, type Classe, type CertificateRequest, type PaginatedResponse, type StudentClassHistory, type StudentTransferRequest } from '@/lib/api'
 import { useFilteredStudents, initials } from '@/lib/admin-data'
 
-export function StudentsScreen({ etudiants, classes, onReload, canManage = true, canReviewTransfers = false, showGrades = true }: {
+export function StudentsScreen({ etudiants, classes, onReload, canManage = true, canReviewTransfers = false, canManageCertificates = false, showGrades = true }: {
   etudiants: Etudiant[]
   classes: Classe[]
   onReload: () => void
   canManage?: boolean
   canReviewTransfers?: boolean
+  canManageCertificates?: boolean
   showGrades?: boolean
 }) {
   const [query, setQuery] = useState('')
@@ -40,6 +41,15 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
   const [decisionReason, setDecisionReason] = useState('')
   const [decisionError, setDecisionError] = useState('')
   const [decisionSaving, setDecisionSaving] = useState(false)
+  const [certificateRequests, setCertificateRequests] = useState<CertificateRequest[]>([])
+  const [certificateLoading, setCertificateLoading] = useState(false)
+  const [certificateError, setCertificateError] = useState('')
+  const [certificateStudent, setCertificateStudent] = useState('')
+  const [certificateYear, setCertificateYear] = useState(`${new Date().getFullYear()}-${new Date().getFullYear() + 1}`)
+  const [certificateSaving, setCertificateSaving] = useState(false)
+  const [certificateDecisionReasons, setCertificateDecisionReasons] = useState<Record<number, string>>({})
+  const [certificateNegotiations, setCertificateNegotiations] = useState<Record<number, boolean>>({})
+  const [certificateDownloading, setCertificateDownloading] = useState<number | null>(null)
   const [form, setForm] = useState({
     matricule: '',
     first_name: '',
@@ -79,9 +89,98 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
     }
   }, [canManage])
 
+  const refreshCertificateRequests = useCallback(async () => {
+    if (!canManageCertificates) return
+    setCertificateLoading(true)
+    setCertificateError('')
+    try {
+      const results: CertificateRequest[] = []
+      let pageNumber = 1
+      let hasNextPage = true
+      while (hasNextPage) {
+        const response = await api.get<PaginatedResponse<CertificateRequest>>(
+          `/certificate-requests/?page=${pageNumber}`,
+        )
+        results.push(...response.results)
+        hasNextPage = Boolean(response.next)
+        pageNumber += 1
+      }
+      setCertificateRequests(results)
+    } catch (error) {
+      setCertificateError(error instanceof Error ? error.message : 'Impossible de charger les demandes de certificat.')
+    } finally {
+      setCertificateLoading(false)
+    }
+  }, [canManageCertificates])
+
   useEffect(() => {
     void refreshTransferRequests()
   }, [refreshTransferRequests])
+
+  useEffect(() => {
+    void refreshCertificateRequests()
+  }, [refreshCertificateRequests])
+
+  const submitCertificateRequest = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setCertificateSaving(true)
+    setCertificateError('')
+    try {
+      await api.post('/certificate-requests/', {
+        student: Number(certificateStudent),
+        academic_year: certificateYear.trim(),
+      })
+      setCertificateStudent('')
+      await refreshCertificateRequests()
+    } catch (error) {
+      setCertificateError(error instanceof Error ? error.message : 'Impossible de créer la demande de certificat.')
+    } finally {
+      setCertificateSaving(false)
+    }
+  }
+
+  const decideCertificateRequest = async (request: CertificateRequest, status: 'APPROVED' | 'REJECTED') => {
+    setCertificateError('')
+    const decisionReason = (certificateDecisionReasons[request.id] || '').trim()
+    if (!decisionReason) {
+      setCertificateError('Indiquez une justification pour chaque décision de certificat.')
+      return
+    }
+    setCertificateSaving(true)
+    try {
+      await api.post(`/certificate-requests/${request.id}/review/`, {
+        status,
+        decision_reason: decisionReason,
+        negotiation_approved: status === 'APPROVED' && Boolean(certificateNegotiations[request.id]),
+      })
+      await refreshCertificateRequests()
+      onReload()
+    } catch (error) {
+      setCertificateError(error instanceof Error ? error.message : 'Impossible d’enregistrer la décision.')
+    } finally {
+      setCertificateSaving(false)
+    }
+  }
+
+  const downloadCertificate = async (request: CertificateRequest) => {
+    setCertificateError('')
+    setCertificateDownloading(request.id)
+    try {
+      const file = await api.download(`/certificate-requests/${request.id}/download/`)
+      const url = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `certificat-scolarite-${request.student_detail.matricule}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (error) {
+      setCertificateError(error instanceof Error ? error.message : 'Impossible de télécharger le certificat.')
+    } finally {
+      setCertificateDownloading(null)
+    }
+  }
 
   useEffect(() => {
     if (!transferStudent) {
@@ -324,6 +423,78 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
                   </div>
                 ))}
                 {transferRequests.length === 0 && <p className="text-sm text-muted-foreground">Aucune demande de transfert.</p>}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {canManageCertificates && (
+        <Card className="border-border/70 bg-card/80 rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><Printer className="size-4" /> Certificats de scolarité</CardTitle>
+            <p className="text-xs text-muted-foreground">Créez les demandes, vérifiez l’inscription et les frais, puis téléchargez les certificats approuvés.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form className="grid gap-3 sm:grid-cols-[1fr_180px_auto]" onSubmit={submitCertificateRequest}>
+              <select required value={certificateStudent} onChange={(event) => setCertificateStudent(event.target.value)} className="h-10 rounded-xl border border-border bg-card px-3 text-sm outline-none">
+                <option value="">Choisir un élève actif et inscrit</option>
+                {etudiants.filter((student) => student.actif && student.statut === 'ENROLLED' && student.classe).map((student) => (
+                  <option key={student.id} value={student.id}>{student.first_name} {student.last_name} · {student.matricule}</option>
+                ))}
+              </select>
+              <Input required maxLength={9} value={certificateYear} onChange={(event) => setCertificateYear(event.target.value)} aria-label="Année scolaire du certificat" placeholder="2026-2027" />
+              <Button type="submit" disabled={certificateSaving || !certificateStudent}>{certificateSaving ? 'Enregistrement…' : 'Créer une demande'}</Button>
+            </form>
+            {certificateError && <p className="text-sm text-destructive" role="alert">{certificateError}</p>}
+            {certificateLoading ? <p className="text-sm text-muted-foreground">Chargement des demandes…</p> : (
+              <div className="space-y-3">
+                {certificateRequests.map((request) => (
+                  <div key={request.id} className="space-y-3 rounded-xl border border-border/70 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-semibold">{request.student_detail.first_name} {request.student_detail.last_name} <span className="text-xs font-normal text-muted-foreground">· {request.student_detail.matricule}</span></p>
+                        <p className="text-xs text-muted-foreground">
+                          {classes.find((classe) => classe.id === request.student_detail.classe)?.nom || 'Classe inconnue'} · {request.academic_year} · {request.status}
+                          {request.status === 'APPROVED' && ` · ${request.fee_verified ? 'Frais vérifiés' : 'Dérogation accordée'}`}
+                          {request.status === 'PENDING' && ` · Frais ${request.fees_settled ? 'réglés' : 'dus'}`}
+                        </p>
+                        {request.decision_reason && <p className="mt-1 text-xs text-muted-foreground">Décision : {request.decision_reason}</p>}
+                      </div>
+                      {request.status === 'APPROVED' && (
+                        <Button size="sm" variant="outline" className="gap-2" disabled={certificateDownloading === request.id} onClick={() => void downloadCertificate(request)}>
+                          <Download className="size-4" /> {certificateDownloading === request.id ? 'Téléchargement…' : 'Télécharger le PDF'}
+                        </Button>
+                      )}
+                    </div>
+                    {request.status === 'PENDING' && (
+                      <div className="space-y-2">
+                        <Input
+                          required
+                          value={certificateDecisionReasons[request.id] || ''}
+                          onChange={(event) => setCertificateDecisionReasons((reasons) => ({ ...reasons, [request.id]: event.target.value }))}
+                          placeholder="Justification de la décision"
+                          aria-label={`Justification pour la demande ${request.id}`}
+                        />
+                        {!request.fees_settled && (
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(certificateNegotiations[request.id])}
+                              onChange={(event) => setCertificateNegotiations((values) => ({ ...values, [request.id]: event.target.checked }))}
+                            />
+                            Autoriser par dérogation malgré les frais dus (justification obligatoire)
+                          </label>
+                        )}
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" disabled={certificateSaving} onClick={() => void decideCertificateRequest(request, 'REJECTED')}>Refuser</Button>
+                          <Button size="sm" disabled={certificateSaving} onClick={() => void decideCertificateRequest(request, 'APPROVED')}>Approuver</Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {certificateRequests.length === 0 && <p className="text-sm text-muted-foreground">Aucune demande de certificat.</p>}
               </div>
             )}
           </CardContent>

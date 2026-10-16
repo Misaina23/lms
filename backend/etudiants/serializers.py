@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -274,16 +276,37 @@ class StudentOfficePassSerializer(serializers.ModelSerializer):
 class CertificateRequestSerializer(serializers.ModelSerializer):
     student_detail = EtudiantSerializer(source='student', read_only=True)
     decided_by_detail = UserNestedSerializer(source='decided_by', read_only=True)
+    fees_settled = serializers.SerializerMethodField()
 
     class Meta:
         model = CertificateRequest
         fields = [
             'id', 'student', 'student_detail', 'academic_year', 'status',
-            'fee_verified', 'negotiation_approved', 'decision_reason',
+            'fee_verified', 'fees_settled', 'negotiation_approved', 'decision_reason',
             'requested_by', 'decided_by', 'decided_by_detail',
             'created_at', 'decided_at',
         ]
         read_only_fields = ['id', 'status', 'requested_by', 'decided_by', 'decided_by_detail', 'created_at', 'decided_at']
+
+    def get_fees_settled(self, obj):
+        enrollment = next(
+            (
+                item
+                for item in obj.student.enrollments.all()
+                if item.academic_year == obj.academic_year
+            ),
+            None,
+        )
+        return bool(
+            enrollment
+            and (
+                enrollment.payment_status == Enrollment.PaymentStatus.PAID
+                or (
+                    enrollment.frais_total is not None
+                    and (enrollment.frais_verses or Decimal('0')) >= enrollment.frais_total
+                )
+            )
+        )
 
 
 class DeliberationSerializer(serializers.ModelSerializer):

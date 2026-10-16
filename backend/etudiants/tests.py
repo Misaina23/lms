@@ -310,6 +310,7 @@ class AdmissionAndCertificateWorkflowTests(APITestCase):
             'academic_year': '2026-2027',
         }, format='json')
         self.assertEqual(create_response.status_code, 201)
+        self.assertTrue(create_response.data['fees_settled'])
         request_obj = CertificateRequest.objects.get(student=student)
         self.assertEqual(request_obj.status, CertificateRequest.Status.PENDING)
 
@@ -325,6 +326,75 @@ class AdmissionAndCertificateWorkflowTests(APITestCase):
         audit_log = AuditLog.objects.get(entity_type='CertificateRequest', entity_id=str(request_obj.id))
         self.assertEqual(audit_log.actor, self.admin_user)
         self.assertEqual(audit_log.new_value['status'], CertificateRequest.Status.APPROVED)
+
+        download_response = self.client.get(
+            reverse('certificate-request-detail', args=[request_obj.id]) + 'download/',
+        )
+        self.assertEqual(download_response.status_code, 200)
+        self.assertEqual(download_response['Content-Type'], 'application/pdf')
+        self.assertIn('attachment;', download_response['Content-Disposition'])
+        self.assertTrue(b''.join(download_response.streaming_content).startswith(b'%PDF-'))
+
+    def test_certificate_pdf_is_unavailable_before_approval(self):
+        student = Etudiant.objects.create(
+            matricule='CERT-PENDING',
+            first_name='Mira',
+            last_name='H',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        Enrollment.objects.create(
+            student=student,
+            classe=self.classe,
+            academic_year='2026-2027',
+            payment_status=Enrollment.PaymentStatus.PAID,
+        )
+        certificate = CertificateRequest.objects.create(
+            student=student,
+            academic_year='2026-2027',
+        )
+
+        response = self.client.get(
+            reverse('certificate-request-detail', args=[certificate.id]) + 'download/',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['detail'], 'Le certificat doit être approuvé avant de pouvoir être téléchargé.')
+
+    def test_only_administrators_can_download_school_certificates(self):
+        student = Etudiant.objects.create(
+            matricule='CERT-ACCESS',
+            first_name='Solo',
+            last_name='I',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        Enrollment.objects.create(
+            student=student,
+            classe=self.classe,
+            academic_year='2026-2027',
+            payment_status=Enrollment.PaymentStatus.PAID,
+        )
+        certificate = CertificateRequest.objects.create(
+            student=student,
+            academic_year='2026-2027',
+            status=CertificateRequest.Status.APPROVED,
+        )
+        secretary = CustomUser.objects.create_user(
+            username='certificate-secretary',
+            email='certificate-secretary@lycee.com',
+            password='secretarypass',
+            matricule='CERTSEC001',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        token = Token.objects.create(user=secretary)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = self.client.get(
+            reverse('certificate-request-detail', args=[certificate.id]) + 'download/',
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_certificate_cannot_be_approved_with_unpaid_fees_without_negotiation(self):
         student = Etudiant.objects.create(

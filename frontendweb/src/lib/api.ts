@@ -45,8 +45,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
+async function download(path: string): Promise<Blob> {
+  if (!API_BASE) {
+    throw new Error('L’API n’est pas configurée. Définissez NEXT_PUBLIC_API_URL dans Vercel.')
+  }
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Erreur réseau' }))
+      throw new Error(error.detail || `Erreur ${response.status}`)
+    }
+    return response.blob()
+  } catch (error) {
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new Error('Le serveur est injoignable. Vérifiez votre connexion et réessayez.')
+    }
+    throw error
+  }
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  download,
   post: <T>(path: string, data: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(data) }),
   put: <T>(path: string, data: unknown) =>
@@ -194,6 +218,20 @@ export type StudentTransferRequest = {
   decision_reason: string;
   created_at: string;
   reviewed_at: string | null;
+};
+
+export type CertificateRequest = {
+  id: number;
+  student: number;
+  student_detail: Etudiant;
+  academic_year: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  fee_verified: boolean;
+  fees_settled: boolean;
+  negotiation_approved: boolean;
+  decision_reason: string;
+  created_at: string;
+  decided_at: string | null;
 };
 
 export type Note = {

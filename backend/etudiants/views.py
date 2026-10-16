@@ -22,6 +22,7 @@ from .models import (
     StudentOrientation,
     StudentTransferRequest,
 )
+from .certificate_documents import generate_school_certificate
 from .serializers import (
     AuditLogSerializer,
     CertificateRequestSerializer,
@@ -515,6 +516,7 @@ def _review_certificate_request(request, pk):
             enrollment = Enrollment.objects.select_for_update().filter(
                 student=student,
                 academic_year=certificate.academic_year,
+                classe=classe,
             ).first()
             if enrollment is None:
                 return Response(
@@ -1045,7 +1047,12 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
 
 class CertificateRequestViewSet(viewsets.ModelViewSet):
-    queryset = CertificateRequest.objects.select_related('student', 'student__classe', 'requested_by', 'decided_by')
+    queryset = CertificateRequest.objects.select_related(
+        'student',
+        'student__classe',
+        'requested_by',
+        'decided_by',
+    ).prefetch_related('student__enrollments')
     serializer_class = CertificateRequestSerializer
     permission_classes = [IsAdminOnly]
 
@@ -1054,9 +1061,39 @@ class CertificateRequestViewSet(viewsets.ModelViewSet):
         academic_year = request.data.get('academic_year')
         if not student_id or not academic_year:
             return Response({'detail': 'student et academic_year sont obligatoires.'}, status=status.HTTP_400_BAD_REQUEST)
-        student = Etudiant.objects.filter(id=student_id).first()
+        if not isinstance(academic_year, str) or not academic_year.strip():
+            return Response({'academic_year': 'Année scolaire invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+        academic_year = academic_year.strip()
+        student = Etudiant.objects.select_related('classe').filter(id=student_id).first()
         if student is None:
             return Response({'detail': 'Étudiant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        if (
+            not student.actif
+            or student.statut != Etudiant.StudentStatus.ENROLLED
+            or student.classe_id is None
+            or (
+                student.classe.academic_year
+                and student.classe.academic_year != academic_year
+            )
+            or not Enrollment.objects.filter(
+                student=student,
+                academic_year=academic_year,
+                classe=student.classe,
+            ).exists()
+        ):
+            return Response(
+                {'detail': 'Une demande exige un élève actif, inscrit dans une classe et une inscription correspondantes à cette année scolaire.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if CertificateRequest.objects.filter(
+            student=student,
+            academic_year=academic_year,
+            status=CertificateRequest.Status.PENDING,
+        ).exists():
+            return Response(
+                {'detail': 'Une demande de certificat est déjà en attente pour cet élève et cette année.'},
+                status=status.HTTP_409_CONFLICT,
+            )
         instance = CertificateRequest.objects.create(
             student=student,
             academic_year=academic_year,
@@ -1069,6 +1106,20 @@ class CertificateRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly], url_path='review')
     def review(self, request, pk=None):
         return _review_certificate_request(request, pk)
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAdminOnly], url_path='download')
+    def download(self, request, pk=None):
+        certificate = self.get_object()
+        try:
+            buffer, certificate_number = generate_school_certificate(certificate)
+        except ValueError as error:
+            return Response({'detail': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=f'{certificate_number}.pdf',
+            content_type='application/pdf',
+        )
 
 
 class DeliberationViewSet(viewsets.ModelViewSet):
