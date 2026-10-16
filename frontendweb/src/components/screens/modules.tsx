@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Search, CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, UserPlus, ChevronRight, BookOpen, GraduationCap, UsersRound, FileText, Camera, CameraOff, ScanLine } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Search, CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, UserPlus, ChevronRight, BookOpen, GraduationCap, UsersRound, FileText, Camera, CameraOff, ScanLine, TriangleAlert } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { api, type User, type Classe, type Matiere, type Etudiant, type Note, type ExamPeriod } from '@/lib/api'
+import { api, type User, type Classe, type Matiere, type Etudiant, type Note, type ExamPeriod, type AttendanceRiskAlert } from '@/lib/api'
 import { initials } from '@/lib/admin-data'
 
 export function TeachersScreen({ users, etudiants, notes, matieres, periods, onReload }: {
@@ -936,6 +936,22 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
   const [cameraActive, setCameraActive] = useState(false)
   const [scanError, setScanError] = useState('')
   const [scanMessage, setScanMessage] = useState('')
+  const [riskAlerts, setRiskAlerts] = useState<AttendanceRiskAlert[]>([])
+  const [riskAlertsError, setRiskAlertsError] = useState('')
+
+  const loadRiskAlerts = useCallback(async () => {
+    setRiskAlertsError('')
+    try {
+      const response = await api.get<{ results: AttendanceRiskAlert[] }>('/absences/risk-alerts/')
+      setRiskAlerts(response.results)
+    } catch (error) {
+      setRiskAlertsError(error instanceof Error ? error.message : 'Impossible de charger les alertes d’assiduité.')
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadRiskAlerts()
+  }, [loadRiskAlerts])
 
   const stopCamera = () => {
     scannerRef.current?.stop()
@@ -999,6 +1015,30 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
         <h2 className="text-lg font-extrabold tracking-tight text-foreground">Pointage & Assiduité</h2>
         <p className="text-sm text-muted-foreground">{absences.length} pointages · {today_abs.length} aujourd'hui</p>
       </div>
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TriangleAlert className="size-5 text-amber-600" />
+            Alertes d’absences répétées
+            <span className="ml-auto rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700">{riskAlerts.length}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {riskAlertsError && <p className="text-sm text-destructive" role="alert">{riskAlertsError}</p>}
+          {!riskAlertsError && riskAlerts.length === 0 && <p className="text-sm text-muted-foreground">Aucune alerte : aucun élève n’a atteint le seuil de 3 jours d’absence non justifiée sur les 30 derniers jours.</p>}
+          {riskAlerts.map((alert) => (
+            <article key={alert.student_id} className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 ${alert.severity === 'HIGH' ? 'border-rose-300 bg-rose-50/70' : 'border-amber-300 bg-amber-50/70'}`}>
+              <div>
+                <p className="font-semibold">{alert.student_name} <span className="font-normal text-muted-foreground">· {alert.matricule}</span></p>
+                <p className="text-sm text-muted-foreground">{alert.class_name} · {alert.absence_days} jours non justifiés · dernière absence : {alert.latest_absence}</p>
+              </div>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${alert.severity === 'HIGH' ? 'bg-rose-200 text-rose-800' : 'bg-amber-200 text-amber-800'}`}>
+                {alert.severity === 'HIGH' ? 'Prioritaire' : 'À suivre'}
+              </span>
+            </article>
+          ))}
+        </CardContent>
+      </Card>
       {canScan && (
         <Card className="rounded-2xl">
           <CardHeader>

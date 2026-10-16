@@ -2,13 +2,19 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
+from datetime import timedelta
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 from .models import Absence
 from .serializers import AbsenceSerializer
 from users.permissions import CanManageAttendance, IsTeacherOrAdmin
 from etudiants.models import Etudiant
 from classes.models import TeacherAssignment
+
+
+RISK_ALERT_WINDOW_DAYS = 30
+RISK_ALERT_ABSENCE_DAYS = 3
+RISK_ALERT_HIGH_ABSENCE_DAYS = 5
 
 
 class AbsenceViewSet(viewsets.ModelViewSet):
@@ -36,6 +42,46 @@ class AbsenceViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         teacher = self.request.user if self.request.user.role == 'PROFESSEUR' else None
         serializer.save(professeur=teacher)
+
+    @action(detail=False, methods=['get'], url_path='risk-alerts')
+    def risk_alerts(self, request):
+        today = timezone.localdate()
+        window_start = today - timedelta(days=RISK_ALERT_WINDOW_DAYS - 1)
+        students = Etudiant.objects.filter(
+            actif=True,
+            absences__statut=Absence.Status.ABSENT,
+            absences__justifiee=False,
+            absences__date_absence__range=(window_start, today),
+        )
+        if request.user.role == 'PROFESSEUR':
+            assigned_classes = TeacherAssignment.objects.filter(
+                professeur=request.user,
+            ).values_list('classe_id', flat=True)
+            students = students.filter(classe_id__in=assigned_classes)
+
+        alerts = students.select_related('classe').annotate(
+            absence_days=Count('absences__date_absence', distinct=True),
+            latest_absence=Max('absences__date_absence'),
+        ).filter(
+            absence_days__gte=RISK_ALERT_ABSENCE_DAYS,
+        ).order_by('-absence_days', 'last_name', 'first_name')
+
+        return Response({
+            'window_days': RISK_ALERT_WINDOW_DAYS,
+            'threshold_days': RISK_ALERT_ABSENCE_DAYS,
+            'results': [
+                {
+                    'student_id': student.id,
+                    'matricule': student.matricule,
+                    'student_name': student.get_full_name(),
+                    'class_name': student.classe.nom if student.classe_id else 'Sans classe',
+                    'absence_days': student.absence_days,
+                    'latest_absence': student.latest_absence,
+                    'severity': 'HIGH' if student.absence_days >= RISK_ALERT_HIGH_ABSENCE_DAYS else 'WARNING',
+                }
+                for student in alerts
+            ],
+        })
 
     @action(detail=False, methods=['post'], permission_classes=[IsTeacherOrAdmin])
     def scan(self, request):

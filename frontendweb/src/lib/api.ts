@@ -229,6 +229,16 @@ export type Absence = {
   created_at: string;
 };
 
+export type AttendanceRiskAlert = {
+  student_id: number
+  matricule: string
+  student_name: string
+  class_name: string
+  absence_days: number
+  latest_absence: string
+  severity: 'WARNING' | 'HIGH'
+}
+
 export type StudentOrientation = {
   id: string;
   student: number;

@@ -1,4 +1,6 @@
+from datetime import timedelta
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 from users.models import CustomUser
@@ -162,3 +164,88 @@ class AbsenceViewSetTests(APITestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, 400)
+
+    def test_risk_alerts_count_distinct_unexcused_absence_days_within_window(self):
+        today = timezone.localdate()
+        for day_offset in (2, 4, 6, 6):
+            Absence.objects.create(
+                etudiant=self.etudiant,
+                professeur=self.professeur,
+                date_absence=today - timedelta(days=day_offset),
+                heure_debut='08:00:00',
+                heure_fin='10:00:00',
+                statut=Absence.Status.ABSENT,
+                justifiee=False,
+            )
+        Absence.objects.create(
+            etudiant=self.etudiant,
+            professeur=self.professeur,
+            date_absence=today - timedelta(days=8),
+            heure_debut='10:00:00',
+            heure_fin='12:00:00',
+            statut=Absence.Status.ABSENT,
+            justifiee=True,
+        )
+
+        response = self.client.get(reverse('absence-risk-alerts'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['window_days'], 30)
+        self.assertEqual(len(response.data['results']), 1)
+        alert = response.data['results'][0]
+        self.assertEqual(alert['student_id'], self.etudiant.id)
+        self.assertEqual(alert['absence_days'], 3)
+        self.assertEqual(alert['severity'], 'WARNING')
+        self.assertEqual(alert['latest_absence'], today - timedelta(days=2))
+
+    def test_risk_alerts_are_limited_to_teacher_assigned_classes(self):
+        assigned_subject = Matiere.objects.create(nom='Français', code='FR')
+        TeacherAssignment.objects.create(
+            professeur=self.professeur,
+            classe=self.classe,
+            matiere=assigned_subject,
+            academic_year='2026-2027',
+        )
+        other_class = Classe.objects.create(
+            nom='6eme B',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            capacite=40,
+        )
+        other_student = Etudiant.objects.create(
+            matricule='ELV002',
+            first_name='Paul',
+            last_name='Martin',
+            classe=other_class,
+            date_inscription='2024-09-01',
+            actif=True,
+        )
+        today = timezone.localdate()
+        for student, days in ((self.etudiant, (1, 3, 5)), (other_student, (1, 3, 5, 7, 9))):
+            for day_offset in days:
+                Absence.objects.create(
+                    etudiant=student,
+                    professeur=self.professeur,
+                    date_absence=today - timedelta(days=day_offset),
+                    heure_debut='08:00:00',
+                    heure_fin='10:00:00',
+                    statut=Absence.Status.ABSENT,
+                    justifiee=False,
+                )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')
+        response = self.client.get(reverse('absence-risk-alerts'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item['student_id'] for item in response.data['results']], [self.etudiant.id])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.admin_user.auth_token.key}')
+        admin_response = self.client.get(reverse('absence-risk-alerts'))
+        self.assertEqual(
+            {item['student_id'] for item in admin_response.data['results']},
+            {self.etudiant.id, other_student.id},
+        )
+        severities = {
+            item['student_id']: item['severity']
+            for item in admin_response.data['results']
+        }
+        self.assertEqual(severities[other_student.id], 'HIGH')
