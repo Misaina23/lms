@@ -67,7 +67,7 @@ export default function Home() {
             <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={104} height={50} className="h-8 w-16 shrink-0 object-contain sm:h-12 sm:w-24" priority />
             <span className="min-w-0">
               <span className="block truncate font-display text-xs font-bold tracking-tight sm:text-base">Lycée Midongy Sud</span>
-              <span className="hidden text-[10px] font-medium uppercase tracking-[.16em] text-muted-foreground sm:block">Apprendre · grandir · réussir</span>
+              <span className="hidden text-[10px] font-medium uppercase tracking-[.16em] text-muted-foreground sm:block">Fahendrena-Fahombiazana-Fahalalana</span>
             </span>
             <Image src="/drapeau.jpeg" alt="Emblème LMS" width={56} height={56} className="ml-1 size-10 shrink-0 rounded-full border border-border bg-white object-contain p-0.5 sm:ml-2 sm:size-14" />
           </Link>

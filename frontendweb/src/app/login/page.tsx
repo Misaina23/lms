@@ -55,11 +55,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-lg border-border/70 bg-card/80 shadow-lg">
         <CardHeader className="items-center pb-2">
           <Image
-            src="/logo%20%282%29.jpeg"
-            alt="Logo"
+            src="/drapeau.jpeg"
+            alt="Emblème du lycée"
             width={160}
-            height={80}
-            className="h-16 w-36 object-contain sm:h-20 sm:w-40"
+            height={160}
+            className="size-28 rounded-full border border-border bg-white object-contain p-1 sm:size-36"
           />
         </CardHeader>
         <CardContent>
