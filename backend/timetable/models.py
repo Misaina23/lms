@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from users.models import CustomUser
 from classes.models import Classe
 from matieres.models import Matiere
@@ -41,18 +42,20 @@ class TimetableSlot(models.Model):
         conflicts = TimetableSlot.objects.filter(
             day_of_week=self.day_of_week,
             academic_year=self.academic_year,
-        ).exclude(id=self.id)
-        overlapping = []
-        for other in conflicts:
-            if self._time_overlap(other):
-                overlapping.append(other)
-        return overlapping
+            start_hour__lt=self.end_hour,
+            end_hour__gt=self.start_hour,
+        )
+        if self.pk:
+            conflicts = conflicts.exclude(pk=self.pk)
 
-    def _time_overlap(self, other):
-        def time_to_minutes(t):
-            return t.hour * 60 + t.minute
-        self_start = time_to_minutes(self.start_hour)
-        self_end = time_to_minutes(self.end_hour)
-        other_start = time_to_minutes(other.start_hour)
-        other_end = time_to_minutes(other.end_hour)
-        return max(self_start, other_start) < min(self_end, other_end)
+        shared_resources = Q(classe_id=self.classe_id)
+        if self.professeur_id:
+            shared_resources |= Q(professeur_id=self.professeur_id)
+        if self.room.strip():
+            shared_resources |= Q(room__iexact=self.room.strip())
+
+        return list(conflicts.filter(shared_resources).select_related(
+            'classe',
+            'matiere',
+            'professeur',
+        ).order_by('start_hour', 'id'))

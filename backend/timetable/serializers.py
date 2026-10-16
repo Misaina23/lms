@@ -21,13 +21,43 @@ class TimetableSlotSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
     def validate(self, data):
-        # Ensure professor is active if assigned
-        professeur = data.get('professeur')
+        professeur = data.get('professeur', self.instance.professeur if self.instance else None)
         if professeur and not professeur.is_active:
-            raise serializers.ValidationError('Cannot assign an inactive professor.')
-        return data
+            raise serializers.ValidationError({'professeur': 'Impossible d’affecter un professeur inactif.'})
 
-    def create(self, validated_data):
-        # Prevent scheduling conflicts
-        # simplified; a full implementation would check for overlaps
-        return super().create(validated_data)
+        slot = TimetableSlot(
+            classe=data.get('classe', self.instance.classe if self.instance else None),
+            matiere=data.get('matiere', self.instance.matiere if self.instance else None),
+            professeur=professeur,
+            day_of_week=data.get(
+                'day_of_week',
+                self.instance.day_of_week if self.instance else None,
+            ),
+            start_hour=data.get('start_hour', self.instance.start_hour if self.instance else None),
+            end_hour=data.get('end_hour', self.instance.end_hour if self.instance else None),
+            room=data.get('room', self.instance.room if self.instance else ''),
+            academic_year=data.get(
+                'academic_year',
+                self.instance.academic_year if self.instance else None,
+            ),
+        )
+        if slot.start_hour >= slot.end_hour:
+            raise serializers.ValidationError({
+                'end_hour': 'L’heure de fin doit être postérieure à l’heure de début.',
+            })
+
+        conflicts = slot.has_conflict()
+        if conflicts:
+            conflicting_resources = set()
+            for other in conflicts:
+                if other.classe_id == slot.classe_id:
+                    conflicting_resources.add('la classe')
+                if slot.professeur_id and other.professeur_id == slot.professeur_id:
+                    conflicting_resources.add('le professeur')
+                if slot.room.strip() and other.room.casefold() == slot.room.strip().casefold():
+                    conflicting_resources.add('la salle')
+            resources = ', '.join(sorted(conflicting_resources))
+            raise serializers.ValidationError({
+                'non_field_errors': [f'Ce créneau chevauche un autre cours pour {resources}.'],
+            })
+        return data

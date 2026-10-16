@@ -31,18 +31,35 @@ class TimetableSlotViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly])
     def conflicts(self, request):
-        from datetime import time
         day = request.query_params.get('day')
+        academic_year = request.query_params.get('academic_year')
         slot_id = request.query_params.get('exclude')
-        conflicts = []
+        qset = TimetableSlot.objects.select_related(
+            'classe',
+            'matiere',
+            'professeur',
+        ).all()
         if day is not None:
-            qset = TimetableSlot.objects.filter(day_of_week=int(day))
-            if slot_id:
-                qset = qset.exclude(id=slot_id)
-            for slot in qset:
-                overlaps = slot.has_conflict()
-                if overlaps:
-                    conflicts.append(TimetableSlotSerializer(overlap).data)
+            qset = qset.filter(day_of_week=day)
+        if academic_year:
+            qset = qset.filter(academic_year=academic_year)
+        if slot_id:
+            qset = qset.exclude(id=slot_id)
+
+        conflicts = []
+        seen_pairs = set()
+        for slot in qset:
+            for other in slot.has_conflict():
+                pair = tuple(sorted((slot.pk, other.pk)))
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                conflicts.append({
+                    'slots': TimetableSlotSerializer(
+                        [slot, other],
+                        many=True,
+                    ).data,
+                })
         return Response({'conflicts': conflicts})
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])

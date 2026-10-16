@@ -79,11 +79,19 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
 
   const conflicts = useMemo(() => {
     const conflictMap: Record<string, TimetableSlot[]> = {}
-    for (let i = 0; i < filteredSlots.length; i++) {
-      for (let j = i + 1; j < filteredSlots.length; j++) {
-        const a = filteredSlots[i]
-        const b = filteredSlots[j]
-        if (a.day_of_week === b.day_of_week && a.academic_year === b.academic_year && overlaps(a, b)) {
+    for (let i = 0; i < slots.length; i++) {
+      for (let j = i + 1; j < slots.length; j++) {
+        const a = slots[i]
+        const b = slots[j]
+        const sameClass = a.classe === b.classe
+        const sameTeacher = a.professeur !== null && a.professeur === b.professeur
+        const sameRoom = !!a.room.trim() && a.room.trim().toLocaleLowerCase() === b.room.trim().toLocaleLowerCase()
+        if (
+          a.day_of_week === b.day_of_week &&
+          a.academic_year === b.academic_year &&
+          (sameClass || sameTeacher || sameRoom) &&
+          overlaps(a, b)
+        ) {
           const key = [a.day_of_week, a.academic_year].join('-')
           if (!conflictMap[key]) conflictMap[key] = []
           if (!conflictMap[key].find(c => c.id === a.id)) conflictMap[key].push(a)
@@ -92,7 +100,7 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
       }
     }
     return conflictMap
-  }, [filteredSlots])
+  }, [slots])
 
   const conflictIds = useMemo(() => {
     const ids = new Set<string>()
@@ -163,7 +171,7 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
         <Card className="border-rose-500/70 bg-rose-500/5 rounded-2xl">
           <CardHeader>
             <CardTitle className="text-base text-rose-700 dark:text-rose-300">Conflits détectés</CardTitle>
-            <p className="text-xs text-muted-foreground">Créneaux qui se superposent pour la même classe/professeur.</p>
+            <p className="text-xs text-muted-foreground">Créneaux superposés partageant une classe, un professeur ou une salle.</p>
           </CardHeader>
           <CardContent className="space-y-2">
             {Object.entries(conflicts).map(([key, conflictSlots]) => (
