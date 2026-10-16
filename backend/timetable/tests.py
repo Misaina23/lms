@@ -3,6 +3,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from classes.models import Classe
+from classes.models import TeacherAssignment
 from matieres.models import Matiere
 from users.models import CustomUser
 from .models import TimetableSlot
@@ -174,3 +175,171 @@ class TimetableConflictTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['conflicts']), 1)
         self.assertEqual(len(response.data['conflicts'][0]['slots']), 2)
+
+    def test_generation_options_only_include_active_assignments_for_selected_year(self):
+        TeacherAssignment.objects.create(
+            professeur=self.teacher_one,
+            classe=self.classe_one,
+            matiere=self.maths,
+            academic_year='2026-2027',
+        )
+        TeacherAssignment.objects.create(
+            professeur=self.teacher_two,
+            classe=self.classe_two,
+            matiere=self.francais,
+            academic_year='2025-2026',
+        )
+
+        response = self.client.get(
+            reverse('timetable-generation-options'),
+            {'academic_year': '2026-2027'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['classes'], [{
+            'id': self.classe_one.id,
+            'name': self.classe_one.nom,
+        }, {
+            'id': self.classe_two.id,
+            'name': self.classe_two.nom,
+        }])
+        self.assertEqual(len(response.data['assignments']), 1)
+        self.assertEqual(response.data['assignments'][0]['teacher_id'], self.teacher_one.id)
+
+    def test_only_admin_can_request_generation_options_or_create_a_plan(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.teacher_one).key}')
+
+        options = self.client.get(
+            reverse('timetable-generation-options'),
+            {'academic_year': '2026-2027'},
+        )
+        generated = self.client.post(reverse('timetable-generate'), {
+            'academic_year': '2026-2027',
+            'sessions': [{
+                'class_id': self.classe_one.id,
+                'subject_id': self.maths.id,
+                'weekly_sessions': 1,
+            }],
+        }, format='json')
+
+        self.assertEqual(options.status_code, 403)
+        self.assertEqual(generated.status_code, 403)
+
+    def test_generator_returns_distributed_preview_without_persisting(self):
+        TeacherAssignment.objects.create(
+            professeur=self.teacher_one,
+            classe=self.classe_one,
+            matiere=self.maths,
+            academic_year='2026-2027',
+        )
+
+        response = self.client.post(reverse('timetable-generate'), {
+            'academic_year': '2026-2027',
+            'sessions': [{
+                'class_id': self.classe_one.id,
+                'subject_id': self.maths.id,
+                'weekly_sessions': 3,
+            }],
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['lesson_duration_minutes'], 60)
+        self.assertEqual(len(response.data['slots']), 3)
+        self.assertEqual(
+            len({slot['day_of_week'] for slot in response.data['slots']}),
+            3,
+        )
+        self.assertTrue(all(slot['professeur'] == self.teacher_one.id for slot in response.data['slots']))
+        self.assertEqual(TimetableSlot.objects.count(), 0)
+
+    def test_generator_rejects_missing_assignment_and_invalid_session_volume(self):
+        no_assignment = self.client.post(reverse('timetable-generate'), {
+            'academic_year': '2026-2027',
+            'sessions': [{
+                'class_id': self.classe_one.id,
+                'subject_id': self.maths.id,
+                'weekly_sessions': 2,
+            }],
+        }, format='json')
+        self.assertEqual(no_assignment.status_code, 400)
+        self.assertIn('enseignant actif', no_assignment.data['detail'])
+
+        invalid_volume = self.client.post(reverse('timetable-generate'), {
+            'academic_year': '2026-2027',
+            'sessions': [{
+                'class_id': self.classe_one.id,
+                'subject_id': self.maths.id,
+                'weekly_sessions': 0,
+            }],
+        }, format='json')
+        self.assertEqual(invalid_volume.status_code, 400)
+        self.assertIn('sessions', invalid_volume.data)
+
+        excessive_volume = self.client.post(reverse('timetable-generate'), {
+            'academic_year': '2026-2027',
+            'sessions': [{
+                'class_id': self.classe_one.id,
+                'subject_id': self.maths.id,
+                'weekly_sessions': 7,
+            }],
+        }, format='json')
+        self.assertEqual(excessive_volume.status_code, 400)
+
+    def test_apply_saves_generated_plan_and_rejects_conflicting_batch(self):
+        TeacherAssignment.objects.create(
+            professeur=self.teacher_one,
+            classe=self.classe_one,
+            matiere=self.maths,
+            academic_year='2026-2027',
+        )
+        preview = self.client.post(reverse('timetable-generate'), {
+            'academic_year': '2026-2027',
+            'sessions': [{
+                'class_id': self.classe_one.id,
+                'subject_id': self.maths.id,
+                'weekly_sessions': 2,
+            }],
+        }, format='json')
+        unauthorized_teacher_plan = self.client.post(reverse('timetable-generate-apply'), {
+            'academic_year': '2026-2027',
+            'slots': [{**preview.data['slots'][0], 'professeur': self.teacher_two.id}],
+        }, format='json')
+        self.assertEqual(unauthorized_teacher_plan.status_code, 400)
+        self.assertEqual(TimetableSlot.objects.count(), 0)
+
+        applied = self.client.post(reverse('timetable-generate-apply'), {
+            'academic_year': '2026-2027',
+            'slots': preview.data['slots'],
+        }, format='json')
+
+        self.assertEqual(applied.status_code, 201)
+        self.assertEqual(len(applied.data), 2)
+        self.assertEqual(TimetableSlot.objects.count(), 2)
+
+        conflicting_slots = [
+            {
+                'classe': self.classe_one.id,
+                'matiere': self.maths.id,
+                'professeur': self.teacher_one.id,
+                'day_of_week': 4,
+                'start_hour': '08:00',
+                'end_hour': '09:00',
+                'room': '',
+            },
+            {
+                'classe': self.classe_one.id,
+                'matiere': self.maths.id,
+                'professeur': self.teacher_one.id,
+                'day_of_week': 4,
+                'start_hour': '08:30',
+                'end_hour': '09:30',
+                'room': '',
+            },
+        ]
+        conflict_response = self.client.post(reverse('timetable-generate-apply'), {
+            'academic_year': '2026-2027',
+            'slots': conflicting_slots,
+        }, format='json')
+
+        self.assertEqual(conflict_response.status_code, 400)
+        self.assertEqual(TimetableSlot.objects.count(), 2)

@@ -169,7 +169,7 @@ export default function Home() {
       case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} role={role} onReload={reload} />
       case 'periods': return <ExamPeriodsScreen periods={data.periods} onReload={reload} />
       case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
-      case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} />
+      case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} canGenerate={role === 'ADMIN'} onReload={reload} />
       case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes} matieres={data.matieres} periods={data.periods} />
       case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} />

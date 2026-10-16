@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,8 +12,10 @@ import {
   Clock,
   MapPin,
   Users,
+  WandSparkles,
 } from 'lucide-react'
 import type { TimetableSlot, Classe, Matiere, User } from '@/lib/api'
+import { api } from '@/lib/api'
 
 const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 const HOURS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00']
@@ -27,16 +29,142 @@ function overlaps(a: { start_hour: string; end_hour: string }, b: { start_hour: 
   return timeToMinutes(a.start_hour) < timeToMinutes(b.end_hour) && timeToMinutes(b.start_hour) < timeToMinutes(a.end_hour)
 }
 
-export function TimetableScreen({ slots = [], classes = [], matieres = [], users = [] }: {
+type GenerationAssignment = {
+  class_id: number
+  class_name: string
+  subject_id: number
+  subject_name: string
+  teacher_id: number
+  teacher_name: string
+}
+
+type GeneratedSlot = Omit<TimetableSlot, 'id' | 'created_at' | 'updated_at'>
+
+export function TimetableScreen({ slots = [], classes = [], matieres = [], users = [], canGenerate = false, onReload }: {
   slots: TimetableSlot[]
   classes: Classe[]
   matieres: Matiere[]
   users: User[]
+  canGenerate?: boolean
+  onReload: () => void
 }) {
   const [dayFilter, setDayFilter] = useState<string>('ALL')
   const [classFilter, setClassFilter] = useState<string>('ALL')
   const [teacherFilter, setTeacherFilter] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
+  const [generationOpen, setGenerationOpen] = useState(false)
+  const academicYears = useMemo(
+    () => [...new Set(classes.map((classe) => classe.academic_year).filter((year): year is string => !!year))].sort().reverse(),
+    [classes],
+  )
+  const [academicYear, setAcademicYear] = useState('')
+  const [generationAssignments, setGenerationAssignments] = useState<GenerationAssignment[]>([])
+  const [weeklySessions, setWeeklySessions] = useState<Record<string, string>>({})
+  const [draftSlots, setDraftSlots] = useState<GeneratedSlot[]>([])
+  const [generationError, setGenerationError] = useState('')
+  const [generationLoading, setGenerationLoading] = useState(false)
+  const [applyingPlan, setApplyingPlan] = useState(false)
+  const [generationSuccess, setGenerationSuccess] = useState('')
+
+  useEffect(() => {
+    if (academicYears.length && !academicYears.includes(academicYear)) {
+      setAcademicYear(academicYears[0])
+    }
+  }, [academicYears, academicYear])
+
+  const assignmentPairs = useMemo(() => {
+    const pairs = new Map<string, GenerationAssignment>()
+    for (const assignment of generationAssignments) {
+      pairs.set(`${assignment.class_id}-${assignment.subject_id}`, assignment)
+    }
+    return [...pairs.values()]
+  }, [generationAssignments])
+
+  const loadGenerationOptions = async () => {
+    if (!academicYear) return
+    setGenerationError('')
+    setGenerationSuccess('')
+    setGenerationLoading(true)
+    setDraftSlots([])
+    try {
+      const response = await api.get<{ assignments: GenerationAssignment[] }>(
+        `/timetable/generation-options/?academic_year=${encodeURIComponent(academicYear)}`,
+      )
+      setGenerationAssignments(response.assignments)
+      setWeeklySessions({})
+      setGenerationOpen(true)
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'Impossible de charger les affectations de cette année.')
+    } finally {
+      setGenerationLoading(false)
+    }
+  }
+
+  const changeGenerationYear = async (year: string) => {
+    setAcademicYear(year)
+    setDraftSlots([])
+    setGenerationError('')
+    setGenerationLoading(true)
+    try {
+      const response = await api.get<{ assignments: GenerationAssignment[] }>(
+        `/timetable/generation-options/?academic_year=${encodeURIComponent(year)}`,
+      )
+      setGenerationAssignments(response.assignments)
+      setWeeklySessions({})
+    } catch (error) {
+      setGenerationAssignments([])
+      setGenerationError(error instanceof Error ? error.message : 'Impossible de charger les affectations de cette année.')
+    } finally {
+      setGenerationLoading(false)
+    }
+  }
+
+  const generatePlan = async () => {
+    setGenerationError('')
+    setGenerationSuccess('')
+    const sessions = assignmentPairs.flatMap((assignment) => {
+      const count = Number(weeklySessions[`${assignment.class_id}-${assignment.subject_id}`] || 0)
+      return Number.isInteger(count) && count > 0
+        ? [{ class_id: assignment.class_id, subject_id: assignment.subject_id, weekly_sessions: count }]
+        : []
+    })
+    if (!sessions.length) {
+      setGenerationError('Indiquez au moins un volume hebdomadaire supérieur à zéro.')
+      return
+    }
+    setGenerationLoading(true)
+    try {
+      const response = await api.post<{ slots: GeneratedSlot[] }>('/timetable/generate/', {
+        academic_year: academicYear,
+        sessions,
+      })
+      setDraftSlots(response.slots)
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'La génération du planning a échoué.')
+    } finally {
+      setGenerationLoading(false)
+    }
+  }
+
+  const applyPlan = async () => {
+    setGenerationError('')
+    setGenerationSuccess('')
+    setApplyingPlan(true)
+    try {
+      await api.post('/timetable/generate/apply/', {
+        academic_year: academicYear,
+        slots: draftSlots,
+      })
+      setGenerationSuccess(`${draftSlots.length} créneau(x) ajouté(s) à l’emploi du temps.`)
+      setDraftSlots([])
+      setGenerationOpen(false)
+      onReload()
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'Le planning n’a pas pu être appliqué.')
+    } finally {
+      setApplyingPlan(false)
+    }
+  }
 
   const classeMap = useMemo(() => {
     const map: Record<number, Classe> = {}
@@ -119,11 +247,92 @@ export function TimetableScreen({ slots = [], classes = [], matieres = [], users
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {canGenerate && (
+            <Button variant="outline" className="h-10 w-full gap-2 border-border px-4 sm:w-auto" onClick={() => void loadGenerationOptions()} disabled={generationLoading || !academicYears.length}>
+              <WandSparkles className="size-4" /> Générer un planning
+            </Button>
+          )}
           <Button variant="outline" className="h-10 w-full gap-2 border-border px-4 sm:w-auto">
             <Search className="size-4" /> Rechercher
           </Button>
         </div>
       </div>
+
+      {generationSuccess && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">{generationSuccess}</p>}
+      {generationError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{generationError}</p>}
+      {generationOpen && (
+        <Card className="rounded-2xl border-primary/30">
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
+              Génération assistée
+              <select value={academicYear} onChange={(event) => void changeGenerationYear(event.target.value)} className="h-9 rounded-lg border border-border bg-card px-3 text-sm" disabled={generationLoading || draftSlots.length > 0}>
+                {academicYears.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Saisissez les heures hebdomadaires prévues pour chaque matière. Le moteur répartit des séances de 60 minutes du lundi au samedi, de 08 h à 12 h et de 13 h à 17 h, en tenant compte des affectations et des créneaux déjà occupés. Les salles restent à renseigner.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!draftSlots.length && (
+              <div className="max-h-72 space-y-2 overflow-y-auto">
+                {assignmentPairs.map((assignment) => {
+                  const key = `${assignment.class_id}-${assignment.subject_id}`
+                  const teacherNames = [...new Set(generationAssignments
+                    .filter((item) => item.class_id === assignment.class_id && item.subject_id === assignment.subject_id)
+                    .map((item) => item.teacher_name))]
+                  return (
+                    <label key={key} className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
+                      <span className="min-w-52 flex-1 font-medium">{assignment.class_name} · {assignment.subject_name}
+                        <span className="block text-xs font-normal text-muted-foreground">Enseignant(s) : {teacherNames.join(', ')}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">Séances/semaine (0–6)</span>
+                      <Input type="number" min="0" max="6" step="1" value={weeklySessions[key] || ''} onChange={(event) => setWeeklySessions((current) => ({ ...current, [key]: event.target.value }))} className="w-24" aria-label={`Séances par semaine ${assignment.class_name} ${assignment.subject_name}`} />
+                    </label>
+                  )
+                })}
+                {!assignmentPairs.length && <p className="py-4 text-sm text-muted-foreground">Aucune affectation d’enseignant active n’est configurée pour cette année.</p>}
+              </div>
+            )}
+            {draftSlots.length > 0 && (
+              <div className="max-h-80 space-y-2 overflow-y-auto">
+                {draftSlots.map((slot, index) => {
+                  const classe = classes.find((item) => item.id === slot.classe)
+                  const matiere = matieres.find((item) => item.id === slot.matiere)
+                  const key = `${slot.classe}-${slot.matiere}`
+                  const eligibleTeachers = [...new Map(generationAssignments
+                    .filter((item) => item.class_id === slot.classe && item.subject_id === slot.matiere)
+                    .map((item) => [item.teacher_id, item])).values()]
+                  return (
+                    <div key={`${key}-${index}`} className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-[1fr_120px_130px_180px_140px] sm:items-center">
+                      <span className="font-medium">{classe?.nom || 'Classe'} · {matiere?.nom || 'Matière'}</span>
+                      <select value={slot.day_of_week} onChange={(event) => setDraftSlots((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, day_of_week: Number(event.target.value) } : item))} className="h-9 rounded-lg border border-border bg-card px-2 text-sm" aria-label="Jour du cours">
+                        {DAY_NAMES.map((day, dayIndex) => <option key={dayIndex} value={dayIndex}>{day}</option>)}
+                      </select>
+                      <Input type="time" step="3600" value={slot.start_hour} onChange={(event) => {
+                        const [hour, minute] = event.target.value.split(':').map(Number)
+                        const end = `${String(hour + 1).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+                        setDraftSlots((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, start_hour: event.target.value, end_hour: end } : item))
+                      }} aria-label="Heure de début" />
+                      <select value={slot.professeur || ''} onChange={(event) => setDraftSlots((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, professeur: Number(event.target.value) } : item))} className="h-9 rounded-lg border border-border bg-card px-2 text-sm" aria-label="Enseignant">
+                        {eligibleTeachers.map((teacher) => <option key={teacher.teacher_id} value={teacher.teacher_id}>{teacher.teacher_name}</option>)}
+                      </select>
+                      <Input value={slot.room} maxLength={50} placeholder="Salle (facultatif)" onChange={(event) => setDraftSlots((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, room: event.target.value } : item))} aria-label="Salle" />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {!draftSlots.length
+                ? <Button type="button" onClick={() => void generatePlan()} disabled={generationLoading || !assignmentPairs.length}>{generationLoading ? 'Génération…' : 'Générer l’aperçu'}</Button>
+                : <>
+                    <Button type="button" onClick={() => void applyPlan()} disabled={applyingPlan}>{applyingPlan ? 'Application…' : 'Valider le planning'}</Button>
+                    <Button type="button" variant="outline" onClick={() => setDraftSlots([])} disabled={applyingPlan}>Modifier les volumes</Button>
+                  </>}
+              <Button type="button" variant="ghost" onClick={() => { setGenerationOpen(false); setDraftSlots([]); setGenerationError('') }} disabled={applyingPlan}>Fermer</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex gap-2">
