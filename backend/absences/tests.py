@@ -8,6 +8,7 @@ from classes.models import Classe, TeacherAssignment
 from etudiants.models import Etudiant
 from matieres.models import Matiere
 from .models import Absence
+from etudiants.models import Notification
 
 
 class AbsenceViewSetTests(APITestCase):
@@ -249,3 +250,42 @@ class AbsenceViewSetTests(APITestCase):
             for item in admin_response.data['results']
         }
         self.assertEqual(severities[other_student.id], 'HIGH')
+
+    def test_attendance_alert_command_notifies_admin_and_assigned_teacher_once_per_day(self):
+        from datetime import timedelta
+
+        from django.core.management import call_command
+        from django.utils import timezone
+
+        matiere = Matiere.objects.create(nom='Histoire', code='HIST')
+        TeacherAssignment.objects.create(
+            professeur=self.professeur,
+            classe=self.classe,
+            matiere=matiere,
+            academic_year='2026-2027',
+        )
+        today = timezone.localdate()
+        for day_offset in (1, 2, 3):
+            Absence.objects.create(
+                etudiant=self.etudiant,
+                professeur=self.professeur,
+                date_absence=today - timedelta(days=day_offset),
+                heure_debut='08:00:00',
+                heure_fin='10:00:00',
+                statut=Absence.Status.ABSENT,
+                justifiee=False,
+            )
+
+        call_command('send_attendance_alerts')
+        call_command('send_attendance_alerts')
+
+        notifications = Notification.objects.filter(notification_type='REPEATED_ABSENCE')
+        self.assertEqual(notifications.count(), 2)
+        self.assertSetEqual(
+            set(notifications.values_list('recipient_id', flat=True)),
+            {self.admin_user.id, self.professeur.id},
+        )
+        notification = notifications.get(recipient=self.professeur)
+        self.assertEqual(notification.status, Notification.Status.SENT)
+        self.assertEqual(notification.payload['absence_days'], 3)
+        self.assertEqual(notification.payload['class_id'], self.classe.id)
