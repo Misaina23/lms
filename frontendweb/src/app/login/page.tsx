@@ -7,7 +7,7 @@ import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { clearSession, isValidPortalRole } from '@/lib/auth'
 
@@ -53,17 +53,14 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg border-border/70 bg-card/80 shadow-lg">
-        <CardHeader className="space-y-1">
-          <div className="mb-2 flex flex-wrap items-center gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={112} height={54} className="h-8 w-16 shrink-0 object-contain sm:h-12 sm:w-24" />
-              <div className="min-w-0">
-                <CardTitle className="text-base sm:text-xl">Lycée Midongy Sud</CardTitle>
-                <p className="text-xs text-muted-foreground">Portail du personnel</p>
-              </div>
-            </div>
-            <Image src="/drapeau.jpeg" alt="Emblème du lycée" width={64} height={64} className="ml-auto size-12 shrink-0 rounded-full border border-border bg-white object-contain p-0.5 sm:size-14" />
-          </div>
+        <CardHeader className="items-center pb-2">
+          <Image
+            src="/logo%20%282%29.jpeg"
+            alt="Logo"
+            width={160}
+            height={80}
+            className="h-16 w-36 object-contain sm:h-20 sm:w-40"
+          />
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
