@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from users.models import CustomUser
 from classes.models import Classe
@@ -44,6 +45,8 @@ class EtudiantSerializer(serializers.ModelSerializer):
         return fields
 
     def validate(self, attrs):
+        if self.instance and 'matricule' in attrs and attrs['matricule'] != self.instance.matricule:
+            raise serializers.ValidationError({'matricule': 'Le matricule est immuable et ne peut pas être modifié.'})
         return attrs
 
     def get_moyenne_generale(self, obj):
@@ -61,7 +64,10 @@ class EtudiantSerializer(serializers.ModelSerializer):
 
 
 class StudentRegistrationSerializer(serializers.Serializer):
-    matricule = serializers.CharField(max_length=50)
+    matricule = serializers.CharField(
+        max_length=50,
+        validators=[UniqueValidator(queryset=Etudiant.objects.all())],
+    )
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
     date_of_birth = serializers.DateField(required=False, allow_null=True)
@@ -78,6 +84,14 @@ class StudentRegistrationSerializer(serializers.Serializer):
     photo = serializers.ImageField(required=False, allow_null=True)
     date_inscription = serializers.DateField()
     academic_year = serializers.CharField(max_length=9)
+
+    def validate(self, attrs):
+        classe = attrs.get('classe')
+        if classe and classe.academic_year and classe.academic_year != attrs['academic_year']:
+            raise serializers.ValidationError({
+                'academic_year': 'L’année scolaire doit correspondre à celle de la classe choisie.',
+            })
+        return attrs
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):
@@ -117,6 +131,18 @@ class EnrollmentSerializer(serializers.ModelSerializer):
         from decimal import Decimal
         verse = obj.frais_verses or Decimal('0')
         return float(obj.frais_total - verse)
+
+    def validate(self, attrs):
+        classe = attrs.get('classe', self.instance.classe if self.instance else None)
+        academic_year = attrs.get(
+            'academic_year',
+            self.instance.academic_year if self.instance else None,
+        )
+        if classe and classe.academic_year and academic_year != classe.academic_year:
+            raise serializers.ValidationError({
+                'classe': 'La classe choisie ne correspond pas à l’année scolaire de l’inscription.',
+            })
+        return attrs
 
 
 class StudentOrientationSerializer(serializers.ModelSerializer):

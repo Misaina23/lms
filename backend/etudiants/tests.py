@@ -1,6 +1,7 @@
 from datetime import date
 from io import StringIO
 
+from django.core.exceptions import ValidationError
 from django.core.management import call_command, CommandError
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -252,6 +253,57 @@ class EtudiantViewSetTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['actif'], True)
+
+    def test_student_matricule_cannot_be_changed_through_api_or_model(self):
+        response = self.client.patch(
+            reverse('etudiant-detail', args=[self.etudiant.id]),
+            {'matricule': 'ELV-CHANGED'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.etudiant.refresh_from_db()
+        self.assertEqual(self.etudiant.matricule, 'ELV001')
+
+        self.etudiant.matricule = 'ELV-CHANGED'
+        with self.assertRaises(ValidationError):
+            self.etudiant.save()
+
+    def test_enrollment_class_must_match_its_academic_year(self):
+        classe_2026 = Classe.objects.create(
+            nom='6eme B',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            academic_year='2026-2027',
+            capacite=40,
+        )
+        response = self.client.post(reverse('enrollment-list'), {
+            'student': self.etudiant.id,
+            'classe': classe_2026.id,
+            'academic_year': '2025-2026',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('classe', response.data)
+
+    def test_registration_class_must_match_academic_year(self):
+        classe_2026 = Classe.objects.create(
+            nom='6eme C',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            academic_year='2026-2027',
+            capacite=40,
+        )
+        response = self.client.post(reverse('etudiant-register'), {
+            'matricule': 'ELV-DIFF-YEAR',
+            'first_name': 'Aina',
+            'last_name': 'Rasoanaivo',
+            'classe': classe_2026.id,
+            'date_inscription': '2025-09-01',
+            'academic_year': '2025-2026',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('academic_year', response.data)
+        self.assertFalse(Etudiant.objects.filter(matricule='ELV-DIFF-YEAR').exists())
 
     def test_secretariat_can_register_student_without_payment(self):
         secretary = CustomUser.objects.create_user(

@@ -1,7 +1,10 @@
-from django.db import models
-from users.models import CustomUser
-from classes.models import Classe
+from django.core.exceptions import ValidationError
 import uuid
+
+from django.db import models
+
+from classes.models import Classe
+from users.models import CustomUser
 # Note: CustomUser reste utilisé pour AuditLog.actor, StudentOrientation.decided_by, Notification.recipient
 # Les étudiants n'ont pas de compte: leur dossier est géré par l'administration scolaire.
 
@@ -53,6 +56,13 @@ class Etudiant(models.Model):
 
     class Meta:
         ordering = ['last_name', 'first_name']
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            previous_matricule = type(self).objects.filter(pk=self.pk).values_list('matricule', flat=True).first()
+            if previous_matricule is not None and self.matricule != previous_matricule:
+                raise ValidationError({'matricule': 'Le matricule d’un élève est immuable.'})
+        super().save(*args, **kwargs)
 
 
 class Enrollment(models.Model):
