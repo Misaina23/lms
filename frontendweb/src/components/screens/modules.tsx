@@ -666,8 +666,8 @@ export function CoverageScreen({ classes, matieres, users }: { classes: any[]; m
                           </div>
                           <p className="text-xs text-muted-foreground">{teacher.matricule} · {teacher.email}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                            <span className={`rounded-full px-2 py-0.5 font-medium ${teacher.is_primary_match ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-700'}`}>
-                              {teacher.is_primary_match ? 'Matière principale compatible' : 'Aide enseignante / couverture'}
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                              Spécialité exacte · {Number(teacher.weekly_scheduled_hours || 0)} h/sem. au planning
                             </span>
                             <span className="rounded-full bg-muted px-2 py-0.5 font-medium">Score {score}</span>
                           </div>

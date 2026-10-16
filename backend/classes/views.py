@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from users.permissions import IsAdminOrReadOnly, IsAdminOnly, CanViewSchedule
 from users.models import CustomUser
-from django.db.models import Sum
+from django.db.models import Count, Sum
 import datetime
 
 from matieres.models import Matiere
@@ -34,6 +34,36 @@ class ClasseViewSet(viewsets.ModelViewSet):
         classes = self.get_queryset().filter(academic_year=academic_year) if academic_year else self.get_queryset()
         missing_subjects = []
         all_matieres = list(Matiere.objects.all().order_by('nom'))
+        years = {classe.academic_year or academic_year for classe in classes}
+        assignment_counts = {
+            (item['academic_year'], item['professeur_id']): item['count']
+            for item in TeacherAssignment.objects.filter(academic_year__in=years)
+            .values('academic_year', 'professeur_id')
+            .annotate(count=Count('id'))
+        }
+
+        from timetable.models import TimetableSlot
+
+        scheduled_minutes = {}
+        for teacher_id, year, start_hour, end_hour in TimetableSlot.objects.filter(
+            academic_year__in=years,
+            professeur__isnull=False,
+        ).values_list('professeur_id', 'academic_year', 'start_hour', 'end_hour'):
+            start_minutes = start_hour.hour * 60 + start_hour.minute
+            end_minutes = end_hour.hour * 60 + end_hour.minute
+            if end_minutes > start_minutes:
+                key = (year, teacher_id)
+                scheduled_minutes[key] = scheduled_minutes.get(key, 0) + end_minutes - start_minutes
+
+        teacher_candidates = CustomUser.objects.filter(
+            role=CustomUser.Role.PROFESSEUR,
+            status=CustomUser.Status.ACTIVE,
+            is_active=True,
+            matiere__isnull=False,
+        ).select_related('matiere').order_by('matiere__nom', 'last_name', 'first_name')
+        candidates_by_subject = {}
+        for teacher in teacher_candidates:
+            candidates_by_subject.setdefault(teacher.matiere_id, []).append(teacher)
 
         for classe in classes:
             current_year = classe.academic_year or academic_year
@@ -45,24 +75,13 @@ class ClasseViewSet(viewsets.ModelViewSet):
                 if matiere.id in assigned_subject_ids:
                     continue
 
-                teacher_candidates = CustomUser.objects.filter(
-                    role=CustomUser.Role.PROFESSEUR,
-                    status=CustomUser.Status.ACTIVE,
-                    is_active=True,
-                ).select_related('matiere').order_by('matiere__nom', 'last_name', 'first_name')
-
                 teacher_suggestions = []
-                for teacher in teacher_candidates:
-                    teacher_assignment_count = TeacherAssignment.objects.filter(
-                        professeur=teacher,
-                        academic_year=current_year,
-                    ).count()
-                    is_primary_match = teacher.matiere_id == matiere.id
-                    priority_score = 100 if is_primary_match else 55
+                for teacher in candidates_by_subject.get(matiere.id, []):
+                    teacher_assignment_count = assignment_counts.get((current_year, teacher.id), 0)
+                    weekly_hours = scheduled_minutes.get((current_year, teacher.id), 0) / 60
+                    priority_score = 75
                     priority_score += 10 if teacher.teacher_type == CustomUser.TeacherType.FONCTIONNAIRE else 5
-                    priority_score -= min(teacher_assignment_count * 5, 30)
-                    if teacher.matiere_id is None:
-                        priority_score -= 10
+                    priority_score -= min(int(weekly_hours * 2), 30)
 
                     teacher_suggestions.append({
                         'id': teacher.id,
@@ -75,9 +94,10 @@ class ClasseViewSet(viewsets.ModelViewSet):
                             'nom': teacher.matiere.nom if teacher.matiere else '—',
                             'code': teacher.matiere.code if teacher.matiere else None,
                         },
-                        'is_primary_match': is_primary_match,
+                        'is_primary_match': True,
                         'priority_score': priority_score,
                         'assigned_courses_count': teacher_assignment_count,
+                        'weekly_scheduled_hours': round(weekly_hours, 2),
                     })
 
                 teacher_suggestions.sort(key=lambda item: (-item['priority_score'], item['last_name'], item['first_name']))
@@ -118,10 +138,7 @@ class ClasseViewSet(viewsets.ModelViewSet):
                 best_match = recommended[0]
                 if best_match.get('is_primary_match'):
                     severity = 'high'
-                    recommended_action = 'Affecter immédiatement le meilleur enseignant principal compatible.'
-                else:
-                    severity = 'medium'
-                    recommended_action = 'Mettre en place une aide enseignante ou un remplaçant prioritaire.'
+                    recommended_action = 'Affecter le meilleur enseignant actif de la spécialité, après vérification de son emploi du temps.'
 
             alerts.append({
                 'classe': item['classe'],

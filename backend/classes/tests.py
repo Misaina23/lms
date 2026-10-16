@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import time
 
 from django.urls import reverse
 from rest_framework.test import APITestCase
@@ -6,6 +7,7 @@ from rest_framework.authtoken.models import Token
 from matieres.models import Matiere
 from users.models import CustomUser
 from .models import Classe, MatiereCoefficient, TeacherAssignment
+from timetable.models import TimetableSlot
 
 
 class ClasseViewSetTests(APITestCase):
@@ -166,8 +168,16 @@ class ClasseBusinessRuleTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.data['missing_subjects']) >= 1)
         self.assertIn('suggested_teachers', response.data['missing_subjects'][0])
-        self.assertTrue(any(t['id'] == teacher.id for t in response.data['missing_subjects'][0]['suggested_teachers']))
-        self.assertTrue(any(item['matiere']['nom'] == 'Physique' for item in response.data['missing_subjects']))
+        math_gap = next(
+            item for item in response.data['missing_subjects']
+            if item['matiere']['nom'] == 'Mathématiques' and item['classe']['id'] == classe.id
+        )
+        physics_gap = next(
+            item for item in response.data['missing_subjects']
+            if item['matiere']['nom'] == 'Physique' and item['classe']['id'] == classe.id
+        )
+        self.assertTrue(any(t['id'] == teacher.id for t in math_gap['suggested_teachers']))
+        self.assertEqual(physics_gap['suggested_teachers'], [])
 
     def test_coverage_endpoint_prioritizes_best_match_teachers(self):
         classe = Classe.objects.create(
@@ -201,6 +211,28 @@ class ClasseBusinessRuleTests(APITestCase):
             status=CustomUser.Status.ACTIVE,
             matiere=maths,
         )
+        overloaded_teacher = CustomUser.objects.create_user(
+            username='physicist-overloaded',
+            email='physicist-overloaded@lycee.com',
+            password='StrongPassw0rd!',
+            first_name='Amelie',
+            last_name='Chargee',
+            matricule='TCHPHY3',
+            role=CustomUser.Role.PROFESSEUR,
+            status=CustomUser.Status.ACTIVE,
+            teacher_type=CustomUser.TeacherType.SUPPLEANT,
+            matiere=physique,
+        )
+        for day in (0, 1):
+            TimetableSlot.objects.create(
+                classe=classe,
+                matiere=physique,
+                professeur=overloaded_teacher,
+                day_of_week=day,
+                start_hour=time(8, 0),
+                end_hour=time(14, 0),
+                academic_year='2024-2025',
+            )
 
         response = self.client.get(reverse('classe-coverage'))
         physics_gap = next(
@@ -210,7 +242,16 @@ class ClasseBusinessRuleTests(APITestCase):
 
         self.assertTrue(physics_gap['suggested_teachers'])
         self.assertEqual(physics_gap['suggested_teachers'][0]['id'], matching_teacher.id)
-        self.assertGreater(physics_gap['suggested_teachers'][0]['priority_score'], physics_gap['suggested_teachers'][1]['priority_score'])
+        self.assertEqual(
+            [teacher['id'] for teacher in physics_gap['suggested_teachers']],
+            [matching_teacher.id, overloaded_teacher.id],
+        )
+        self.assertNotIn(fallback_teacher.id, [teacher['id'] for teacher in physics_gap['suggested_teachers']])
+        self.assertEqual(physics_gap['suggested_teachers'][1]['weekly_scheduled_hours'], 12)
+        self.assertGreater(
+            physics_gap['suggested_teachers'][0]['priority_score'],
+            physics_gap['suggested_teachers'][1]['priority_score'],
+        )
 
     def test_coverage_alerts_detect_urgent_missing_subjects(self):
         classe = Classe.objects.create(
