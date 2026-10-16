@@ -13,10 +13,11 @@ const audiences = [
   ['SECRETARIAT', 'Secrétariat'],
 ] as const
 
-export function NotificationsScreen({ notifications, classes, role, onReload }: {
+export function NotificationsScreen({ notifications, classes, role, recipientId, onReload }: {
   notifications: Notification[]
   classes: Classe[]
   role: string
+  recipientId: number | null
   onReload: () => void
 }) {
   const [title, setTitle] = useState('')
@@ -27,6 +28,7 @@ export function NotificationsScreen({ notifications, classes, role, onReload }: 
   const [sending, setSending] = useState(false)
   const [reading, setReading] = useState<string | null>(null)
   const [success, setSuccess] = useState('')
+  const inboxNotifications = notifications.filter((notification) => notification.recipient === recipientId)
 
   const sendAnnouncement = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -112,8 +114,8 @@ export function NotificationsScreen({ notifications, classes, role, onReload }: 
         <CardHeader><CardTitle className="text-base">Boîte de réception</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {error && role !== 'ADMIN' && <p className="text-sm text-destructive" role="alert">{error}</p>}
-          {notifications.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Aucune notification pour le moment.</p>}
-          {notifications.map((notification) => (
+          {inboxNotifications.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Aucune notification pour le moment.</p>}
+          {inboxNotifications.map((notification) => (
             <article key={notification.id} className={`rounded-xl border p-4 ${notification.is_read ? 'border-border bg-card' : 'border-primary/25 bg-primary/[.035]'}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -124,7 +126,7 @@ export function NotificationsScreen({ notifications, classes, role, onReload }: 
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{notification.message}</p>
                   <p className="mt-2 text-[11px] text-muted-foreground">{new Date(notification.created_at).toLocaleString('fr-FR')}</p>
                 </div>
-                {role !== 'ADMIN' && !notification.is_read && (
+                {!notification.is_read && (
                   <Button size="sm" variant="outline" disabled={reading === notification.id} onClick={() => void markRead(notification)} className="gap-1">
                     <Check className="size-3" /> Lu
                   </Button>

@@ -101,6 +101,7 @@ export default function Home() {
   const [mobileNav, setMobileNav] = useState(false)
   const [query, setQuery] = useState('')
   const [role, setRole] = useState<string | null>(null)
+  const [userId, setUserId] = useState<number | null>(null)
   const [displayName, setDisplayName] = useState('Personnel')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
@@ -121,6 +122,7 @@ export default function Home() {
       return
     }
     setRole(user.role)
+    setUserId(user.id)
     setDisplayName(`${user.first_name} ${user.last_name}`.trim() || roleLabels[user.role])
     setActive(user.role === 'ADMIN' ? 'overview' : roleScreenKeys[user.role][0])
     setIsLoggedIn(true)
@@ -172,7 +174,7 @@ export default function Home() {
       case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes as any} matieres={data.matieres} notes={data.notes} />
       case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} />
       case 'chat': return <ChatScreen users={data.users} />
-      case 'notifications': return <NotificationsScreen notifications={data.notifications} classes={data.classes} role={role} onReload={reload} />
+      case 'notifications': return <NotificationsScreen notifications={data.notifications} classes={data.classes} role={role} recipientId={userId} onReload={reload} />
       case 'office': return <OfficePassesScreen students={data.etudiants} records={data.officePasses} role={role} onReload={reload} />
       case 'audit': return <AuditScreen logs={data.auditLogs} />
     }
@@ -229,7 +231,7 @@ export default function Home() {
                 </div>
                 <button onClick={() => setActive('notifications')} className="relative flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted sm:size-10" aria-label="Notifications">
                   <Bell className="size-[18px]" />
-                  {role !== 'ADMIN' && data.notifications.some((notification) => !notification.is_read) && <span className="absolute right-1 top-1 size-2 rounded-full bg-destructive" />}
+                  {userId !== null && data.notifications.some((notification) => notification.recipient === userId && !notification.is_read) && <span className="absolute right-1 top-1 size-2 rounded-full bg-destructive" />}
                 </button>
                 {isLoggedIn && (
                   <button onClick={handleLogout} className="flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted sm:size-10" aria-label="Déconnexion">

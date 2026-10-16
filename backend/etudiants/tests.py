@@ -24,6 +24,7 @@ from .models import (
     StudentOfficePass,
     StudentTransferRequest,
 )
+from .payment_alerts import send_tuition_payment_reminders
 
 
 class DemoPortalSeedCommandTests(TestCase):
@@ -79,6 +80,113 @@ class DemoPortalSeedCommandTests(TestCase):
         self.assertTrue(CustomUser.objects.get(email='admin@gmail.com').check_password(admin_password))
         self.assertEqual(Classe.objects.filter(academic_year=academic_year).count(), 9)
         self.assertEqual(Etudiant.objects.filter(classe__academic_year=academic_year).count(), 45)
+
+
+class TuitionPaymentReminderTests(TestCase):
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            username='payment-reminder-admin',
+            email='payment-reminder-admin@lycee.com',
+            password='adminpass',
+            first_name='Admin',
+            last_name='Finance',
+            matricule='PAYADMIN',
+            role=CustomUser.Role.ADMIN,
+        )
+        self.secretary = CustomUser.objects.create_user(
+            username='payment-reminder-secretary',
+            email='payment-reminder-secretary@lycee.com',
+            password='secretarypass',
+            first_name='Secrétaire',
+            last_name='Finance',
+            matricule='PAYSECRET',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        self.classe = Classe.objects.create(
+            nom='Terminale S',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            academic_year='2026-2027',
+            capacite=30,
+        )
+
+    def create_enrollment(self, matricule, payment_status, total=None, paid=None, active=True):
+        student = Etudiant.objects.create(
+            matricule=matricule,
+            first_name='Aina',
+            last_name=matricule,
+            classe=self.classe,
+            date_inscription='2026-09-01',
+            statut=Etudiant.StudentStatus.ENROLLED,
+            actif=active,
+        )
+        return Enrollment.objects.create(
+            student=student,
+            classe=self.classe,
+            academic_year='2026-2027',
+            payment_status=payment_status,
+            frais_total=total,
+            frais_verses=paid,
+        )
+
+    def test_daily_command_notifies_admin_only_once_and_does_not_claim_due_date(self):
+        unpaid = self.create_enrollment(
+            'PAY-UNPAID',
+            Enrollment.PaymentStatus.UNPAID,
+        )
+        partial = self.create_enrollment(
+            'PAY-PARTIAL',
+            Enrollment.PaymentStatus.PARTIAL,
+            total='150000.00',
+            paid='25000.00',
+        )
+        self.create_enrollment(
+            'PAY-PAID',
+            Enrollment.PaymentStatus.PAID,
+            total='150000.00',
+            paid='150000.00',
+        )
+        self.create_enrollment(
+            'PAY-INACTIVE',
+            Enrollment.PaymentStatus.UNPAID,
+            active=False,
+        )
+        today = date(2026, 10, 16)
+
+        first_output = StringIO()
+        second_output = StringIO()
+        call_command('send_payment_reminders', stdout=first_output)
+        call_command('send_payment_reminders', stdout=second_output)
+        self.assertIn('2 rappel(s)', first_output.getvalue())
+        self.assertIn('0 rappel(s)', second_output.getvalue())
+
+        reminders = Notification.objects.filter(
+            notification_type='TUITION_PAYMENT_REMINDER',
+        )
+        self.assertEqual(reminders.count(), 2)
+        self.assertSetEqual(
+            set(reminders.values_list('recipient_id', flat=True)),
+            {self.admin.id},
+        )
+        self.assertSetEqual(
+            set(reminders.values_list('payload__enrollment_id', flat=True)),
+            {str(unpaid.pk), str(partial.pk)},
+        )
+        partial_reminder = reminders.get(payload__enrollment_id=str(partial.pk))
+        self.assertEqual(partial_reminder.payload['amount_remaining'], '125000.00')
+        self.assertEqual(partial_reminder.payload['severity'], 'WARNING')
+        self.assertIn('Reste à payer', partial_reminder.message)
+        self.assertNotIn('échéance', partial_reminder.message.lower())
+        self.assertFalse(Notification.objects.filter(recipient=self.secretary).exists())
+
+    def test_partial_enrollment_with_fully_paid_balance_is_skipped(self):
+        self.create_enrollment(
+            'PAY-STALE',
+            Enrollment.PaymentStatus.PARTIAL,
+            total='100000.00',
+            paid='100000.00',
+        )
+
+        self.assertEqual(send_tuition_payment_reminders(today=date(2026, 10, 16)), 0)
 
 
 class AdmissionAndCertificateWorkflowTests(APITestCase):
