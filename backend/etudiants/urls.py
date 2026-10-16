@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     EtudiantViewSet, EnrollmentViewSet, StudentOrientationViewSet, AuditLogViewSet,
     NotificationViewSet, StudentOfficePassViewSet, CertificateRequestViewSet, DeliberationViewSet,
+    StudentClassHistoryViewSet, StudentTransferRequestViewSet,
     import_students_endpoint, export_students_endpoint, transfer_student_endpoint,
     review_certificate_request_endpoint, analyze_deliberations_endpoint,
 )
@@ -16,6 +17,8 @@ router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'office-passes', StudentOfficePassViewSet, basename='office-pass')
 router.register(r'certificate-requests', CertificateRequestViewSet, basename='certificate-request')
 router.register(r'deliberations', DeliberationViewSet, basename='deliberation')
+router.register(r'student-class-history', StudentClassHistoryViewSet, basename='student-class-history')
+router.register(r'student-transfer-requests', StudentTransferRequestViewSet, basename='student-transfer-request')
 
 urlpatterns = [
     path('etudiants/import/', import_students_endpoint, name='etudiant-import'),

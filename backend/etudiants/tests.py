@@ -13,7 +13,17 @@ from classes.models import TeacherAssignment
 from matieres.models import Matiere, ExamPeriod
 from notes.models import Note
 from budget.models import BudgetItem
-from .models import AuditLog, Etudiant, Enrollment, Notification, StudentOfficePass, CertificateRequest, Deliberation
+from .models import (
+    AuditLog,
+    CertificateRequest,
+    Deliberation,
+    Enrollment,
+    Etudiant,
+    Notification,
+    StudentClassHistory,
+    StudentOfficePass,
+    StudentTransferRequest,
+)
 
 
 class DemoPortalSeedCommandTests(TestCase):
@@ -163,6 +173,12 @@ class AdmissionAndCertificateWorkflowTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Deliberation.objects.filter(student=candidate, decision='ADMITTED').exists())
         self.assertTrue(Deliberation.objects.filter(student=repeater, decision='REPEATER').exists())
+        self.assertTrue(StudentClassHistory.objects.filter(
+            student=repeater,
+            classe=self.classe,
+            academic_year='2026-2027',
+            change_type=StudentClassHistory.ChangeType.REPEAT,
+        ).exists())
 
     def test_certificate_request_verifies_school_fees_and_allows_negotiation(self):
         student = Etudiant.objects.create(
@@ -426,6 +442,34 @@ class EtudiantViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('classe', response.data)
 
+    def test_enrollment_class_changes_require_transfer_and_new_enrollment_is_historized(self):
+        enrollment = self.client.post(reverse('enrollment-list'), {
+            'student': self.etudiant.id,
+            'classe': self.classe.id,
+            'academic_year': '2024-2025',
+        }, format='json')
+
+        self.assertEqual(enrollment.status_code, 201)
+        self.assertTrue(StudentClassHistory.objects.filter(
+            student=self.etudiant,
+            classe=self.classe,
+            academic_year='2024-2025',
+            change_type=StudentClassHistory.ChangeType.INITIAL,
+        ).exists())
+
+        other_class = Classe.objects.create(
+            nom='6eme D',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            capacite=40,
+        )
+        changed = self.client.patch(
+            reverse('enrollment-detail', args=[enrollment.data['id']]),
+            {'classe': other_class.id},
+            format='json',
+        )
+        self.assertEqual(changed.status_code, 400)
+        self.assertIn('classe', changed.data)
+
     def test_registration_class_must_match_academic_year(self):
         classe_2026 = Classe.objects.create(
             nom='6eme C',
@@ -654,3 +698,257 @@ class EtudiantViewSetTests(APITestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, 403)
+
+
+class StudentTransferWorkflowTests(APITestCase):
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            username='transfer-admin',
+            email='transfer-admin@lycee.com',
+            password='adminpass',
+            first_name='Admin',
+            last_name='Transfer',
+            matricule='TRANSFER-ADMIN',
+            role=CustomUser.Role.ADMIN,
+        )
+        self.secretary = CustomUser.objects.create_user(
+            username='transfer-secretary',
+            email='transfer-secretary@lycee.com',
+            password='secretarypass',
+            first_name='Secretaire',
+            last_name='Transfer',
+            matricule='TRANSFER-SECRETARY',
+            role=CustomUser.Role.SECRETARIAT,
+        )
+        self.current_class = Classe.objects.create(
+            nom='1ere A',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            academic_year='2026-2027',
+            capacite=30,
+        )
+        self.target_class = Classe.objects.create(
+            nom='1ere B',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            academic_year='2026-2027',
+            capacite=30,
+        )
+        self.student = Etudiant.objects.create(
+            matricule='TRANSFER-STUDENT',
+            first_name='Aina',
+            last_name='Rasoanaivo',
+            classe=self.current_class,
+            date_inscription='2026-09-01',
+            statut=Etudiant.StudentStatus.ENROLLED,
+            actif=True,
+        )
+        self.enrollment = Enrollment.objects.create(
+            student=self.student,
+            classe=self.current_class,
+            academic_year='2026-2027',
+        )
+
+    def authenticate(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=user).key}')
+
+    def create_request(self):
+        return self.client.post(reverse('student-transfer-request-list'), {
+            'student': self.student.id,
+            'target_class': self.target_class.id,
+            'academic_year': '2026-2027',
+            'reason': 'Déménagement de la famille.',
+        }, format='json')
+
+    def test_secretariat_can_request_transfer_and_admin_can_approve_with_history_and_audit(self):
+        self.authenticate(self.secretary)
+        requested = self.create_request()
+
+        self.assertEqual(requested.status_code, 201)
+        transfer_request = StudentTransferRequest.objects.get(id=requested.data['id'])
+        self.assertEqual(transfer_request.requested_by, self.secretary)
+        self.assertEqual(
+            self.client.get(reverse('student-transfer-request-list')).data['results'][0]['id'],
+            transfer_request.id,
+        )
+
+        self.authenticate(self.admin)
+        approved = self.client.post(
+            reverse('student-transfer-request-review', args=[transfer_request.id]),
+            {
+                'status': StudentTransferRequest.Status.APPROVED,
+                'decision_reason': 'Transfert accepté après vérification des places.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(approved.status_code, 200)
+        self.student.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        transfer_request.refresh_from_db()
+        self.assertEqual(self.student.classe, self.target_class)
+        self.assertEqual(self.enrollment.classe, self.target_class)
+        self.assertEqual(transfer_request.reviewed_by, self.admin)
+        self.assertTrue(StudentClassHistory.objects.filter(
+            student=self.student,
+            classe=self.target_class,
+            academic_year='2026-2027',
+            change_type=StudentClassHistory.ChangeType.TRANSFER,
+        ).exists())
+        self.assertTrue(AuditLog.objects.filter(
+            entity_type='StudentTransferRequest',
+            entity_id=str(transfer_request.id),
+            actor=self.admin,
+            reason='Transfert accepté après vérification des places.',
+        ).exists())
+
+    def test_request_rejects_invalid_duplicate_and_full_class_cases(self):
+        self.authenticate(self.secretary)
+        invalid = self.client.post(reverse('student-transfer-request-list'), {
+            'student': 'invalid',
+            'target_class': self.target_class.id,
+            'reason': 'Motif',
+        }, format='json')
+        self.assertEqual(invalid.status_code, 400)
+
+        first_request = self.create_request()
+        self.assertEqual(first_request.status_code, 201)
+        duplicate = self.create_request()
+        self.assertEqual(duplicate.status_code, 409)
+
+        other_class = Classe.objects.create(
+            nom='1ere C',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            academic_year='2026-2027',
+            capacite=1,
+        )
+        Etudiant.objects.create(
+            matricule='TRANSFER-OCCUPANT',
+            first_name='Miora',
+            last_name='R.',
+            classe=other_class,
+            date_inscription='2026-09-01',
+        )
+        full_class = self.client.post(reverse('student-transfer-request-list'), {
+            'student': self.student.id,
+            'target_class': other_class.id,
+            'reason': 'Déménagement.',
+            'academic_year': '2026-2027',
+        }, format='json')
+        self.assertEqual(full_class.status_code, 409)
+
+    def test_admin_rejection_is_traced_and_decisions_cannot_be_repeated(self):
+        self.authenticate(self.secretary)
+        response = self.create_request()
+        transfer_request_id = response.data['id']
+
+        self.authenticate(self.admin)
+        url = reverse('student-transfer-request-review', args=[transfer_request_id])
+        missing_reason = self.client.post(url, {
+            'status': StudentTransferRequest.Status.REJECTED,
+        }, format='json')
+        self.assertEqual(missing_reason.status_code, 400)
+        self.assertEqual(self.client.post(url, {
+            'status': StudentTransferRequest.Status.REJECTED,
+            'decision_reason': 'Capacité indisponible.',
+        }, format='json').status_code, 200)
+        self.assertEqual(self.client.post(url, {
+            'status': StudentTransferRequest.Status.APPROVED,
+            'decision_reason': 'Décision déjà prise.',
+        }, format='json').status_code, 400)
+
+        transfer_request = StudentTransferRequest.objects.get(id=transfer_request_id)
+        self.assertEqual(transfer_request.status, StudentTransferRequest.Status.REJECTED)
+        self.assertEqual(self.student.classe, self.current_class)
+        self.assertTrue(AuditLog.objects.filter(
+            entity_type='StudentTransferRequest',
+            entity_id=str(transfer_request.id),
+            reason='Capacité indisponible.',
+        ).exists())
+
+    def test_approval_rechecks_capacity_and_secreteriat_cannot_decide(self):
+        self.target_class.capacite = 1
+        self.target_class.save(update_fields=['capacite'])
+        self.authenticate(self.secretary)
+        response = self.create_request()
+        transfer_request_id = response.data['id']
+
+        forbidden = self.client.post(
+            reverse('student-transfer-request-review', args=[transfer_request_id]),
+            {
+                'status': StudentTransferRequest.Status.APPROVED,
+                'decision_reason': 'Pas autorisé.',
+            },
+            format='json',
+        )
+        self.assertEqual(forbidden.status_code, 403)
+        Etudiant.objects.create(
+            matricule='TRANSFER-LATE-OCCUPANT',
+            first_name='Lova',
+            last_name='R.',
+            classe=self.target_class,
+            date_inscription='2026-09-01',
+        )
+
+        self.authenticate(self.admin)
+        full = self.client.post(
+            reverse('student-transfer-request-review', args=[transfer_request_id]),
+            {
+                'status': StudentTransferRequest.Status.APPROVED,
+                'decision_reason': 'Réévaluation.',
+            },
+            format='json',
+        )
+        self.assertEqual(full.status_code, 409)
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.classe, self.current_class)
+        self.assertEqual(
+            StudentTransferRequest.objects.get(id=transfer_request_id).status,
+            StudentTransferRequest.Status.PENDING,
+        )
+
+    def test_approval_rejects_request_when_student_has_moved_since_request(self):
+        self.authenticate(self.secretary)
+        response = self.create_request()
+        transfer_request_id = response.data['id']
+        intervening_class = Classe.objects.create(
+            nom='1ere C',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            academic_year='2026-2027',
+            capacite=30,
+        )
+        self.student.classe = intervening_class
+        self.student.save(update_fields=['classe'])
+        self.enrollment.classe = intervening_class
+        self.enrollment.save(update_fields=['classe'])
+
+        self.authenticate(self.admin)
+        approval = self.client.post(
+            reverse('student-transfer-request-review', args=[transfer_request_id]),
+            {
+                'status': StudentTransferRequest.Status.APPROVED,
+                'decision_reason': 'Vérification de la classe actuelle.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(approval.status_code, 400)
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.classe, intervening_class)
+        self.assertEqual(
+            StudentTransferRequest.objects.get(id=transfer_request_id).status,
+            StudentTransferRequest.Status.PENDING,
+        )
+
+    def test_legacy_transfer_endpoint_creates_request_for_secretariat(self):
+        self.authenticate(self.secretary)
+        response = self.client.post(
+            reverse('etudiant-transfer', args=[self.student.id]),
+            {
+                'target_class_id': self.target_class.id,
+                'academic_year': '2026-2027',
+                'reason': 'Réorganisation familiale.',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(self.student.classe, self.current_class)
+        self.assertEqual(StudentTransferRequest.objects.count(), 1)

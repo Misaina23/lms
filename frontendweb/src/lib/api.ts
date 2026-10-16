@@ -154,6 +154,48 @@ export type Enrollment = {
   updated_at: string;
 };
 
+export type StudentClassHistory = {
+  id: number;
+  student: number;
+  classe: number;
+  classe_detail: {
+    id: number;
+    nom: string;
+    niveau: string;
+    stream: string;
+  };
+  academic_year: string;
+  change_type: 'INITIAL' | 'TRANSFER' | 'PROMOTION' | 'REPEAT';
+  reason: string;
+  effective_at: string;
+};
+
+export type StudentTransferRequest = {
+  id: number;
+  student: number;
+  student_detail: Etudiant;
+  from_class: number | null;
+  from_class_detail: {
+    id: number;
+    nom: string;
+    niveau: string;
+    stream: string;
+  } | null;
+  target_class: number;
+  target_class_detail: {
+    id: number;
+    nom: string;
+    niveau: string;
+    stream: string;
+  };
+  academic_year: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  decision_reason: string;
+  created_at: string;
+  reviewed_at: string | null;
+};
+
 export type Note = {
   id: number;
   etudiant: number;

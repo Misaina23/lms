@@ -3,7 +3,18 @@ from rest_framework.validators import UniqueValidator
 
 from users.models import CustomUser
 from classes.models import Classe
-from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification, StudentOfficePass, CertificateRequest, Deliberation
+from .models import (
+    AuditLog,
+    CertificateRequest,
+    Deliberation,
+    Enrollment,
+    Etudiant,
+    Notification,
+    StudentClassHistory,
+    StudentOfficePass,
+    StudentOrientation,
+    StudentTransferRequest,
+)
 
 
 class UserNestedSerializer(serializers.ModelSerializer):
@@ -47,6 +58,10 @@ class EtudiantSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance and 'matricule' in attrs and attrs['matricule'] != self.instance.matricule:
             raise serializers.ValidationError({'matricule': 'Le matricule est immuable et ne peut pas être modifié.'})
+        if self.instance and 'classe' in attrs and attrs['classe'] != self.instance.classe:
+            raise serializers.ValidationError({
+                'classe': 'Un changement de classe doit passer par une demande de transfert approuvée.',
+            })
         return attrs
 
     def get_moyenne_generale(self, obj):
@@ -138,11 +153,58 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             'academic_year',
             self.instance.academic_year if self.instance else None,
         )
+        if self.instance and classe != self.instance.classe:
+            raise serializers.ValidationError({
+                'classe': 'Un changement de classe doit passer par une demande de transfert approuvée.',
+            })
         if classe and classe.academic_year and academic_year != classe.academic_year:
             raise serializers.ValidationError({
                 'classe': 'La classe choisie ne correspond pas à l’année scolaire de l’inscription.',
             })
+        student = attrs.get('student', self.instance.student if self.instance else None)
+        if (
+            not self.instance
+            and student
+            and student.classe_id
+            and student.classe.academic_year == academic_year
+            and student.classe_id != getattr(classe, 'id', None)
+        ):
+            raise serializers.ValidationError({
+                'classe': 'Un changement de classe doit passer par une demande de transfert approuvée.',
+            })
         return attrs
+
+
+class StudentClassHistorySerializer(serializers.ModelSerializer):
+    classe_detail = ClasseNestedSerializer(source='classe', read_only=True)
+    changed_by_detail = UserNestedSerializer(source='changed_by', read_only=True)
+
+    class Meta:
+        model = StudentClassHistory
+        fields = [
+            'id', 'student', 'classe', 'classe_detail', 'academic_year',
+            'change_type', 'reason', 'changed_by', 'changed_by_detail',
+            'effective_at',
+        ]
+        read_only_fields = fields
+
+
+class StudentTransferRequestSerializer(serializers.ModelSerializer):
+    student_detail = EtudiantSerializer(source='student', read_only=True)
+    from_class_detail = ClasseNestedSerializer(source='from_class', read_only=True)
+    target_class_detail = ClasseNestedSerializer(source='target_class', read_only=True)
+    requested_by_detail = UserNestedSerializer(source='requested_by', read_only=True)
+    reviewed_by_detail = UserNestedSerializer(source='reviewed_by', read_only=True)
+
+    class Meta:
+        model = StudentTransferRequest
+        fields = [
+            'id', 'student', 'student_detail', 'from_class', 'from_class_detail',
+            'target_class', 'target_class_detail', 'academic_year', 'reason',
+            'status', 'requested_by', 'requested_by_detail', 'reviewed_by',
+            'reviewed_by_detail', 'decision_reason', 'created_at', 'reviewed_at',
+        ]
+        read_only_fields = fields
 
 
 class StudentOrientationSerializer(serializers.ModelSerializer):

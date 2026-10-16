@@ -10,12 +10,197 @@ from django.utils import timezone
 import datetime
 import io
 from decimal import Decimal
-from .models import Etudiant, Enrollment, StudentOrientation, AuditLog, Notification, StudentOfficePass, CertificateRequest, Deliberation
-from .serializers import EtudiantSerializer, EnrollmentSerializer, StudentOrientationSerializer, AuditLogSerializer, NotificationSerializer, StudentRegistrationSerializer, StudentOfficePassSerializer, CertificateRequestSerializer, DeliberationSerializer
-from users.permissions import IsAdminOnly, IsAdminOrReadOnly, IsStaffUser, CanManageStudents, CanManageEnrollment, CanManageOfficePass, CanViewSchedule
+from .models import (
+    AuditLog,
+    CertificateRequest,
+    Deliberation,
+    Enrollment,
+    Etudiant,
+    Notification,
+    StudentClassHistory,
+    StudentOfficePass,
+    StudentOrientation,
+    StudentTransferRequest,
+)
+from .serializers import (
+    AuditLogSerializer,
+    CertificateRequestSerializer,
+    DeliberationSerializer,
+    EnrollmentSerializer,
+    EtudiantSerializer,
+    NotificationSerializer,
+    StudentClassHistorySerializer,
+    StudentOfficePassSerializer,
+    StudentOrientationSerializer,
+    StudentRegistrationSerializer,
+    StudentTransferRequestSerializer,
+)
+from users.permissions import (
+    CanManageEnrollment,
+    CanManageOfficePass,
+    CanManageStudents,
+    CanRequestStudentTransfer,
+    CanViewSchedule,
+    IsAdminOnly,
+    IsAdminOrReadOnly,
+    IsStaffUser,
+)
 from users.models import CustomUser
 from classes.models import Classe, TeacherAssignment
 from matieres.models import ExamPeriod
+
+
+def record_student_class(student, classe, academic_year, change_type, changed_by, reason=''):
+    if classe is None:
+        return None
+    return StudentClassHistory.objects.create(
+        student=student,
+        classe=classe,
+        academic_year=academic_year or classe.academic_year or '',
+        change_type=change_type,
+        changed_by=changed_by,
+        reason=reason,
+    )
+
+
+def record_deliberation_class_history(
+    student,
+    previous_class_id,
+    target_class,
+    academic_year,
+    decision,
+    deliberation_created,
+    changed_by,
+):
+    if (
+        decision == Deliberation.Decision.ADMITTED
+        and target_class
+        and previous_class_id != target_class.id
+    ):
+        record_student_class(
+            student=student,
+            classe=target_class,
+            academic_year=academic_year or target_class.academic_year or '',
+            change_type=StudentClassHistory.ChangeType.PROMOTION,
+            changed_by=changed_by,
+            reason='Passage appliqué après délibération.',
+        )
+    elif (
+        decision == Deliberation.Decision.REPEATER
+        and deliberation_created
+    ):
+        record_student_class(
+            student=student,
+            classe=student.classe,
+            academic_year=academic_year or (student.classe.academic_year if student.classe else ''),
+            change_type=StudentClassHistory.ChangeType.REPEAT,
+            changed_by=changed_by,
+            reason='Redoublement décidé après délibération.',
+        )
+
+
+def _create_student_transfer_request(request, student_id, target_class_id, reason, academic_year=None):
+    if not str(student_id or '').isdigit() or not str(target_class_id or '').isdigit():
+        return Response(
+            {'detail': 'Les identifiants de l’élève et de la classe doivent être numériques.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    with transaction.atomic():
+        student = Etudiant.objects.select_for_update().select_related('classe').filter(
+            pk=student_id,
+            actif=True,
+            statut=Etudiant.StudentStatus.ENROLLED,
+        ).first()
+        if student is None:
+            return Response(
+                {'detail': 'Élève actif et inscrit introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        target_class = Classe.objects.select_for_update().filter(pk=target_class_id).first()
+        if target_class is None:
+            return Response({'detail': 'Classe cible introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        if not isinstance(reason, str) or not reason.strip():
+            return Response(
+                {'reason': 'Un motif est obligatoire pour demander un transfert.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        year = academic_year or target_class.academic_year or (
+            student.classe.academic_year if student.classe else None
+        )
+        if not year:
+            return Response(
+                {'academic_year': 'L’année scolaire du transfert est obligatoire.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if (
+            student.classe is None
+            or student.classe_id == target_class.id
+            or not student.classe.academic_year
+            or student.classe.academic_year != year
+            or not target_class.academic_year
+            or target_class.academic_year != year
+        ):
+            return Response(
+                {'target_class': 'L’élève et la classe cible doivent appartenir à la même année scolaire.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        enrollment = Enrollment.objects.select_for_update().filter(
+            student=student,
+            academic_year=year,
+        ).first()
+        if enrollment is None or enrollment.classe_id != student.classe_id:
+            return Response(
+                {'detail': 'L’inscription de l’élève ne correspond pas à sa classe actuelle pour cette année.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if StudentTransferRequest.objects.filter(
+            student=student,
+            academic_year=year,
+            status=StudentTransferRequest.Status.PENDING,
+        ).exists():
+            return Response(
+                {'detail': 'Une demande de transfert est déjà en attente pour cet élève.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        current_count = Etudiant.objects.filter(classe=target_class, actif=True).exclude(pk=student.pk).count()
+        reserved_places = StudentTransferRequest.objects.filter(
+            target_class=target_class,
+            academic_year=year,
+            status=StudentTransferRequest.Status.PENDING,
+        ).count()
+        if current_count + reserved_places >= target_class.capacite:
+            return Response(
+                {'detail': 'La classe cible a atteint sa capacité disponible.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        transfer_request = StudentTransferRequest.objects.create(
+            student=student,
+            from_class=student.classe,
+            target_class=target_class,
+            academic_year=year,
+            reason=reason.strip(),
+            requested_by=request.user,
+        )
+        AuditLog.objects.create(
+            actor=request.user,
+            entity_type='StudentTransferRequest',
+            entity_id=str(transfer_request.pk),
+            action=AuditLog.Action.CREATE,
+            new_value={
+                'student': student.pk,
+                'from_class': student.classe_id,
+                'target_class': target_class.pk,
+                'academic_year': year,
+                'status': transfer_request.status,
+            },
+            reason=transfer_request.reason,
+        )
+    return Response(
+        StudentTransferRequestSerializer(transfer_request).data,
+        status=status.HTTP_201_CREATED,
+    )
 
 
 class StudentExportContentNegotiation(DefaultContentNegotiation):
@@ -55,10 +240,17 @@ def import_students_endpoint(request):
         )
         if created_flag:
             created.append(student)
+            record_student_class(
+                student=student,
+                classe=classe,
+                academic_year=classe.academic_year or '',
+                change_type=StudentClassHistory.ChangeType.INITIAL,
+                changed_by=request.user,
+                reason='Import initial des élèves.',
+            )
         else:
-            student.classe = classe
             student.actif = True
-            student.save(update_fields=['classe', 'actif'])
+            student.save(update_fields=['actif'])
     return Response({'created': len(created), 'updated': len(students) - len(created), 'classe_id': classe.id}, status=status.HTTP_201_CREATED)
 
 
@@ -119,29 +311,147 @@ def export_students_endpoint(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminOnly])
+@permission_classes([CanRequestStudentTransfer])
 def transfer_student_endpoint(request, pk=None):
-    etudiant = Etudiant.objects.filter(id=pk).first()
-    if etudiant is None:
-        return Response({'detail': 'Étudiant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    target_class_id = request.data.get('target_class_id')
-    if not target_class_id:
-        return Response({'detail': 'target_class_id est obligatoire.'}, status=status.HTTP_400_BAD_REQUEST)
-    target_class = Classe.objects.filter(id=target_class_id).first()
-    if target_class is None:
-        return Response({'detail': 'Classe cible introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    etudiant.classe = target_class
-    etudiant.statut = Etudiant.StudentStatus.ENROLLED
-    etudiant.save(update_fields=['classe', 'statut'])
-    AuditLog.objects.create(
-        actor=request.user,
-        entity_type='Etudiant',
-        entity_id=str(etudiant.id),
-        action=AuditLog.Action.STATUS_CHANGE,
-        new_value={'classe': target_class.id, 'statut': etudiant.statut, 'reason': request.data.get('reason', '')},
-        reason=request.data.get('reason', 'Transfert administratif validé.'),
+    return _create_student_transfer_request(
+        request,
+        pk,
+        request.data.get('target_class_id'),
+        request.data.get('reason'),
+        request.data.get('academic_year'),
     )
-    return Response({'status': 'transferred', 'student_id': etudiant.id, 'target_class_id': target_class.id})
+
+
+def _review_student_transfer(request, pk):
+    with transaction.atomic():
+        transfer_request = StudentTransferRequest.objects.select_for_update().select_related(
+            'from_class',
+            'target_class',
+        ).filter(pk=pk).first()
+        if transfer_request is None:
+            return Response({'detail': 'Demande de transfert introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        transfer_request.student = Etudiant.objects.select_for_update().select_related(
+            'classe',
+        ).get(pk=transfer_request.student_id)
+        if transfer_request.status != StudentTransferRequest.Status.PENDING:
+            return Response(
+                {'detail': 'Cette demande a déjà fait l’objet d’une décision.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        decision = request.data.get('status')
+        if decision not in (StudentTransferRequest.Status.APPROVED, StudentTransferRequest.Status.REJECTED):
+            return Response(
+                {'status': 'La décision doit être APPROVED ou REJECTED.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        decision_reason = request.data.get('decision_reason')
+        if not isinstance(decision_reason, str) or not decision_reason.strip():
+            return Response(
+                {'decision_reason': 'Une justification est obligatoire pour la décision.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if decision == StudentTransferRequest.Status.APPROVED:
+            target_class = Classe.objects.select_for_update().get(pk=transfer_request.target_class_id)
+            current_class = transfer_request.student.classe
+            enrollment = Enrollment.objects.select_for_update().filter(
+                student=transfer_request.student,
+                academic_year=transfer_request.academic_year,
+            ).first()
+            if enrollment is None:
+                return Response(
+                    {'detail': 'Aucune inscription n’existe pour cet élève et cette année scolaire.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if (
+                current_class is None
+                or transfer_request.from_class_id != current_class.id
+                or target_class.id == current_class.id
+                or current_class.academic_year != transfer_request.academic_year
+                or target_class.academic_year != transfer_request.academic_year
+                or enrollment.classe_id != current_class.id
+            ):
+                return Response(
+                    {'detail': 'La classe actuelle, la classe cible et la demande doivent appartenir à la même année scolaire.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            current_count = Etudiant.objects.filter(classe=target_class, actif=True).exclude(
+                pk=transfer_request.student_id,
+            ).count()
+            other_pending_count = StudentTransferRequest.objects.filter(
+                target_class=target_class,
+                academic_year=transfer_request.academic_year,
+                status=StudentTransferRequest.Status.PENDING,
+            ).exclude(pk=transfer_request.pk).count()
+            if current_count + other_pending_count >= target_class.capacite:
+                return Response(
+                    {'detail': 'La classe cible a atteint sa capacité disponible.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+        transfer_request.status = decision
+        transfer_request.reviewed_by = request.user
+        transfer_request.decision_reason = decision_reason.strip()
+        transfer_request.reviewed_at = timezone.now()
+        transfer_request.save(update_fields=[
+            'status',
+            'reviewed_by',
+            'decision_reason',
+            'reviewed_at',
+        ])
+        if decision == StudentTransferRequest.Status.APPROVED:
+            _apply_student_transfer(transfer_request)
+        AuditLog.objects.create(
+            actor=request.user,
+            entity_type='StudentTransferRequest',
+            entity_id=str(transfer_request.pk),
+            action=AuditLog.Action.STATUS_CHANGE,
+            old_value={'status': StudentTransferRequest.Status.PENDING},
+            new_value={
+                'status': transfer_request.status,
+                'student': transfer_request.student_id,
+                'from_class': transfer_request.from_class_id,
+                'target_class': transfer_request.target_class_id,
+                'academic_year': transfer_request.academic_year,
+                'decision_reason': transfer_request.decision_reason,
+            },
+            reason=transfer_request.decision_reason,
+        )
+
+    return Response(StudentTransferRequestSerializer(transfer_request).data)
+
+
+def _apply_student_transfer(transfer_request):
+    student = transfer_request.student
+    old_class_id = student.classe_id
+    student.classe = transfer_request.target_class
+    student.statut = Etudiant.StudentStatus.ENROLLED
+    student.save(update_fields=['classe', 'statut'])
+    Enrollment.objects.filter(
+        student=student,
+        academic_year=transfer_request.academic_year,
+    ).update(classe=transfer_request.target_class)
+    record_student_class(
+        student=student,
+        classe=transfer_request.target_class,
+        academic_year=transfer_request.academic_year,
+        change_type=StudentClassHistory.ChangeType.TRANSFER,
+        changed_by=transfer_request.reviewed_by,
+        reason=transfer_request.decision_reason or transfer_request.reason,
+    )
+    AuditLog.objects.create(
+        actor=transfer_request.reviewed_by,
+        entity_type='Etudiant',
+        entity_id=str(student.pk),
+        action=AuditLog.Action.STATUS_CHANGE,
+        old_value={'classe': old_class_id},
+        new_value={
+            'classe': transfer_request.target_class_id,
+            'academic_year': transfer_request.academic_year,
+            'transfer_request': transfer_request.pk,
+        },
+        reason=transfer_request.decision_reason or transfer_request.reason,
+    )
 
 
 @api_view(['POST'])
@@ -317,6 +627,7 @@ def analyze_deliberations_endpoint(request):
             continue
         average = (weighted_total / coefficient_total).quantize(Decimal('0.01'))
         decision = Deliberation.Decision.ADMITTED if average >= threshold else Deliberation.Decision.REPEATER
+        previous_class_id = student.classe_id
         recommended_stream = stream or (student.classe.stream if student.classe else None)
         target_class = None
         if recommended_stream:
@@ -325,7 +636,7 @@ def analyze_deliberations_endpoint(request):
         if decision == Deliberation.Decision.ADMITTED and target_class:
             student.classe = target_class
             student.save(update_fields=['classe'])
-        deliberation, _ = Deliberation.objects.update_or_create(
+        deliberation, created = Deliberation.objects.update_or_create(
             student=student,
             exam_period=period,
             defaults={
@@ -337,6 +648,15 @@ def analyze_deliberations_endpoint(request):
                 'decided_by': request.user,
                 'applied_at': timezone.now(),
             },
+        )
+        record_deliberation_class_history(
+            student=student,
+            previous_class_id=previous_class_id,
+            target_class=target_class,
+            academic_year=academic_year or period.academic_year,
+            decision=decision,
+            deliberation_created=created,
+            changed_by=request.user,
         )
         analyses.append({
             'student_id': student.id,
@@ -375,6 +695,18 @@ class EtudiantViewSet(viewsets.ModelViewSet):
             return [IsAdminOnly()]
         return super().get_permissions()
 
+    def perform_create(self, serializer):
+        student = serializer.save()
+        if student.classe_id:
+            record_student_class(
+                student=student,
+                classe=student.classe,
+                academic_year=student.classe.academic_year or '',
+                change_type=StudentClassHistory.ChangeType.INITIAL,
+                changed_by=self.request.user,
+                reason='Création du dossier élève.',
+            )
+
     @action(detail=False, methods=['post'])
     def register(self, request):
         serializer = StudentRegistrationSerializer(data=request.data)
@@ -401,6 +733,14 @@ class EtudiantViewSet(viewsets.ModelViewSet):
                 classe=data.get('classe'),
                 academic_year=data['academic_year'],
                 payment_status=Enrollment.PaymentStatus.UNPAID,
+            )
+            record_student_class(
+                student=student,
+                classe=data.get('classe'),
+                academic_year=data['academic_year'],
+                change_type=StudentClassHistory.ChangeType.INITIAL,
+                changed_by=request.user,
+                reason='Inscription scolaire.',
             )
             AuditLog.objects.create(
                 actor=request.user,
@@ -467,10 +807,18 @@ class EtudiantViewSet(viewsets.ModelViewSet):
             )
             if created_flag:
                 created.append(student)
+                if classe.academic_year:
+                    record_student_class(
+                        student=student,
+                        classe=classe,
+                        academic_year=classe.academic_year,
+                        change_type=StudentClassHistory.ChangeType.INITIAL,
+                        changed_by=request.user,
+                        reason='Import initial des élèves.',
+                    )
             else:
-                student.classe = classe
                 student.actif = True
-                student.save(update_fields=['classe', 'actif'])
+                student.save(update_fields=['actif'])
         return Response({'created': len(created), 'updated': len(students) - len(created), 'classe_id': classe.id}, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAdminOnly], url_path='export', url_name='export')
@@ -526,27 +874,79 @@ class EtudiantViewSet(viewsets.ModelViewSet):
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename='liste_eleves.xls', content_type='application/vnd.ms-excel')
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly], url_path='transfer', url_name='transfer')
+    @action(detail=True, methods=['post'], permission_classes=[CanRequestStudentTransfer], url_path='transfer', url_name='transfer')
     def transfer_student(self, request, pk=None):
         etudiant = self.get_object()
-        target_class_id = request.data.get('target_class_id')
-        if not target_class_id:
-            return Response({'detail': 'target_class_id est obligatoire.'}, status=status.HTTP_400_BAD_REQUEST)
-        target_class = Classe.objects.filter(id=target_class_id).first()
-        if target_class is None:
-            return Response({'detail': 'Classe cible introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-        etudiant.classe = target_class
-        etudiant.statut = Etudiant.StudentStatus.ENROLLED
-        etudiant.save(update_fields=['classe', 'statut'])
-        AuditLog.objects.create(
-            actor=request.user,
-            entity_type='Etudiant',
-            entity_id=str(etudiant.id),
-            action=AuditLog.Action.STATUS_CHANGE,
-            new_value={'classe': target_class.id, 'statut': etudiant.statut, 'reason': request.data.get('reason', '')},
-            reason=request.data.get('reason', 'Transfert administratif validé.'),
+        return _create_student_transfer_request(
+            request,
+            etudiant.pk,
+            request.data.get('target_class_id'),
+            request.data.get('reason'),
+            request.data.get('academic_year'),
         )
-        return Response({'status': 'transferred', 'student_id': etudiant.id, 'target_class_id': target_class.id})
+
+
+class StudentClassHistoryViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = StudentClassHistory.objects.select_related(
+        'student',
+        'classe',
+        'changed_by',
+    )
+    serializer_class = StudentClassHistorySerializer
+    permission_classes = [CanManageStudents]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['student', 'academic_year', 'change_type']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.role == CustomUser.Role.PROFESSEUR:
+            class_ids = TeacherAssignment.objects.filter(
+                professeur=self.request.user,
+            ).values_list('classe_id', flat=True)
+            return queryset.filter(classe_id__in=class_ids)
+        return queryset
+
+
+class StudentTransferRequestViewSet(viewsets.ModelViewSet):
+    queryset = StudentTransferRequest.objects.select_related(
+        'student',
+        'student__classe',
+        'from_class',
+        'target_class',
+        'requested_by',
+        'reviewed_by',
+    )
+    serializer_class = StudentTransferRequestSerializer
+    permission_classes = [IsAdminOnly]
+    http_method_names = ['get', 'post', 'head', 'options']
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['student', 'academic_year', 'status', 'target_class']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve', 'create'):
+            return [CanRequestStudentTransfer()]
+        if self.action == 'review':
+            return [IsAdminOnly()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.role == CustomUser.Role.SECRETARIAT:
+            return queryset.filter(requested_by=self.request.user)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        return _create_student_transfer_request(
+            request,
+            request.data.get('student'),
+            request.data.get('target_class'),
+            request.data.get('reason'),
+            request.data.get('academic_year'),
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly])
+    def review(self, request, pk=None):
+        return _review_student_transfer(request, pk)
 
 
 class EnrollmentViewSet(viewsets.ModelViewSet):
@@ -572,6 +972,23 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             ).values_list('classe_id', flat=True)
             return Enrollment.objects.filter(classe_id__in=classe_ids)
         return Enrollment.objects.none()
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            enrollment = serializer.save()
+            has_class_history = StudentClassHistory.objects.filter(
+                student=enrollment.student,
+                academic_year=enrollment.academic_year,
+            ).exists()
+            if not has_class_history:
+                record_student_class(
+                    student=enrollment.student,
+                    classe=enrollment.classe,
+                    academic_year=enrollment.academic_year,
+                    change_type=StudentClassHistory.ChangeType.INITIAL,
+                    changed_by=self.request.user,
+                    reason='Inscription scolaire.',
+                )
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly], url_path='confirm-payment')
     def confirm_payment(self, request, pk=None):
@@ -696,6 +1113,7 @@ class DeliberationViewSet(viewsets.ModelViewSet):
                 continue
             average = (weighted_total / coefficient_total).quantize(Decimal('0.01'))
             decision = Deliberation.Decision.ADMITTED if average >= threshold else Deliberation.Decision.REPEATER
+            previous_class_id = student.classe_id
             recommended_stream = stream or (student.classe.stream if student.classe else None)
             target_class = None
             if recommended_stream:
@@ -704,7 +1122,7 @@ class DeliberationViewSet(viewsets.ModelViewSet):
             if decision == Deliberation.Decision.ADMITTED and target_class:
                 student.classe = target_class
                 student.save(update_fields=['classe'])
-            deliberation, _ = Deliberation.objects.update_or_create(
+            deliberation, created = Deliberation.objects.update_or_create(
                 student=student,
                 exam_period=period,
                 defaults={
@@ -716,6 +1134,15 @@ class DeliberationViewSet(viewsets.ModelViewSet):
                     'decided_by': request.user,
                     'applied_at': timezone.now(),
                 },
+            )
+            record_deliberation_class_history(
+                student=student,
+                previous_class_id=previous_class_id,
+                target_class=target_class,
+                academic_year=academic_year or period.academic_year,
+                decision=decision,
+                deliberation_created=created,
+                changed_by=request.user,
             )
             analyses.append({
                 'student_id': student.id,

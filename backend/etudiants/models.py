@@ -128,6 +128,103 @@ class Enrollment(models.Model):
         return f"{self.student} - {self.academic_year} ({self.get_payment_status_display()})"
 
 
+class StudentClassHistory(models.Model):
+    class ChangeType(models.TextChoices):
+        INITIAL = 'INITIAL', 'Inscription'
+        TRANSFER = 'TRANSFER', 'Transfert'
+        PROMOTION = 'PROMOTION', 'Passage'
+        REPEAT = 'REPEAT', 'Redoublement'
+
+    student = models.ForeignKey(
+        Etudiant,
+        on_delete=models.CASCADE,
+        related_name='class_history',
+    )
+    classe = models.ForeignKey(
+        Classe,
+        on_delete=models.PROTECT,
+        related_name='student_class_history',
+    )
+    academic_year = models.CharField(max_length=9)
+    change_type = models.CharField(max_length=12, choices=ChangeType.choices)
+    reason = models.TextField(blank=True)
+    changed_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='student_class_changes',
+    )
+    effective_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-effective_at', '-id']
+        indexes = [
+            models.Index(fields=['student', 'academic_year']),
+        ]
+
+    def __str__(self):
+        return f"{self.student} — {self.classe} ({self.academic_year})"
+
+
+class StudentTransferRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'En attente'
+        APPROVED = 'APPROVED', 'Approuvée'
+        REJECTED = 'REJECTED', 'Refusée'
+
+    student = models.ForeignKey(
+        Etudiant,
+        on_delete=models.PROTECT,
+        related_name='transfer_requests',
+    )
+    from_class = models.ForeignKey(
+        Classe,
+        on_delete=models.PROTECT,
+        related_name='outgoing_transfer_requests',
+        null=True,
+        blank=True,
+    )
+    target_class = models.ForeignKey(
+        Classe,
+        on_delete=models.PROTECT,
+        related_name='incoming_transfer_requests',
+    )
+    academic_year = models.CharField(max_length=9)
+    reason = models.TextField()
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    requested_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='student_transfer_requests',
+    )
+    reviewed_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='student_transfer_decisions',
+    )
+    decision_reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['status', 'academic_year']),
+            models.Index(fields=['student', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.student} : {self.from_class} → {self.target_class} ({self.get_status_display()})"
+
+
 class StudentOrientation(models.Model):
     """AI-driven orientation recommendation for end-of-Seconde students."""
     class Stream(models.TextChoices):

@@ -1,20 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import QRCode from 'qrcode'
-import { Search, CheckCircle2, UserPlus, X, UsersRound, Printer, IdCard } from 'lucide-react'
+import { Search, CheckCircle2, UserPlus, X, UsersRound, Printer, IdCard, ArrowRightLeft, History } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { api, type Etudiant, type Classe } from '@/lib/api'
+import { api, type Etudiant, type Classe, type PaginatedResponse, type StudentClassHistory, type StudentTransferRequest } from '@/lib/api'
 import { useFilteredStudents, initials } from '@/lib/admin-data'
 
-export function StudentsScreen({ etudiants, classes, onReload, canManage = true, showGrades = true }: {
+export function StudentsScreen({ etudiants, classes, onReload, canManage = true, canReviewTransfers = false, showGrades = true }: {
   etudiants: Etudiant[]
   classes: Classe[]
   onReload: () => void
   canManage?: boolean
+  canReviewTransfers?: boolean
   showGrades?: boolean
 }) {
   const [query, setQuery] = useState('')
@@ -24,6 +25,21 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
   const [formError, setFormError] = useState('')
   const [cardStudent, setCardStudent] = useState<Etudiant | null>(null)
   const [cardQr, setCardQr] = useState('')
+  const [transferStudent, setTransferStudent] = useState<Etudiant | null>(null)
+  const [transferTargetClass, setTransferTargetClass] = useState('')
+  const [transferReason, setTransferReason] = useState('')
+  const [transferError, setTransferError] = useState('')
+  const [transferSaving, setTransferSaving] = useState(false)
+  const [transferRequests, setTransferRequests] = useState<StudentTransferRequest[]>([])
+  const [transferRequestsLoading, setTransferRequestsLoading] = useState(false)
+  const [transferRequestsError, setTransferRequestsError] = useState('')
+  const [studentHistory, setStudentHistory] = useState<StudentClassHistory[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [decisionRequest, setDecisionRequest] = useState<StudentTransferRequest | null>(null)
+  const [decisionStatus, setDecisionStatus] = useState<'APPROVED' | 'REJECTED'>('APPROVED')
+  const [decisionReason, setDecisionReason] = useState('')
+  const [decisionError, setDecisionError] = useState('')
+  const [decisionSaving, setDecisionSaving] = useState(false)
   const [form, setForm] = useState({
     matricule: '',
     first_name: '',
@@ -39,6 +55,116 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
   const pageItems = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize)
+  const refreshTransferRequests = useCallback(async () => {
+    if (!canManage) return
+    setTransferRequestsLoading(true)
+    setTransferRequestsError('')
+    try {
+      const results: StudentTransferRequest[] = []
+      let pageNumber = 1
+      let hasNextPage = true
+      while (hasNextPage) {
+        const response = await api.get<PaginatedResponse<StudentTransferRequest>>(
+          `/student-transfer-requests/?page=${pageNumber}`,
+        )
+        results.push(...response.results)
+        hasNextPage = Boolean(response.next)
+        pageNumber += 1
+      }
+      setTransferRequests(results)
+    } catch (error) {
+      setTransferRequestsError(error instanceof Error ? error.message : 'Impossible de charger les demandes de transfert.')
+    } finally {
+      setTransferRequestsLoading(false)
+    }
+  }, [canManage])
+
+  useEffect(() => {
+    void refreshTransferRequests()
+  }, [refreshTransferRequests])
+
+  useEffect(() => {
+    if (!transferStudent) {
+      setStudentHistory([])
+      return
+    }
+    let cancelled = false
+    const loadHistory = async () => {
+      setHistoryLoading(true)
+      try {
+        const results: StudentClassHistory[] = []
+        let pageNumber = 1
+        let hasNextPage = true
+        while (hasNextPage) {
+          const response = await api.get<PaginatedResponse<StudentClassHistory>>(
+            `/student-class-history/?student=${transferStudent.id}&page=${pageNumber}`,
+          )
+          results.push(...response.results)
+          hasNextPage = Boolean(response.next)
+          pageNumber += 1
+        }
+        if (!cancelled) setStudentHistory(results)
+      } catch (error) {
+        if (!cancelled) {
+          setTransferError(error instanceof Error ? error.message : 'Impossible de charger l’historique scolaire.')
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false)
+      }
+    }
+    void loadHistory()
+    return () => { cancelled = true }
+  }, [transferStudent])
+
+  const submitTransferRequest = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!transferStudent) return
+    const sourceClass = classes.find((classe) => classe.id === transferStudent.classe)
+    if (!sourceClass?.academic_year) {
+      setTransferError('L’année scolaire de la classe actuelle est inconnue.')
+      return
+    }
+    setTransferSaving(true)
+    setTransferError('')
+    try {
+      await api.post('/student-transfer-requests/', {
+        student: transferStudent.id,
+        target_class: Number(transferTargetClass),
+        academic_year: sourceClass.academic_year,
+        reason: transferReason,
+      })
+      setTransferStudent(null)
+      setTransferTargetClass('')
+      setTransferReason('')
+      await refreshTransferRequests()
+      onReload()
+    } catch (error) {
+      setTransferError(error instanceof Error ? error.message : 'Impossible de créer la demande de transfert.')
+    } finally {
+      setTransferSaving(false)
+    }
+  }
+
+  const submitTransferDecision = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!decisionRequest) return
+    setDecisionSaving(true)
+    setDecisionError('')
+    try {
+      await api.post(`/student-transfer-requests/${decisionRequest.id}/review/`, {
+        status: decisionStatus,
+        decision_reason: decisionReason,
+      })
+      setDecisionRequest(null)
+      setDecisionReason('')
+      await refreshTransferRequests()
+      onReload()
+    } catch (error) {
+      setDecisionError(error instanceof Error ? error.message : 'Impossible d’enregistrer la décision.')
+    } finally {
+      setDecisionSaving(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -171,6 +297,39 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
         </Card>
       )}
 
+      {canManage && (
+        <Card className="border-border/70 bg-card/80 rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><ArrowRightLeft className="size-4" /> Transferts scolaires</CardTitle>
+            <p className="text-xs text-muted-foreground">Les demandes sont soumises au contrôle de capacité et restent traçables dans l’historique de l’élève.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {transferRequestsError && <p className="text-sm text-destructive" role="alert">{transferRequestsError}</p>}
+            {transferRequestsLoading ? <p className="text-sm text-muted-foreground">Chargement des demandes…</p> : (
+              <div className="space-y-2">
+                {transferRequests.map((request) => (
+                  <div key={request.id} className="flex flex-col gap-3 rounded-xl border border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-semibold">{request.student_detail.first_name} {request.student_detail.last_name} <span className="text-xs font-normal text-muted-foreground">· {request.student_detail.matricule}</span></p>
+                      <p className="text-xs text-muted-foreground">{request.from_class_detail?.nom || 'Classe inconnue'} → {request.target_class_detail.nom} · {request.academic_year} · {request.status}</p>
+                      <p className="mt-1 text-sm">{request.reason}</p>
+                      {request.decision_reason && <p className="mt-1 text-xs text-muted-foreground">Décision : {request.decision_reason}</p>}
+                    </div>
+                    {canReviewTransfers && request.status === 'PENDING' && (
+                      <div className="flex shrink-0 gap-2">
+                        <Button size="sm" onClick={() => { setDecisionRequest(request); setDecisionStatus('APPROVED'); setDecisionError('') }}>Approuver</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setDecisionRequest(request); setDecisionStatus('REJECTED'); setDecisionError('') }}>Refuser</Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {transferRequests.length === 0 && <p className="text-sm text-muted-foreground">Aucune demande de transfert.</p>}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-border/70 bg-card/80 rounded-2xl">
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <div>
@@ -216,11 +375,17 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
                         {etudiant.moyenne_generale != null ? `${etudiant.moyenne_generale}/20` : '—'}
                       </td>}
                       <td data-label="Action" className="px-3 py-3 sm:px-6 sm:py-4 text-right">
-                        {canManage && (
+                        {canManage && <div className="flex justify-end gap-1">
+                          {etudiant.statut === 'ENROLLED' && etudiant.actif && <Button variant="ghost" size="sm" className="gap-1" onClick={() => {
+                            setTransferError('')
+                            setTransferTargetClass('')
+                            setTransferReason('')
+                            setTransferStudent(etudiant)
+                          }}><ArrowRightLeft className="size-4" /> Transfert</Button>}
                           <Button variant="ghost" size="sm" className="gap-1" onClick={() => setCardStudent(etudiant)}>
                             <IdCard className="size-4" /> Carte
                           </Button>
-                        )}
+                        </div>}
                       </td>
                     </tr>
                   )
@@ -240,6 +405,72 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
           </div>
         </CardContent>
       </Card>
+
+      {transferStudent && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4" role="dialog" aria-modal="true" aria-label="Demande de transfert scolaire">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-background p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-display text-lg font-bold">Demande de transfert</h3>
+                <p className="text-sm text-muted-foreground">{transferStudent.first_name} {transferStudent.last_name} · {classes.find((classe) => classe.id === transferStudent.classe)?.nom || 'Classe inconnue'}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setTransferStudent(null)} aria-label="Fermer"><X className="size-4" /></Button>
+            </div>
+            <form className="space-y-4" onSubmit={submitTransferRequest}>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Classe cible</label>
+                <select required value={transferTargetClass} onChange={(event) => setTransferTargetClass(event.target.value)} className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm outline-none">
+                  <option value="">Choisir une classe de la même année</option>
+                  {classes.filter((classe) => classe.id !== transferStudent.classe && classe.academic_year === classes.find((current) => current.id === transferStudent.classe)?.academic_year).map((classe) => <option key={classe.id} value={classe.id}>{classe.nom} — {classe.niveau}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Motif de la demande</label>
+                <textarea required value={transferReason} onChange={(event) => setTransferReason(event.target.value)} rows={3} className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none" />
+              </div>
+              <div className="rounded-xl border border-border/70 p-3">
+                <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold"><History className="size-4" /> Historique des classes</h4>
+                {historyLoading ? <p className="text-xs text-muted-foreground">Chargement de l’historique…</p> : studentHistory.length > 0 ? (
+                  <ul className="space-y-2">
+                    {studentHistory.map((event) => <li key={event.id} className="text-xs">
+                      <span className="font-semibold">{event.academic_year} · {event.classe_detail.nom} · {event.change_type}</span>
+                      {event.reason && <span className="text-muted-foreground"> — {event.reason}</span>}
+                    </li>)}
+                  </ul>
+                ) : <p className="text-xs text-muted-foreground">Aucun événement d’historique enregistré.</p>}
+              </div>
+              {transferError && <p className="text-sm text-destructive" role="alert">{transferError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setTransferStudent(null)}>Annuler</Button>
+                <Button type="submit" disabled={transferSaving}>{transferSaving ? 'Envoi…' : 'Soumettre la demande'}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {decisionRequest && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4" role="dialog" aria-modal="true" aria-label="Décision de transfert">
+          <form onSubmit={submitTransferDecision} className="w-full max-w-lg space-y-4 rounded-2xl bg-background p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-display text-lg font-bold">{decisionStatus === 'APPROVED' ? 'Approuver' : 'Refuser'} le transfert</h3>
+                <p className="text-sm text-muted-foreground">{decisionRequest.student_detail.first_name} {decisionRequest.student_detail.last_name} → {decisionRequest.target_class_detail.nom}</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setDecisionRequest(null)} aria-label="Fermer"><X className="size-4" /></Button>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Justification obligatoire</label>
+              <textarea required value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} rows={3} className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none" />
+            </div>
+            {decisionError && <p className="text-sm text-destructive" role="alert">{decisionError}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDecisionRequest(null)}>Annuler</Button>
+              <Button type="submit" disabled={decisionSaving}>{decisionSaving ? 'Enregistrement…' : 'Confirmer la décision'}</Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {cardStudent && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4" role="dialog" aria-modal="true" aria-label="Carte scolaire">
