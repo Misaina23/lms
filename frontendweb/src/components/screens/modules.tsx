@@ -1126,17 +1126,161 @@ export function TimetableScreen() {
   )
 }
 
-export function ReportsScreen({ users, etudiants, classes, matieres, notes }: { users: User[]; etudiants: Etudiant[]; classes: any[]; matieres: Matiere[]; notes: Note[] }) {
+type GradeReport = {
+  period: { id: number; label: string; code: string; academic_year: string }
+  threshold: string
+  summary: {
+    student_count: number
+    subject_class_count: number
+    note_count: number
+    average: string
+    passed_count: number
+    pass_rate: string
+  }
+  results: {
+    class_id: number | null
+    class_name: string
+    subject_id: number
+    subject_name: string
+    student_count: number
+    average: string
+    passed_count: number
+    pass_rate: string
+  }[]
+}
+
+export function ReportsScreen({ users, etudiants, classes, matieres, periods }: {
+  users: User[]
+  etudiants: Etudiant[]
+  classes: Classe[]
+  matieres: Matiere[]
+  periods: ExamPeriod[]
+}) {
+  const [selectedPeriod, setSelectedPeriod] = useState('')
+  const [threshold, setThreshold] = useState('9.75')
+  const [report, setReport] = useState<GradeReport | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!periods.length) {
+      setSelectedPeriod('')
+      return
+    }
+    const latest = [...periods].sort((a, b) => b.start_date.localeCompare(a.start_date))[0]
+    setSelectedPeriod((current) => periods.some((period) => String(period.id) === current) ? current : String(latest.id))
+  }, [periods])
+
+  useEffect(() => {
+    if (!selectedPeriod) {
+      setReport(null)
+      return
+    }
+    let cancelled = false
+    setReport(null)
+    setLoading(true)
+    setError('')
+    api.get<GradeReport>(`/notes/reports/?exam_period=${encodeURIComponent(selectedPeriod)}&threshold=${encodeURIComponent(threshold)}`)
+      .then((result) => { if (!cancelled) setReport(result) })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Impossible de charger le rapport des résultats.')
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedPeriod, threshold])
+
+  const exportCsv = () => {
+    if (!report) return
+    const rows = [
+      ['Période', report.period.label, 'Année scolaire', report.period.academic_year, 'Seuil', report.threshold],
+      ['Classe', 'Matière', 'Élèves notés', 'Moyenne pondérée', 'Admis', 'Taux de réussite (%)'],
+      ...report.results.map((row) => [
+        row.class_name,
+        row.subject_name,
+        row.student_count,
+        row.average,
+        row.passed_count,
+        row.pass_rate,
+      ]),
+    ]
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(';')).join('\r\n')
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `rapport-resultats-${report.period.code}-${report.period.academic_year}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-extrabold tracking-tight text-foreground">Rapports & Pilotage</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Élèves</p><p className="mt-1 text-2xl font-semibold">{etudiants.filter((e) => e.actif).length}</p></CardContent></Card>
-        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Enseignants actifs</p><p className="mt-1 text-2xl font-semibold">{users.filter((u) => u.role === 'PROFESSEUR' && u.status === 'ACTIVE').length}</p></CardContent></Card>
+        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Élèves actifs</p><p className="mt-1 text-2xl font-semibold">{etudiants.filter((student) => student.actif).length}</p></CardContent></Card>
+        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Enseignants actifs</p><p className="mt-1 text-2xl font-semibold">{users.filter((user) => user.role === 'PROFESSEUR' && user.status === 'ACTIVE').length}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Classes</p><p className="mt-1 text-2xl font-semibold">{classes.length}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Matières</p><p className="mt-1 text-2xl font-semibold">{matieres.length}</p></CardContent></Card>
       </div>
-      <Card className="rounded-2xl"><CardContent className="p-8 text-center text-muted-foreground">Exports PDF / Excel disponibles dans une prochaine version.</CardContent></Card>
+      <Card className="rounded-2xl">
+        <CardHeader><CardTitle className="text-base">Résultats par classe et matière</CardTitle></CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid min-w-56 gap-1.5 text-xs font-semibold">Période d’examen
+              <select value={selectedPeriod} onChange={(event) => setSelectedPeriod(event.target.value)} className="h-10 rounded-xl border border-border bg-card px-3 text-sm" disabled={!periods.length}>
+                {periods.length === 0 && <option value="">Aucune période configurée</option>}
+                {[...periods].sort((a, b) => b.start_date.localeCompare(a.start_date)).map((period) => (
+                  <option key={period.id} value={period.id}>{period.label} — {period.academic_year}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid w-36 gap-1.5 text-xs font-semibold">Seuil d’admission
+              <Input type="number" min="0" max="20" step="0.25" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
+            </label>
+            <Button type="button" variant="outline" onClick={exportCsv} disabled={!report || loading}>Exporter CSV</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Calcul basé uniquement sur les notes validées ou verrouillées. Le taux de réussite utilise le seuil sélectionné.</p>
+          {!periods.length && <p className="text-sm text-muted-foreground">Configurez d’abord une période d’examen pour consulter les résultats.</p>}
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          {loading && <p className="py-6 text-center text-sm text-muted-foreground">Calcul du rapport…</p>}
+          {!loading && report && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Élèves évalués</p><p className="mt-1 text-xl font-semibold">{report.summary.student_count}</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Moyenne générale</p><p className="mt-1 text-xl font-semibold">{report.summary.average}/20</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Taux de réussite</p><p className="mt-1 text-xl font-semibold">{report.summary.pass_rate}%</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Notes au-dessus du seuil</p><p className="mt-1 text-xl font-semibold">{report.summary.passed_count}/{report.summary.note_count}</p></CardContent></Card>
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3">Classe</th>
+                      <th className="px-4 py-3">Matière</th>
+                      <th className="px-4 py-3 text-right">Élèves</th>
+                      <th className="px-4 py-3 text-right">Moyenne</th>
+                      <th className="px-4 py-3 text-right">Admis</th>
+                      <th className="px-4 py-3 text-right">Réussite</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.results.map((row) => (
+                      <tr key={`${row.class_id ?? 'none'}-${row.subject_id}`} className="border-t border-border">
+                        <td className="px-4 py-3 font-medium">{row.class_name}</td>
+                        <td className="px-4 py-3">{row.subject_name}</td>
+                        <td className="px-4 py-3 text-right">{row.student_count}</td>
+                        <td className="px-4 py-3 text-right">{row.average}/20</td>
+                        <td className="px-4 py-3 text-right">{row.passed_count}/{row.student_count}</td>
+                        <td className="px-4 py-3 text-right">{row.pass_rate}%</td>
+                      </tr>
+                    ))}
+                    {report.results.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Aucune note validée pour cette période.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

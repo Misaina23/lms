@@ -123,6 +123,76 @@ class NoteViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['score_1'], '14.50')
 
+    def test_reports_aggregate_validated_results_by_class_and_subject(self):
+        self.note.score_1 = '8.00'
+        self.note.coefficient = '2.00'
+        self.note.status = Note.Status.APPROVED
+        self.note.save()
+        second_student = Etudiant.objects.create(
+            matricule='ELV002',
+            first_name='Paul',
+            last_name='Rabe',
+            classe=self.classe,
+            date_inscription='2024-09-01',
+            actif=True,
+        )
+        Note.objects.create(
+            etudiant=second_student,
+            matiere=self.matiere,
+            professeur=self.professeur,
+            exam_period=self.exam_period,
+            score_1='12.00',
+            coefficient='1.00',
+            date_evaluation='2024-10-02',
+            status=Note.Status.LOCKED,
+        )
+        Note.objects.create(
+            etudiant=second_student,
+            matiere=Matiere.objects.create(nom='Français', code='FR'),
+            professeur=self.professeur,
+            exam_period=self.exam_period,
+            score_1='10.50',
+            coefficient='1.00',
+            date_evaluation='2024-10-03',
+            status=Note.Status.APPROVED,
+        )
+
+        response = self.client.get(reverse('note-reports'), {
+            'exam_period': self.exam_period.id,
+            'threshold': '9.75',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['summary'], {
+            'student_count': 2,
+            'subject_class_count': 2,
+            'note_count': 3,
+            'average': '9.62',
+            'passed_count': 2,
+            'pass_rate': '66.67',
+        })
+        mathematics = next(
+            row for row in response.data['results']
+            if row['subject_id'] == self.matiere.id
+        )
+        self.assertEqual(mathematics['average'], '9.33')
+        self.assertEqual(mathematics['pass_rate'], '50.00')
+        self.assertEqual(mathematics['student_count'], 2)
+
+    def test_reports_validate_threshold_and_require_a_valid_period(self):
+        invalid_threshold = self.client.get(reverse('note-reports'), {
+            'exam_period': self.exam_period.id,
+            'threshold': 'NaN',
+        })
+        self.assertEqual(invalid_threshold.status_code, 400)
+        self.assertIn('threshold', invalid_threshold.data)
+
+        invalid_period = self.client.get(reverse('note-reports'), {
+            'exam_period': '999999',
+        })
+        self.assertEqual(invalid_period.status_code, 400)
+        self.assertIn('exam_period', invalid_period.data)
+
     def test_teacher_submits_note_and_admin_approves_it(self):
         TeacherAssignment.objects.create(
             professeur=self.professeur,
@@ -142,6 +212,49 @@ class NoteViewSetTests(APITestCase):
 
         self.assertEqual(approved.status_code, 200)
         self.assertEqual(approved.data['status'], Note.Status.APPROVED)
+
+    def test_teacher_reports_include_only_their_assigned_class_and_subject(self):
+        self.note.status = Note.Status.APPROVED
+        self.note.save()
+        other_class = Classe.objects.create(
+            nom='6eme B',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            capacite=40,
+            academic_year='2024-2025',
+        )
+        other_student = Etudiant.objects.create(
+            matricule='ELV-OTHER-CLASS',
+            first_name='Aro',
+            last_name='Other',
+            classe=other_class,
+            date_inscription='2024-09-01',
+            actif=True,
+        )
+        Note.objects.create(
+            etudiant=other_student,
+            matiere=self.matiere,
+            professeur=self.professeur,
+            exam_period=self.exam_period,
+            score_1='18.00',
+            coefficient='1.00',
+            date_evaluation='2024-10-02',
+            status=Note.Status.APPROVED,
+        )
+        TeacherAssignment.objects.create(
+            professeur=self.professeur,
+            classe=self.classe,
+            matiere=self.matiere,
+            academic_year='2024-2025',
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')
+
+        response = self.client.get(reverse('note-reports'), {
+            'exam_period': self.exam_period.id,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['summary']['note_count'], 1)
+        self.assertEqual(response.data['results'][0]['class_id'], self.classe.id)
 
     def test_teacher_cannot_edit_note_after_submission(self):
         self.note.status = Note.Status.SUBMITTED

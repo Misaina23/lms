@@ -171,7 +171,7 @@ export default function Home() {
       case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
       case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} />
-      case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes as any} matieres={data.matieres} notes={data.notes} />
+      case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes} matieres={data.matieres} periods={data.periods} />
       case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} />
       case 'chat': return <ChatScreen users={data.users} />
       case 'notifications': return <NotificationsScreen notifications={data.notifications} classes={data.classes} role={role} recipientId={userId} onReload={reload} />
