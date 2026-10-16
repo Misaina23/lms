@@ -59,7 +59,7 @@ export default function LoginPage() {
               <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={112} height={54} className="h-8 w-16 shrink-0 object-contain sm:h-12 sm:w-24" />
               <div className="min-w-0">
                 <CardTitle className="text-base sm:text-xl">Lycée Midongy Sud</CardTitle>
-                <p className="text-xs text-muted-foreground">Administration centrale</p>
+                <p className="text-xs text-muted-foreground">Portail du personnel</p>
               </div>
             </div>
             <Image src="/drapeau.jpeg" alt="Emblème du lycée" width={64} height={64} className="ml-auto size-12 shrink-0 rounded-full border border-border bg-white object-contain p-0.5 sm:size-14" />
@@ -72,7 +72,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@lycee.com"
+                placeholder="votre.email@lycee.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

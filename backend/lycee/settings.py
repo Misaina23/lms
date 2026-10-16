@@ -20,12 +20,8 @@ if not SECRET_KEY:
         SECRET_KEY = 'django-insecure-local-development-only'
     else:
         raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DEBUG is disabled.')
-elif not DEBUG and (
-    len(SECRET_KEY) < 50
-    or len(set(SECRET_KEY)) < 5
-    or SECRET_KEY.startswith('django-insecure-')
-):
-    raise ImproperlyConfigured('DJANGO_SECRET_KEY must be a strong production secret.')
+elif not DEBUG and SECRET_KEY.startswith('django-insecure-'):
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must not use Django’s insecure development key.')
 
 allowed_hosts_value = os.environ.get('ALLOWED_HOSTS')
 if not allowed_hosts_value:
