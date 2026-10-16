@@ -10,7 +10,7 @@ La commande est refusée lorsque `DEBUG=False`. Elle ne vide pas la base de donn
 
 ## Seed automatique sur Render
 
-Après le redéploiement, `start.sh` lance automatiquement les migrations puis le seed sécurisé, car `SEED_DEMO_DATA=true` est configuré dans `render.yaml`. Il est réexécutable sans dupliquer les données. Pour désactiver les seeds au démarrage après leur création, définissez `SEED_DEMO_DATA=false` dans les variables Render.
+En production, `start.sh` lance les migrations puis démarre immédiatement le serveur. Le seed de démonstration est désactivé par défaut (`SEED_DEMO_DATA=false` dans `render.yaml`) afin qu’il ne ralentisse pas le démarrage du service et n’ajoute pas de données de démonstration à la base réelle. Pour le lancer volontairement une seule fois, définissez temporairement `SEED_DEMO_DATA=true` dans les variables Render, redéployez, puis remettez `false` après confirmation de la création des données. La commande est réexécutable sans dupliquer les données.
 
 Le seed de production :
 

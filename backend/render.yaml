@@ -25,7 +25,7 @@ services:
       - key: FRONTEND_URL
         value: https://lyceemidongysud.vercel.app
       - key: SEED_DEMO_DATA
-        value: "true"
+        value: "false"
       - key: EMAIL_HOST
         sync: false
       - key: EMAIL_PORT

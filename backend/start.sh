@@ -12,7 +12,7 @@ python manage.py ensure_superuser \
   --force
 python manage.py collectstatic --noinput
 
-if [ "${SEED_DEMO_DATA:-true}" = "true" ]; then
+if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
     python manage.py seed_demo_portal --production
 fi
 
