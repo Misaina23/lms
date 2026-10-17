@@ -44,7 +44,9 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
   const [certificateRequests, setCertificateRequests] = useState<CertificateRequest[]>([])
   const [certificateLoading, setCertificateLoading] = useState(false)
   const [certificateError, setCertificateError] = useState('')
+  const [certificateClass, setCertificateClass] = useState('')
   const [certificateStudent, setCertificateStudent] = useState('')
+  const [certificateStudentSearch, setCertificateStudentSearch] = useState('')
   const [certificateYear, setCertificateYear] = useState(`${new Date().getFullYear()}-${new Date().getFullYear() + 1}`)
   const [certificateSaving, setCertificateSaving] = useState(false)
   const [certificateDecisionReasons, setCertificateDecisionReasons] = useState<Record<number, string>>({})
@@ -61,6 +63,12 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
     academic_year: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
   })
   const filtered = useFilteredStudents(etudiants, query)
+  const certificateCandidates = etudiants.filter((student) => {
+    if (!student.actif || student.statut !== 'ENROLLED' || student.classe !== Number(certificateClass)) return false
+    const search = certificateStudentSearch.trim().toLocaleLowerCase()
+    return !search || [student.first_name, student.last_name, student.matricule]
+      .some((value) => value?.toLocaleLowerCase().includes(search))
+  })
   const pageSize = 5
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
@@ -131,6 +139,7 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
         academic_year: certificateYear.trim(),
       })
       setCertificateStudent('')
+      setCertificateStudentSearch('')
       await refreshCertificateRequests()
     } catch (error) {
       setCertificateError(error instanceof Error ? error.message : 'Impossible de créer la demande de certificat.')
@@ -436,15 +445,60 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
             <p className="text-xs text-muted-foreground">Créez les demandes, vérifiez l’inscription et les frais, puis téléchargez les certificats approuvés.</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form className="grid gap-3 sm:grid-cols-[1fr_180px_auto]" onSubmit={submitCertificateRequest}>
-              <select required value={certificateStudent} onChange={(event) => setCertificateStudent(event.target.value)} className="h-10 rounded-xl border border-border bg-card px-3 text-sm outline-none">
-                <option value="">Choisir un élève actif et inscrit</option>
-                {etudiants.filter((student) => student.actif && student.statut === 'ENROLLED' && student.classe).map((student) => (
-                  <option key={student.id} value={student.id}>{student.first_name} {student.last_name} · {student.matricule}</option>
-                ))}
-              </select>
-              <Input required maxLength={9} value={certificateYear} onChange={(event) => setCertificateYear(event.target.value)} aria-label="Année scolaire du certificat" placeholder="2026-2027" />
-              <Button type="submit" disabled={certificateSaving || !certificateStudent}>{certificateSaving ? 'Enregistrement…' : 'Créer une demande'}</Button>
+            <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1.4fr_180px_auto]" onSubmit={submitCertificateRequest}>
+              <label className="grid gap-1.5 text-xs font-semibold">Classe
+                <select required value={certificateClass} onChange={(event) => {
+                  setCertificateClass(event.target.value)
+                  setCertificateStudent('')
+                  setCertificateStudentSearch('')
+                }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal outline-none">
+                  <option value="">Choisir d’abord une classe</option>
+                  {classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom} — {classe.niveau}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold">Rechercher un élève
+                <Input
+                  type="search"
+                  value={certificateStudentSearch}
+                  onChange={(event) => {
+                    setCertificateStudentSearch(event.target.value)
+                    setCertificateStudent('')
+                  }}
+                  disabled={!certificateClass}
+                  aria-label="Rechercher par nom ou matricule"
+                  placeholder="Nom, prénom ou matricule"
+                />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold">Année scolaire
+                <Input required maxLength={9} value={certificateYear} onChange={(event) => setCertificateYear(event.target.value)} placeholder="2026-2027" />
+              </label>
+              <div className="flex items-end">
+                <Button type="submit" className="w-full" disabled={certificateSaving || !certificateStudent}>{certificateSaving ? 'Enregistrement…' : 'Créer une demande'}</Button>
+              </div>
+              {certificateClass && !certificateStudent && certificateStudentSearch.trim() && (
+                <div className="space-y-1 rounded-xl border border-border p-2 md:col-span-2 xl:col-span-2" role="listbox" aria-label="Résultats des élèves">
+                  {certificateCandidates.slice(0, 8).map((student) => (
+                    <button
+                      key={student.id}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      onClick={() => setCertificateStudent(String(student.id))}
+                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+                    >
+                      <span>{student.first_name} {student.last_name}</span>
+                      <span className="text-xs text-muted-foreground">{student.matricule}</span>
+                    </button>
+                  ))}
+                  {certificateCandidates.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève inscrit correspondant dans cette classe.</p>}
+                  {certificateCandidates.length > 8 && <p className="px-3 py-2 text-xs text-muted-foreground">Affinez la recherche pour réduire les résultats.</p>}
+                </div>
+              )}
+              {certificateStudent && (
+                <p className="text-sm text-primary md:col-span-2 xl:col-span-2">
+                  Élève sélectionné : {etudiants.find((student) => student.id === Number(certificateStudent))?.full_name}
+                </p>
+              )}
             </form>
             {certificateError && <p className="text-sm text-destructive" role="alert">{certificateError}</p>}
             {certificateLoading ? <p className="text-sm text-muted-foreground">Chargement des demandes…</p> : (

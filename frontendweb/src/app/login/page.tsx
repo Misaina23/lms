@@ -53,13 +53,13 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg border-border/70 bg-card/80 shadow-lg">
-        <CardHeader className="items-center pb-2">
+        <CardHeader className="flex items-center justify-center pb-2">
           <Image
             src="/drapeau.jpeg"
             alt="Emblème du lycée"
             width={160}
             height={160}
-            className="size-28 rounded-full border border-border bg-white object-contain p-1 sm:size-36"
+            className="mx-auto size-28 rounded-full border border-border bg-white object-contain p-1 sm:size-36"
           />
         </CardHeader>
         <CardContent>

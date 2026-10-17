@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 from matieres.models import Matiere
 from users.models import CustomUser
-from .models import Classe, MatiereCoefficient, TeacherAssignment
+from .models import Classe, MatiereCoefficient, SchoolConfig, TeacherAssignment
 from timetable.models import TimetableSlot
 
 
@@ -104,6 +104,88 @@ class ClasseBusinessRuleTests(APITestCase):
         self.assertEqual(matiere.get_coefficient_for_class(classe_s), Decimal('5.00'))
         self.assertEqual(matiere.get_coefficient_for_class(classe_ose), Decimal('3.00'))
         self.assertEqual(matiere.get_coefficient_for_class(classe_l), Decimal('2.00'))
+
+    def test_class_coefficient_overrides_stream_coefficient(self):
+        matiere = Matiere.objects.create(code='ANGL', nom='Anglais', coefficient=1)
+        premiere_s = Classe.objects.create(
+            nom='Première S',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            capacite=30,
+        )
+        terminale_s = Classe.objects.create(
+            nom='Terminale S',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            capacite=30,
+        )
+        MatiereCoefficient.objects.create(
+            matiere=matiere,
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            coefficient=Decimal('2.00'),
+        )
+        MatiereCoefficient.objects.create(
+            matiere=matiere,
+            classe=premiere_s,
+            niveau=premiere_s.niveau,
+            stream=premiere_s.stream,
+            coefficient=Decimal('3.00'),
+        )
+        MatiereCoefficient.objects.create(
+            matiere=matiere,
+            classe=terminale_s,
+            niveau=terminale_s.niveau,
+            stream=terminale_s.stream,
+            coefficient=Decimal('4.00'),
+        )
+
+        self.assertEqual(matiere.get_coefficient_for_class(premiere_s), Decimal('3.00'))
+        self.assertEqual(matiere.get_coefficient_for_class(terminale_s), Decimal('4.00'))
+
+    def test_matiere_coefficient_api_accepts_multiple_classes_in_same_stream(self):
+        matiere = Matiere.objects.create(code='HIST', nom='Histoire', coefficient=1)
+        first_class = Classe.objects.create(
+            nom='Première S',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            capacite=30,
+        )
+        second_class = Classe.objects.create(
+            nom='Terminale S',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            stream=Classe.Stream.SCIENTIFIQUE,
+            capacite=30,
+        )
+
+        first_response = self.client.post(reverse('matiere-coefficient-list'), {
+            'matiere': matiere.id,
+            'classe': first_class.id,
+            'coefficient': '5.00',
+        })
+        second_response = self.client.post(reverse('matiere-coefficient-list'), {
+            'matiere': matiere.id,
+            'classe': second_class.id,
+            'coefficient': '2.00',
+        })
+
+        self.assertEqual(first_response.status_code, 201, first_response.data)
+        self.assertEqual(second_response.status_code, 201, second_response.data)
+        self.assertEqual(matiere.get_coefficient_for_class(first_class), Decimal('5.00'))
+        self.assertEqual(matiere.get_coefficient_for_class(second_class), Decimal('2.00'))
+
+    def test_school_config_stores_evaluation_period_type_per_year(self):
+        response = self.client.post(reverse('school-config-list'), {
+            'academic_year': '2026-2027',
+            'evaluation_period_type': SchoolConfig.EvaluationPeriodType.BIMESTRE,
+        })
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['evaluation_period_type'], 'BIMESTRE')
+        self.assertEqual(
+            SchoolConfig.objects.get(academic_year='2026-2027').evaluation_period_type,
+            SchoolConfig.EvaluationPeriodType.BIMESTRE,
+        )
 
     def test_general_classes_support_multiple_subdivisions(self):
         seconde_a = Classe.objects.create(nom='Seconde A', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.GENERAL, capacite=35)

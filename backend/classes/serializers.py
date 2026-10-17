@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db.models import Q
 from users.models import CustomUser
 from users.serializers import UserListSerializer
 
@@ -74,8 +75,9 @@ class MatiereSerializer(serializers.ModelSerializer):
         if classe:
             MatiereCoefficient.objects.update_or_create(
                 matiere=matiere,
+                classe=classe,
                 niveau=classe.niveau,
-                stream=classe.stream or '',
+                stream=classe.stream,
                 defaults={'coefficient': matiere.coefficient},
             )
         return matiere
@@ -91,8 +93,9 @@ class MatiereSerializer(serializers.ModelSerializer):
         if classe:
             MatiereCoefficient.objects.update_or_create(
                 matiere=instance,
+                classe=classe,
                 niveau=classe.niveau,
-                stream=classe.stream or '',
+                stream=classe.stream,
                 defaults={'coefficient': instance.coefficient},
             )
         return instance
@@ -100,14 +103,71 @@ class MatiereSerializer(serializers.ModelSerializer):
 
 class MatiereCoefficientSerializer(serializers.ModelSerializer):
     matiere_detail = serializers.SerializerMethodField()
+    classe_detail = serializers.SerializerMethodField()
+    classe = serializers.PrimaryKeyRelatedField(
+        queryset=Classe.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    niveau = serializers.ChoiceField(choices=Classe.Niveau.choices, required=False)
+    stream = serializers.ChoiceField(
+        choices=Classe.Stream.choices,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+    )
 
     class Meta:
         model = MatiereCoefficient
-        fields = ['id', 'matiere', 'matiere_detail', 'niveau', 'stream', 'coefficient', 'created_at', 'updated_at']
+        fields = [
+            'id', 'matiere', 'matiere_detail', 'classe', 'classe_detail',
+            'niveau', 'stream', 'coefficient', 'created_at', 'updated_at',
+        ]
         read_only_fields = ['created_at', 'updated_at']
+        extra_kwargs = {
+            'niveau': {'required': False},
+            'stream': {'required': False, 'allow_null': True},
+        }
+        validators = []
+
+    def validate(self, attrs):
+        classe = attrs.get('classe', getattr(self.instance, 'classe', None))
+        matiere = attrs.get('matiere', getattr(self.instance, 'matiere', None))
+        if classe:
+            attrs['niveau'] = classe.niveau
+            attrs['stream'] = classe.stream
+        elif not attrs.get('niveau', getattr(self.instance, 'niveau', None)):
+            raise serializers.ValidationError({'niveau': 'Indiquez un niveau ou sélectionnez une classe.'})
+
+        if matiere:
+            coefficients = MatiereCoefficient.objects.filter(matiere=matiere)
+            if self.instance:
+                coefficients = coefficients.exclude(pk=self.instance.pk)
+            if classe:
+                duplicate = coefficients.filter(classe=classe).exists()
+            else:
+                niveau = attrs.get('niveau', self.instance.niveau if self.instance else None)
+                stream = attrs.get('stream', self.instance.stream if self.instance else None)
+                stream_filter = Q(stream=stream)
+                if stream in (None, ''):
+                    stream_filter = Q(stream__isnull=True) | Q(stream='')
+                duplicate = coefficients.filter(
+                    classe__isnull=True,
+                    niveau=niveau,
+                ).filter(stream_filter).exists()
+            if duplicate:
+                raise serializers.ValidationError({
+                    'classe' if classe else 'stream': 'Un coefficient existe déjà pour cette matière et cette classe/filière.'
+                })
+        return attrs
 
     def get_matiere_detail(self, obj):
         return {'id': obj.matiere.id, 'nom': obj.matiere.nom, 'code': obj.matiere.code}
+
+    def get_classe_detail(self, obj):
+        if not obj.classe_id:
+            return None
+        return {'id': obj.classe.id, 'nom': obj.classe.nom, 'niveau': obj.classe.get_niveau_display(), 'stream': obj.classe.stream}
 
 
 class TeacherSummarySerializer(serializers.ModelSerializer):

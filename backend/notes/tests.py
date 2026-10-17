@@ -1,8 +1,10 @@
+from decimal import Decimal
+
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 from users.models import CustomUser
-from classes.models import Classe, TeacherAssignment
+from classes.models import Classe, MatiereCoefficient, SchoolConfig, TeacherAssignment
 from etudiants.models import Etudiant
 from matieres.models import Matiere, ExamPeriod
 from .models import Note
@@ -90,6 +92,40 @@ class NoteViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Note.objects.count(), 2)
 
+    def test_create_note_uses_coefficient_configured_for_class(self):
+        second_period = ExamPeriod.objects.create(
+            code='T2',
+            label='Trimestre 2',
+            period_type=ExamPeriod.PeriodType.TRIMESTRE_2,
+            academic_year='2024-2025',
+            start_date='2025-01-01',
+            end_date='2025-03-31',
+        )
+        MatiereCoefficient.objects.create(
+            matiere=self.matiere,
+            classe=self.classe,
+            niveau=self.classe.niveau,
+            stream=self.classe.stream,
+            coefficient='5.00',
+        )
+
+        response = self.client.post(reverse('note-list'), {
+            'etudiant': self.etudiant.id,
+            'matiere': self.matiere.id,
+            'professeur': self.professeur.id,
+            'exam_period': second_period.id,
+            'score_1': '16.00',
+            'coefficient': '1.00',
+            'date_evaluation': '2025-01-05',
+        })
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['coefficient'], '5.00')
+        self.assertEqual(
+            Note.objects.get(exam_period=second_period).coefficient,
+            Decimal('5.00'),
+        )
+
     def test_exam_period_can_configure_one_note_for_an_academic_year(self):
         response = self.client.post(reverse('exam-period-list'), {
             'code': '26T1',
@@ -104,6 +140,33 @@ class NoteViewSetTests(APITestCase):
         self.assertEqual(response.data['number_of_notes'], 1)
         self.assertEqual(response.data['weight_note_1'], '1.00')
         self.assertEqual(response.data['weight_note_2'], '0.00')
+
+    def test_exam_period_type_uses_academic_year_configuration(self):
+        SchoolConfig.objects.create(
+            academic_year='2026-2027',
+            evaluation_period_type=SchoolConfig.EvaluationPeriodType.BIMESTRE,
+        )
+        period_data = {
+            'code': '26B1',
+            'label': 'Bimestre 1',
+            'period_type': 'B1',
+            'academic_year': '2026-2027',
+            'start_date': '2026-09-01',
+            'end_date': '2026-10-31',
+        }
+        accepted = self.client.post(reverse('exam-period-list'), period_data)
+
+        self.assertEqual(accepted.status_code, 201, accepted.data)
+        self.assertEqual(accepted.data['period_type'], 'B1')
+
+        rejected = self.client.post(reverse('exam-period-list'), {
+            **period_data,
+            'code': '26T1',
+            'label': 'Trimestre 1',
+            'period_type': 'T1',
+        })
+        self.assertEqual(rejected.status_code, 400)
+        self.assertIn('period_type', rejected.data)
 
     def test_teacher_cannot_submit_note_for_unassigned_class(self):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')

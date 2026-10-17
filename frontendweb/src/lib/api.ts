@@ -120,6 +120,25 @@ export type Matiere = {
   updated_at: string;
 };
 
+export type MatiereCoefficient = {
+  id: number;
+  matiere: number;
+  matiere_detail: { id: number; nom: string; code: string };
+  classe: number | null;
+  classe_detail: { id: number; nom: string; niveau: string; stream: string | null } | null;
+  niveau: string;
+  stream: string | null;
+  coefficient: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SchoolConfig = {
+  id: number;
+  academic_year: string;
+  evaluation_period_type: 'BIMESTRE' | 'TRIMESTRE';
+};
+
 export type ExamPeriod = {
   id: number;
   code: string;

@@ -187,7 +187,7 @@ export default function Home() {
           <aside className={`${mobileNav ? 'translate-x-0' : '-translate-x-full'} mobile-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(88vw,320px)] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 lg:static lg:w-[272px] lg:translate-x-0`}>
             <div className="flex h-[82px] shrink-0 items-center justify-between border-b border-sidebar-border px-6">
               <div className="flex items-center gap-3">
-                <Image src="/logo%20%282%29.jpeg" alt="Logo LMS" width={80} height={40} className="h-9 w-[72px] shrink-0 object-contain" />
+                <Image src="/drapeau.jpeg" alt="Emblème du lycée" width={80} height={40} className="h-9 w-[72px] shrink-0 object-contain" />
                 <div><p className="font-semibold tracking-tight text-sidebar-foreground">Lycée Midongy Sud</p><p className="text-[11px] text-sidebar-foreground/55">{role ? roleLabels[role] : 'Espace sécurisé'}</p></div>
               </div>
               <button onClick={() => setMobileNav(false)} className="text-sidebar-foreground/60 lg:hidden" aria-label="Fermer le menu"><X className="size-5" /></button>

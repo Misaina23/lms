@@ -100,8 +100,16 @@ class TeacherAssignment(models.Model):
 
 
 class MatiereCoefficient(models.Model):
-    """Coefficient d'une matière spécifique à un niveau (et éventuellement à une filière)."""
+    """Coefficient d'une matière pour une classe ou une filière."""
     matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE, related_name='coefficients')
+    classe = models.ForeignKey(
+        Classe,
+        on_delete=models.CASCADE,
+        related_name='matiere_coefficients',
+        null=True,
+        blank=True,
+        help_text="Classe précise (facultatif pour conserver les coefficients de filière).",
+    )
     niveau = models.CharField(
         max_length=30,
         choices=Classe.Niveau.choices,
@@ -119,17 +127,37 @@ class MatiereCoefficient(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['matiere', 'niveau', 'stream']
-        unique_together = ['matiere', 'niveau', 'stream']
+        ordering = ['matiere', 'classe', 'niveau', 'stream']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['matiere', 'classe'],
+                condition=models.Q(classe__isnull=False),
+                name='unique_matiere_coefficient_class',
+            ),
+            models.UniqueConstraint(
+                fields=['matiere', 'niveau', 'stream'],
+                condition=models.Q(classe__isnull=True),
+                name='unique_matiere_coefficient_stream',
+            ),
+        ]
 
     def __str__(self):
-        suffix = f" / {self.stream}" if self.stream else ""
-        return f"{self.matiere.nom} — {self.niveau}{suffix} = {self.coefficient}"
+        scope = self.classe.nom if self.classe_id else self.stream or self.niveau
+        return f"{self.matiere.nom} — {scope} = {self.coefficient}"
 
 
 class SchoolConfig(models.Model):
     """Configuration globale de l'établissement (plages horaires, tolérance)."""
+    class EvaluationPeriodType(models.TextChoices):
+        BIMESTRE = 'BIMESTRE', 'Bimestre'
+        TRIMESTRE = 'TRIMESTRE', 'Trimestre'
+
     academic_year = models.CharField(max_length=9, unique=True)
+    evaluation_period_type = models.CharField(
+        max_length=10,
+        choices=EvaluationPeriodType.choices,
+        default=EvaluationPeriodType.TRIMESTRE,
+    )
     school_name = models.CharField(max_length=200, default='Lycée Horizon')
     school_address = models.CharField(max_length=300, blank=True)
     school_phone = models.CharField(max_length=30, blank=True)

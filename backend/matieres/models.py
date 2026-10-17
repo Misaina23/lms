@@ -14,10 +14,18 @@ class Matiere(models.Model):
 
     def get_coefficient_for_class(self, classe):
         from decimal import Decimal
+        from django.db.models import Q
         from classes.models import MatiereCoefficient
 
         if classe is None:
             return Decimal(str(self.coefficient))
+
+        class_coefficient = MatiereCoefficient.objects.filter(
+            matiere=self,
+            classe=classe,
+        ).first()
+        if class_coefficient:
+            return class_coefficient.coefficient
 
         stream_value = getattr(classe, 'stream', None)
         niveau_value = getattr(classe, 'niveau', None)
@@ -35,8 +43,7 @@ class Matiere(models.Model):
             fallback = MatiereCoefficient.objects.filter(
                 matiere=self,
                 niveau=niveau_value,
-                stream='',
-            ).order_by('-coefficient').first()
+            ).filter(Q(stream='') | Q(stream__isnull=True)).order_by('-coefficient').first()
             if fallback:
                 return fallback.coefficient
 
@@ -52,6 +59,12 @@ class Matiere(models.Model):
 class ExamPeriod(models.Model):
     """Represents an exam period: Trimestre 1, Trimestre 2, etc."""
     class PeriodType(models.TextChoices):
+        BIMESTRE_1 = 'B1', 'Bimestre 1'
+        BIMESTRE_2 = 'B2', 'Bimestre 2'
+        BIMESTRE_3 = 'B3', 'Bimestre 3'
+        BIMESTRE_4 = 'B4', 'Bimestre 4'
+        BIMESTRE_5 = 'B5', 'Bimestre 5'
+        BIMESTRE_6 = 'B6', 'Bimestre 6'
         TRIMESTRE_1 = 'T1', 'Trimestre 1'
         TRIMESTRE_2 = 'T2', 'Trimestre 2'
         TRIMESTRE_3 = 'T3', 'Trimestre 3'

@@ -4,6 +4,7 @@ from .models import Note
 
 class NoteSerializer(serializers.ModelSerializer):
     note = serializers.SerializerMethodField()
+    coefficient = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
 
     class Meta:
         model = Note
@@ -41,6 +42,19 @@ class NoteSerializer(serializers.ModelSerializer):
             ).exists():
                 raise serializers.ValidationError('Vous ne pouvez noter que vos classes et matières affectées.')
         return attrs
+
+    def create(self, validated_data):
+        student = validated_data['etudiant']
+        subject = validated_data['matiere']
+        validated_data['coefficient'] = subject.get_coefficient_for_class(student.classe)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        student = validated_data.get('etudiant', instance.etudiant)
+        subject = validated_data.get('matiere', instance.matiere)
+        if student.pk != instance.etudiant_id or subject.pk != instance.matiere_id:
+            validated_data['coefficient'] = subject.get_coefficient_for_class(student.classe)
+        return super().update(instance, validated_data)
 
     def get_note(self, obj):
         return obj.note

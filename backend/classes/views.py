@@ -207,11 +207,11 @@ class TeacherAssignmentViewSet(viewsets.ModelViewSet):
 
 
 class MatiereCoefficientViewSet(viewsets.ModelViewSet):
-    queryset = MatiereCoefficient.objects.select_related('matiere').all()
+    queryset = MatiereCoefficient.objects.select_related('matiere', 'classe').all()
     serializer_class = MatiereCoefficientSerializer
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['matiere', 'niveau', 'stream']
+    filterset_fields = ['matiere', 'classe', 'niveau', 'stream']
 
 
 class SchoolConfigViewSet(viewsets.ModelViewSet):

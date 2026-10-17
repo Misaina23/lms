@@ -5,7 +5,7 @@ import { Search, CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, UserPlus, C
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { api, type User, type Classe, type Matiere, type Etudiant, type Note, type ExamPeriod, type AttendanceRiskAlert } from '@/lib/api'
+import { api, type User, type Classe, type Matiere, type MatiereCoefficient, type Etudiant, type Note, type ExamPeriod, type SchoolConfig, type PaginatedResponse, type AttendanceRiskAlert } from '@/lib/api'
 import { initials } from '@/lib/admin-data'
 
 export function TeachersScreen({ users, etudiants, notes, matieres, periods, onReload }: {
@@ -424,12 +424,35 @@ export function ClassesScreen({ classes, etudiants, onReload }: { classes: any[]
   )
 }
 
-export function MatieresScreen({ matieres, classes, onReload }: { matieres: Matiere[]; classes: any[]; onReload: () => void }) {
+export function MatieresScreen({ matieres, classes, onReload }: { matieres: Matiere[]; classes: Classe[]; onReload: () => void }) {
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingMatiere, setEditingMatiere] = useState<Matiere | null>(null)
-  const [form, setForm] = useState({ nom: '', code: '', description: '', coefficient: 1, classe: '' })
+  const [form, setForm] = useState({ nom: '', code: '', description: '', coefficient: 1 })
   const [saving, setSaving] = useState(false)
+  const [coefficients, setCoefficients] = useState<MatiereCoefficient[]>([])
+  const [coefficientsLoading, setCoefficientsLoading] = useState(true)
+  const [coefficientForm, setCoefficientForm] = useState({ matiere: '', classe: '', coefficient: '1' })
+  const [editingCoefficient, setEditingCoefficient] = useState<number | null>(null)
+  const [coefficientError, setCoefficientError] = useState('')
+  const [coefficientSaving, setCoefficientSaving] = useState(false)
+
+  const refreshCoefficients = async () => {
+    setCoefficientsLoading(true)
+    setCoefficientError('')
+    try {
+      const response = await api.get<PaginatedResponse<MatiereCoefficient>>('/matiere-coefficients/')
+      setCoefficients(response.results)
+    } catch (error) {
+      setCoefficientError(error instanceof Error ? error.message : 'Impossible de charger les coefficients par classe.')
+    } finally {
+      setCoefficientsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void refreshCoefficients()
+  }, [])
 
   const filtered = matieres.filter((m) => {
     const q = query.toLowerCase()
@@ -437,7 +460,7 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
   })
 
   const resetForm = () => {
-    setForm({ nom: '', code: '', description: '', coefficient: 1, classe: '' })
+    setForm({ nom: '', code: '', description: '', coefficient: 1 })
     setEditingMatiere(null)
     setShowForm(false)
   }
@@ -449,23 +472,70 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
 
   const openEdit = (matiere: Matiere) => {
     setEditingMatiere(matiere)
-    setForm({ nom: matiere.nom, code: matiere.code, description: matiere.description || '', coefficient: matiere.coefficient, classe: '' })
+    setForm({ nom: matiere.nom, code: matiere.code, description: matiere.description || '', coefficient: matiere.coefficient })
     setShowForm(true)
+  }
+
+  const resetCoefficientForm = () => {
+    setCoefficientForm({ matiere: '', classe: '', coefficient: '1' })
+    setEditingCoefficient(null)
+    setCoefficientError('')
+  }
+
+  const openCoefficientEdit = (coefficient: MatiereCoefficient) => {
+    if (!coefficient.classe) return
+    setCoefficientForm({
+      matiere: String(coefficient.matiere),
+      classe: String(coefficient.classe),
+      coefficient: coefficient.coefficient,
+    })
+    setEditingCoefficient(coefficient.id)
+    setCoefficientError('')
+  }
+
+  const saveCoefficient = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!coefficientForm.matiere || !coefficientForm.classe) return
+    setCoefficientSaving(true)
+    setCoefficientError('')
+    try {
+      const payload = {
+        matiere: Number(coefficientForm.matiere),
+        classe: Number(coefficientForm.classe),
+        coefficient: coefficientForm.coefficient,
+      }
+      if (editingCoefficient) {
+        await api.patch(`/matiere-coefficients/${editingCoefficient}/`, payload)
+      } else {
+        await api.post('/matiere-coefficients/', payload)
+      }
+      await refreshCoefficients()
+      resetCoefficientForm()
+    } catch (error) {
+      setCoefficientError(error instanceof Error ? error.message : 'Impossible d’enregistrer ce coefficient.')
+    } finally {
+      setCoefficientSaving(false)
+    }
+  }
+
+  const deleteCoefficient = async (coefficient: MatiereCoefficient) => {
+    if (!confirm('Supprimer ce coefficient personnalisé ?')) return
+    setCoefficientError('')
+    try {
+      await api.delete(`/matiere-coefficients/${coefficient.id}/`)
+      await refreshCoefficients()
+    } catch (error) {
+      setCoefficientError(error instanceof Error ? error.message : 'Impossible de supprimer ce coefficient.')
+    }
   }
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      const payload: any = { ...form }
-      if (payload.classe) {
-        payload.classe = Number(payload.classe)
-      } else {
-        delete payload.classe
-      }
       if (editingMatiere) {
-        await api.patch(`/matieres/${editingMatiere.id}/`, payload)
+        await api.patch(`/matieres/${editingMatiere.id}/`, form)
       } else {
-        await api.post('/matieres/', payload)
+        await api.post('/matieres/', form)
       }
       onReload()
       resetForm()
@@ -519,21 +589,8 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
                 <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="MATH" />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Classe</label>
-                <select
-                  value={form.classe}
-                  onChange={(e) => setForm({ ...form, classe: e.target.value })}
-                  className="h-9 w-full rounded-lg border border-border bg-muted/35 px-3 text-sm outline-none"
-                >
-                  <option value="">Aucune (coefficient global)</option>
-                  {classes.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.nom} - {c.niveau} {c.stream || ''}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Coefficient</label>
-                <Input type="number" value={form.coefficient.toString()} onChange={(e) => setForm({ ...form, coefficient: parseFloat(e.target.value) || 1 })} />
+                <label className="text-xs font-medium text-muted-foreground">Coefficient par défaut</label>
+                <Input type="number" min="0.01" step="0.01" value={form.coefficient.toString()} onChange={(e) => setForm({ ...form, coefficient: parseFloat(e.target.value) || 1 })} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Description</label>
@@ -547,6 +604,74 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
           </CardContent>
         </Card>
       )}
+
+      <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">Coefficients par matière et par classe</CardTitle>
+          <p className="text-xs text-muted-foreground">Un coefficient défini pour une classe remplace celui de la filière ou le coefficient par défaut de la matière.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={saveCoefficient} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_160px_auto]">
+            <label className="grid gap-1.5 text-xs font-semibold">Matière
+              <select required value={coefficientForm.matiere} onChange={(event) => {
+                const selectedSubject = event.target.value
+                const existing = coefficients.find((item) => item.matiere === Number(selectedSubject) && item.classe === Number(coefficientForm.classe))
+                setCoefficientForm({
+                  ...coefficientForm,
+                  matiere: selectedSubject,
+                  coefficient: existing?.coefficient || coefficientForm.coefficient,
+                })
+                setEditingCoefficient(existing?.id ?? null)
+              }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal">
+                <option value="">Choisir une matière</option>
+                {matieres.map((matiere) => <option key={matiere.id} value={matiere.id}>{matiere.code} — {matiere.nom}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold">Classe
+              <select required value={coefficientForm.classe} onChange={(event) => {
+                const selectedClass = event.target.value
+                const existing = coefficients.find((item) => item.matiere === Number(coefficientForm.matiere) && item.classe === Number(selectedClass))
+                setCoefficientForm({
+                  ...coefficientForm,
+                  classe: selectedClass,
+                  coefficient: existing?.coefficient || coefficientForm.coefficient,
+                })
+                setEditingCoefficient(existing?.id ?? null)
+              }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal">
+                <option value="">Choisir une classe</option>
+                {classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom} — {classe.stream || classe.niveau}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold">Coefficient
+              <Input required type="number" min="0.01" step="0.01" value={coefficientForm.coefficient} onChange={(event) => setCoefficientForm({ ...coefficientForm, coefficient: event.target.value })} />
+            </label>
+            <div className="flex items-end gap-2">
+              <Button type="submit" disabled={coefficientSaving || !matieres.length || !classes.length} className="w-full">
+                {coefficientSaving ? 'Enregistrement…' : editingCoefficient ? 'Modifier' : 'Configurer'}
+              </Button>
+              {editingCoefficient && <Button type="button" variant="outline" onClick={resetCoefficientForm}>Annuler</Button>}
+            </div>
+          </form>
+          {coefficientError && <p className="text-sm text-destructive" role="alert">{coefficientError}</p>}
+          {coefficientsLoading ? <p className="text-sm text-muted-foreground">Chargement des coefficients…</p> : (
+            <div className="space-y-2">
+              {coefficients.filter((item) => item.classe).map((item) => (
+                <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm">
+                    <span className="font-semibold">{item.matiere_detail.code} — {item.matiere_detail.nom}</span>
+                    <span className="text-muted-foreground"> · {item.classe_detail?.nom || classes.find((classe) => classe.id === item.classe)?.nom} · Coef. {item.coefficient}</span>
+                  </p>
+                  <div className="flex gap-1">
+                    <Button type="button" size="sm" variant="ghost" onClick={() => openCoefficientEdit(item)} aria-label={`Modifier le coefficient ${item.matiere_detail.nom} - ${item.classe_detail?.nom || ''}`}><Pencil className="size-3" /></Button>
+                    <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => void deleteCoefficient(item)} aria-label={`Supprimer le coefficient ${item.matiere_detail.nom}`}><Trash2 className="size-3" /></Button>
+                  </div>
+                </div>
+              ))}
+              {coefficients.filter((item) => item.classe).length === 0 && <p className="text-sm text-muted-foreground">Aucun coefficient personnalisé par classe.</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((matiere) => (
@@ -804,6 +929,57 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [evaluationPeriodType, setEvaluationPeriodType] = useState<SchoolConfig['evaluation_period_type']>('TRIMESTRE')
+  const [schoolConfigId, setSchoolConfigId] = useState<number | null>(null)
+  const [configError, setConfigError] = useState('')
+  const [configSaving, setConfigSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setConfigError('')
+    api.get<PaginatedResponse<SchoolConfig>>(`/school-config/?academic_year=${encodeURIComponent(form.academic_year)}`)
+      .then((response) => {
+        if (cancelled) return
+        const config = response.results.find((item) => item.academic_year === form.academic_year)
+        setSchoolConfigId(config?.id ?? null)
+        setEvaluationPeriodType(config?.evaluation_period_type ?? 'TRIMESTRE')
+      })
+      .catch((loadError) => {
+        if (!cancelled) setConfigError(loadError instanceof Error ? loadError.message : 'Impossible de charger la configuration de l’année.')
+      })
+    return () => { cancelled = true }
+  }, [form.academic_year])
+
+  const periodOptions = evaluationPeriodType === 'BIMESTRE'
+    ? ['B1', 'B2', 'B3', 'B4', 'B5', 'B6']
+    : ['T1', 'T2', 'T3']
+
+  useEffect(() => {
+    if (!periodOptions.includes(form.period_type)) {
+      setForm((current) => ({ ...current, period_type: periodOptions[0] }))
+    }
+  }, [evaluationPeriodType, form.period_type])
+
+  const saveEvaluationConfig = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setConfigSaving(true)
+    setConfigError('')
+    try {
+      const payload = {
+        academic_year: form.academic_year,
+        evaluation_period_type: evaluationPeriodType,
+      }
+      const config = schoolConfigId
+        ? await api.patch<SchoolConfig>(`/school-config/${schoolConfigId}/`, payload)
+        : await api.post<SchoolConfig>('/school-config/', payload)
+      setSchoolConfigId(config.id)
+      onReload()
+    } catch (saveError) {
+      setConfigError(saveError instanceof Error ? saveError.message : 'Impossible d’enregistrer la configuration.')
+    } finally {
+      setConfigSaving(false)
+    }
+  }
 
   const savePeriod = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -814,9 +990,7 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
       await api.post('/exam-periods/', {
         ...form,
         code,
-        label: form.period_type.startsWith('T')
-          ? `Trimestre ${form.period_type.slice(1)}`
-          : `Semestre ${form.period_type.slice(1)}`,
+        label: `${form.period_type.startsWith('B') ? 'Bimestre' : 'Trimestre'} ${form.period_type.slice(1)}`,
         number_of_notes: Number(form.number_of_notes),
         weight_note_1: form.number_of_notes === '1' ? '1' : form.weight_note_1,
         weight_note_2: form.number_of_notes === '1' ? '0' : form.weight_note_2,
@@ -845,8 +1019,27 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
       <div>
         <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Configuration pédagogique</p>
         <h2 className="mt-1 text-lg font-extrabold tracking-tight text-foreground">Années et périodes d’évaluation</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Configurez les trimestres ou semestres pour chaque année et choisissez une ou deux notes par période. L’inscription des élèves reste indépendante des règlements.</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Choisissez l’organisation en bimestres ou trimestres pour chaque année scolaire, puis configurez les périodes et leur pondération.</p>
       </div>
+
+      <Card className="border-border/70 bg-card/80 rounded-2xl">
+        <CardHeader><CardTitle className="text-base">Organisation de l’année scolaire</CardTitle></CardHeader>
+        <CardContent>
+          <form onSubmit={saveEvaluationConfig} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <label className="grid gap-1.5 text-xs font-semibold">Année scolaire
+              <Input required maxLength={9} pattern="\d{4}-\d{4}" value={form.academic_year} onChange={(event) => setForm({ ...form, academic_year: event.target.value })} placeholder="2026-2027" />
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold">Organisation des évaluations
+              <select value={evaluationPeriodType} onChange={(event) => setEvaluationPeriodType(event.target.value as SchoolConfig['evaluation_period_type'])} className="h-10 rounded-xl border border-input bg-card px-3 text-sm font-normal">
+                <option value="BIMESTRE">Bimestres</option>
+                <option value="TRIMESTRE">Trimestres</option>
+              </select>
+            </label>
+            <Button type="submit" disabled={configSaving}>{configSaving ? 'Enregistrement…' : 'Enregistrer la configuration'}</Button>
+          </form>
+          {configError && <p className="mt-3 text-sm text-destructive" role="alert">{configError}</p>}
+        </CardContent>
+      </Card>
 
       <Card className="border-border/70 bg-card/80 rounded-2xl">
         <CardHeader><CardTitle className="text-base">Ajouter une période</CardTitle></CardHeader>
@@ -857,12 +1050,7 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
             </label>
             <label className="grid gap-1.5 text-xs font-semibold">Type de période
               <select className="h-10 rounded-xl border border-input bg-card px-3 text-sm font-normal" value={form.period_type} onChange={(event) => setForm({ ...form, period_type: event.target.value })}>
-                <option value="T1">Trimestre 1</option>
-                <option value="T2">Trimestre 2</option>
-                <option value="T3">Trimestre 3</option>
-                <option value="T4">Trimestre 4</option>
-                <option value="S1">Semestre 1</option>
-                <option value="S2">Semestre 2</option>
+                {periodOptions.map((code) => <option key={code} value={code}>{evaluationPeriodType === 'BIMESTRE' ? 'Bimestre' : 'Trimestre'} {code.slice(1)}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold">Nombre de notes

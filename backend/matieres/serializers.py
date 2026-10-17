@@ -25,12 +25,25 @@ class ExamPeriodSerializer(serializers.ModelSerializer):
         start_date = attrs.get('start_date', getattr(self.instance, 'start_date', None))
         end_date = attrs.get('end_date', getattr(self.instance, 'end_date', None))
         academic_year = attrs.get('academic_year', getattr(self.instance, 'academic_year', ''))
+        period_type = attrs.get('period_type', getattr(self.instance, 'period_type', ''))
         if academic_year:
             first_year, second_year = (int(year) for year in academic_year.split('-'))
             if second_year != first_year + 1:
                 raise serializers.ValidationError(
                     {'academic_year': 'L’année scolaire doit couvrir deux années consécutives.'}
                 )
+        if not self.instance and period_type.startswith(('B', 'T')):
+            from classes.models import SchoolConfig
+
+            configured_type = SchoolConfig.objects.filter(
+                academic_year=academic_year,
+            ).values_list('evaluation_period_type', flat=True).first()
+            configured_type = configured_type or 'TRIMESTRE'
+            if period_type.startswith('B') != (configured_type == 'BIMESTRE'):
+                expected_label = 'bimestrielle' if configured_type == 'BIMESTRE' else 'trimestrielle'
+                raise serializers.ValidationError({
+                    'period_type': f'Cette année scolaire est configurée en périodes {expected_label}.'
+                })
         if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError({'end_date': 'La fin de la période doit être après son début.'})
 
