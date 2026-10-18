@@ -428,7 +428,7 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingMatiere, setEditingMatiere] = useState<Matiere | null>(null)
-  const [form, setForm] = useState({ nom: '', code: '', description: '', coefficient: 1 })
+  const [form, setForm] = useState({ nom: '', code: '' })
   const [saving, setSaving] = useState(false)
   const [coefficients, setCoefficients] = useState<MatiereCoefficient[]>([])
   const [coefficientsLoading, setCoefficientsLoading] = useState(true)
@@ -460,7 +460,7 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
   })
 
   const resetForm = () => {
-    setForm({ nom: '', code: '', description: '', coefficient: 1 })
+    setForm({ nom: '', code: '' })
     setEditingMatiere(null)
     setShowForm(false)
   }
@@ -472,7 +472,7 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
 
   const openEdit = (matiere: Matiere) => {
     setEditingMatiere(matiere)
-    setForm({ nom: matiere.nom, code: matiere.code, description: matiere.description || '', coefficient: matiere.coefficient })
+    setForm({ nom: matiere.nom, code: matiere.code })
     setShowForm(true)
   }
 
@@ -588,14 +588,6 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
                 <label className="text-xs font-medium text-muted-foreground">Code *</label>
                 <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="MATH" />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Coefficient par défaut</label>
-                <Input type="number" min="0.01" step="0.01" value={form.coefficient.toString()} onChange={(e) => setForm({ ...form, coefficient: parseFloat(e.target.value) || 1 })} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Description</label>
-                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Option..." />
-              </div>
               <div className="sm:col-span-2 flex justify-end gap-2">
                 <Button variant="outline" onClick={resetForm}>Annuler</Button>
                 <Button onClick={handleSave} disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</Button>
@@ -608,7 +600,7 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
       <Card className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">Coefficients par matière et par classe</CardTitle>
-          <p className="text-xs text-muted-foreground">Un coefficient défini pour une classe remplace celui de la filière ou le coefficient par défaut de la matière.</p>
+          <p className="text-xs text-muted-foreground">Configurez ici le coefficient applicable à chaque classe.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={saveCoefficient} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_160px_auto]">
@@ -680,8 +672,7 @@ export function MatieresScreen({ matieres, classes, onReload }: { matieres: Mati
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-semibold">{matiere.nom}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{matiere.code} · Coef. {matiere.coefficient}</p>
-                  {matiere.description && <p className="mt-1 text-xs text-muted-foreground">{matiere.description}</p>}
+                  <p className="mt-1 text-xs text-muted-foreground">{matiere.code}</p>
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-2">

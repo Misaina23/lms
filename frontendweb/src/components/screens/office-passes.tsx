@@ -6,7 +6,7 @@ import { CheckCircle2, Printer, TicketCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { api, type Etudiant, type StudentOfficePass } from '@/lib/api'
+import { api, type Etudiant, type StudentOfficePass, type Classe } from '@/lib/api'
 
 const kinds: Record<StudentOfficePass['kind'], string> = {
   CONVOCATION: 'Convocation au bureau',
@@ -14,13 +14,16 @@ const kinds: Record<StudentOfficePass['kind'], string> = {
   RETURN: 'Autorisation de retour en classe',
 }
 
-export function OfficePassesScreen({ students, records, role, onReload }: {
+export function OfficePassesScreen({ students, classes, records, role, onReload }: {
   students: Etudiant[]
+  classes: Classe[]
   records: StudentOfficePass[]
   role: string
   onReload: () => void
 }) {
   const [studentId, setStudentId] = useState('')
+  const [studentClass, setStudentClass] = useState('')
+  const [studentSearch, setStudentSearch] = useState('')
   const [kind, setKind] = useState<StudentOfficePass['kind']>('CONVOCATION')
   const [reason, setReason] = useState('')
   const [destination, setDestination] = useState('Bureau de vie scolaire')
@@ -63,6 +66,7 @@ export function OfficePassesScreen({ students, records, role, onReload }: {
   }
 
   const student = printing?.student_detail
+  const matchingStudents = students.filter((item) => item.actif && item.classe === Number(studentClass) && studentClass && `${item.first_name} ${item.last_name} ${item.matricule}`.toLocaleLowerCase().includes(studentSearch.trim().toLocaleLowerCase()))
 
   return (
     <div className="space-y-6">
@@ -77,12 +81,24 @@ export function OfficePassesScreen({ students, records, role, onReload }: {
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><TicketCheck className="size-5 text-primary" /> Émettre un document</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={issuePass} className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-1.5 text-xs font-semibold">Élève
-                <select required value={studentId} onChange={(event) => setStudentId(event.target.value)} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
-                  <option value="">Sélectionner un élève</option>
-                  {students.filter((item) => item.actif).map((item) => <option key={item.id} value={item.id}>{item.last_name} {item.first_name} — {item.matricule}</option>)}
-                </select>
-              </label>
+              <div className="grid gap-2">
+                <label className="grid gap-1.5 text-xs font-semibold">Classe
+                  <select required value={studentClass} onChange={(event) => { setStudentClass(event.target.value); setStudentId(''); setStudentSearch('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
+                    <option value="">Choisir une classe</option>
+                    {classes.map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-xs font-semibold">Rechercher un élève par nom ou matricule
+                  <Input required disabled={!studentClass} value={studentSearch} onChange={(event) => { setStudentSearch(event.target.value); setStudentId('') }} placeholder="Nom, prénom ou matricule" />
+                </label>
+                {studentSearch.trim() && <div className="max-h-36 overflow-y-auto rounded-lg border border-border">
+                  {matchingStudents.slice(0, 8).map((item) => <button type="button" key={item.id} onClick={() => setStudentId(String(item.id))} className={`flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-muted ${studentId === String(item.id) ? 'bg-primary/10' : ''}`}>
+                    <span>{item.first_name} {item.last_name}</span><span className="text-muted-foreground">{item.matricule}</span>
+                  </button>)}
+                  {matchingStudents.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève trouvé dans cette classe.</p>}
+                </div>}
+                {studentId && <p className="text-xs text-muted-foreground">Élève sélectionné : {students.find((item) => item.id === Number(studentId))?.first_name} {students.find((item) => item.id === Number(studentId))?.last_name} · {students.find((item) => item.id === Number(studentId))?.matricule}</p>}
+              </div>
               <label className="grid gap-1.5 text-xs font-semibold">Type de document
                 <select value={kind} onChange={(event) => setKind(event.target.value as StudentOfficePass['kind'])} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
                   {Object.entries(kinds).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -94,7 +110,7 @@ export function OfficePassesScreen({ students, records, role, onReload }: {
                 <label className="grid gap-1.5 text-xs font-semibold">Date et heure (facultatif)<Input type="datetime-local" value={scheduledFor} onChange={(event) => setScheduledFor(event.target.value)} /></label>
               </div>
               {error && <p className="sm:col-span-2 text-sm text-destructive" role="alert">{error}</p>}
-              <div className="sm:col-span-2 flex justify-end"><Button type="submit" disabled={saving || students.length === 0}>{saving ? 'Enregistrement…' : 'Créer le billet'}</Button></div>
+              <div className="sm:col-span-2 flex justify-end"><Button type="submit" disabled={saving || !studentId}>{saving ? 'Enregistrement…' : 'Créer le billet'}</Button></div>
             </form>
           </CardContent>
         </Card>

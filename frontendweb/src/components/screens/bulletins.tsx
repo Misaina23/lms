@@ -14,15 +14,17 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react'
-import type { Etudiant, Note, Matiere, ExamPeriod } from '@/lib/api'
+import type { Etudiant, Note, Matiere, ExamPeriod, Classe } from '@/lib/api'
 
-export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], periods = [] }: {
+export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], periods = [], classes = [] }: {
   etudiants: Etudiant[]
   notes: Note[]
   matieres: Matiere[]
   periods: ExamPeriod[]
+  classes: Classe[]
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
+  const [selectedClassId, setSelectedClassId] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPeriodId, setSelectedPeriodId] = useState('')
 
@@ -36,7 +38,8 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
 
   const filteredEtudiants = useMemo(() => {
     return etudiants.filter(etudiant => {
-      if (!searchQuery) return true
+      if (!selectedClassId || etudiant.classe !== Number(selectedClassId)) return false
+      if (!searchQuery) return false
       const q = searchQuery.toLowerCase()
       return (
         etudiant.first_name?.toLowerCase().includes(q) ||
@@ -44,7 +47,7 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
         etudiant.matricule?.toLowerCase().includes(q)
       )
     })
-  }, [etudiants, searchQuery])
+  }, [etudiants, searchQuery, selectedClassId])
 
   const studentNotes = useMemo(() => {
     if (!selectedStudentId || !selectedPeriodId) return []
@@ -115,6 +118,12 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
             <p className="text-xs text-muted-foreground">Choisissez une période pour n’afficher que les notes validées.</p>
           </CardHeader>
           <CardContent>
+            <label className="mb-4 grid max-w-sm gap-1.5 text-xs font-semibold">Classe
+              <select required value={selectedClassId} onChange={(event) => { setSelectedClassId(event.target.value); setSelectedStudentId(null); setSearchQuery('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
+                <option value="">Choisir une classe</option>
+                {classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}
+              </select>
+            </label>
             <label className="mb-4 grid max-w-sm gap-1.5 text-xs font-semibold">Période
               <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
                 <option value="">Choisir une période</option>
@@ -126,6 +135,7 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={!selectedClassId}
                 placeholder="Rechercher par nom ou matricule..."
                 className="h-10 w-full pl-9"
               />
