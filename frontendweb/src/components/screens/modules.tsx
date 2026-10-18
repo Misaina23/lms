@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api, type User, type Classe, type Matiere, type MatiereCoefficient, type Etudiant, type Note, type ExamPeriod, type SchoolConfig, type PaginatedResponse, type AttendanceRiskAlert } from '@/lib/api'
-import { initials } from '@/lib/admin-data'
+import { initials, matchesStudentQuery } from '@/lib/admin-data'
 
 export function TeachersScreen({ users, etudiants, notes, matieres, periods, onReload }: {
   users: User[]
@@ -811,17 +811,92 @@ export function CoverageScreen({ classes, matieres, users }: { classes: any[]; m
   )
 }
 
-export function GradesScreen({ notes, users, etudiants, matieres, periods, role, onReload }: {
+export function GradesScreen({ notes, users, etudiants, classes, matieres, periods, role, userId, onReload }: {
   notes: Note[]
   users: User[]
   etudiants: Etudiant[]
+  classes: Classe[]
   matieres: Matiere[]
   periods: ExamPeriod[]
   role: string
+  userId: number | null
   onReload: () => void
 }) {
   const [actionError, setActionError] = useState('')
   const [processingNote, setProcessingNote] = useState<number | null>(null)
+  const [notesClassFilter, setNotesClassFilter] = useState('')
+  const [notesSearch, setNotesSearch] = useState('')
+  const [notePage, setNotePage] = useState(0)
+  const [assignments, setAssignments] = useState<Array<{ classe: number; matiere: number; academic_year: string; professeur: number }>>([])
+  const [classId, setClassId] = useState('')
+  const [subjectId, setSubjectId] = useState('')
+  const [periodId, setPeriodId] = useState('')
+  const [studentQuery, setStudentQuery] = useState('')
+  const [studentId, setStudentId] = useState('')
+  const [score1, setScore1] = useState('')
+  const [score2, setScore2] = useState('')
+  const [evaluationDate, setEvaluationDate] = useState(new Date().toISOString().slice(0, 10))
+  const [savingGrade, setSavingGrade] = useState(false)
+  const [gradeMessage, setGradeMessage] = useState('')
+  const [gradeError, setGradeError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const loadAssignments = async () => {
+      try {
+        const rows: Array<{ classe: number; matiere: number; academic_year: string; professeur: number }> = []
+        let page = 1
+        let next = true
+        while (next) {
+          const response = await api.get<PaginatedResponse<(typeof rows)[number]>>(`/teacher-assignments/?page=${page}&page_size=500${role === 'PROFESSEUR' && userId ? `&professeur=${userId}` : ''}`)
+          rows.push(...response.results)
+          next = Boolean(response.next)
+          page += 1
+        }
+        if (!cancelled) setAssignments(rows)
+      } catch (error) {
+        if (!cancelled) setGradeError(error instanceof Error ? error.message : 'Impossible de charger vos classes affectées.')
+      }
+    }
+    void loadAssignments()
+    return () => { cancelled = true }
+  }, [role, userId])
+
+  const availableAssignments = assignments.filter((item) => item.classe === Number(classId) && (!periodId || item.academic_year === periods.find((period) => period.id === Number(periodId))?.academic_year))
+  const availableSubjects = [...new Set(availableAssignments.map((item) => item.matiere))]
+  const matchingStudentCandidates = studentQuery.trim() ? etudiants.filter((student) => student.actif && student.statut === 'ENROLLED' && student.classe === Number(classId) && matchesStudentQuery(student, studentQuery)) : []
+  const matchingStudents = matchingStudentCandidates.slice(0, 8)
+  const filteredNotes = notes.filter((note) => {
+    const student = etudiants.find((item) => item.id === note.etudiant)
+    return Boolean(student && notesClassFilter && student.classe === Number(notesClassFilter) && (!notesSearch.trim() || matchesStudentQuery(student, notesSearch)))
+  })
+  const notePageCount = Math.max(1, Math.ceil(filteredNotes.length / 30))
+  const visibleNotes = filteredNotes.slice(notePage * 30, notePage * 30 + 30)
+
+  const saveGrade = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!studentId || !classId || !subjectId || !periodId) return
+    setSavingGrade(true)
+    setGradeError('')
+    setGradeMessage('')
+    try {
+      const existing = notes.find((note) => note.etudiant === Number(studentId) && note.matiere === Number(subjectId) && note.exam_period === Number(periodId))
+      const payload = { etudiant: Number(studentId), matiere: Number(subjectId), exam_period: Number(periodId), score_1: score1, score_2: score2 || null, date_evaluation: evaluationDate }
+      if (existing && !['DRAFT', 'REJECTED'].includes(existing.status)) throw new Error('Une note déjà transmise existe pour cet élève, cette matière et cette période.')
+      if (existing) await api.patch(`/notes/${existing.id}/`, payload)
+      else await api.post('/notes/', payload)
+      setGradeMessage(existing ? 'Brouillon de note mis à jour.' : 'Note enregistrée en brouillon.')
+      setScore1('')
+      setScore2('')
+      setStudentId('')
+      setStudentQuery('')
+      onReload()
+    } catch (error) {
+      setGradeError(error instanceof Error ? error.message : 'Impossible d’enregistrer la note.')
+    } finally {
+      setSavingGrade(false)
+    }
+  }
   const actOnNote = async (note: Note, action: 'submit' | 'approve' | 'reject') => {
     setProcessingNote(note.id)
     setActionError('')
@@ -852,10 +927,48 @@ export function GradesScreen({ notes, users, etudiants, matieres, periods, role,
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">En brouillon</p><p className="mt-1 text-2xl font-semibold">{notes.filter((n) => n.status === 'DRAFT').length}</p></CardContent></Card>
       </div>
 
+      {role === 'PROFESSEUR' && <Card className="rounded-2xl">
+        <CardHeader><CardTitle className="text-base">Saisir une note</CardTitle><p className="text-xs text-muted-foreground">Choisissez la classe avant de rechercher l’élève par nom ou matricule.</p></CardHeader>
+        <CardContent>
+          <form onSubmit={saveGrade} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="grid gap-1.5 text-xs font-semibold">Classe
+              <select required value={classId} onChange={(event) => { setClassId(event.target.value); setSubjectId(''); setPeriodId(''); setStudentId(''); setStudentQuery('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal">
+                <option value="">Choisir une classe</option>{classes.filter((classe) => assignments.some((item) => item.classe === classe.id)).map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold">Matière
+              <select required value={subjectId} onChange={(event) => setSubjectId(event.target.value)} disabled={!classId} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une matière</option>{matieres.filter((item) => availableSubjects.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold">Période
+              <select required value={periodId} onChange={(event) => { setPeriodId(event.target.value); setSubjectId('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une période</option>{periods.filter((period) => !period.is_locked && (!classId || period.academic_year === classes.find((classe) => classe.id === Number(classId))?.academic_year)).map((period) => <option key={period.id} value={period.id}>{period.label} · {period.academic_year}</option>)}</select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold">Rechercher un élève par nom ou matricule
+              <Input required disabled={!classId} value={studentQuery} onChange={(event) => { setStudentQuery(event.target.value); setStudentId('') }} placeholder="Nom, prénom ou matricule" />
+            </label>
+            <div className="max-h-36 overflow-y-auto rounded-lg border border-border">
+              {matchingStudents.map((student) => <button type="button" key={student.id} onClick={() => setStudentId(String(student.id))} className={`flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-muted ${studentId === String(student.id) ? 'bg-primary/10' : ''}`}><span>{student.first_name} {student.last_name}</span><span className="text-muted-foreground">{student.matricule}</span></button>)}
+              {classId && studentQuery.trim() && matchingStudents.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève correspondant dans cette classe.</p>}
+              {matchingStudentCandidates.length > 8 && <p className="px-3 py-2 text-xs text-muted-foreground">Affinez la recherche pour réduire les résultats.</p>}
+              {!studentQuery.trim() && <p className="px-3 py-2 text-sm text-muted-foreground">Saisissez un nom ou un matricule après avoir choisi la classe.</p>}
+            </div>
+            <label className="grid gap-1.5 text-xs font-semibold">Note 1 / 20<Input required type="number" min="0" max="20" step="0.01" value={score1} onChange={(event) => setScore1(event.target.value)} /></label>
+            {periods.find((period) => period.id === Number(periodId))?.number_of_notes === 2 && <label className="grid gap-1.5 text-xs font-semibold">Note 2 / 20<Input type="number" min="0" max="20" step="0.01" value={score2} onChange={(event) => setScore2(event.target.value)} /></label>}
+            <label className="grid gap-1.5 text-xs font-semibold">Date d’évaluation<Input required type="date" value={evaluationDate} onChange={(event) => setEvaluationDate(event.target.value)} /></label>
+            {gradeError && <p className="text-sm text-destructive sm:col-span-2" role="alert">{gradeError}</p>}
+            {gradeMessage && <p className="text-sm text-emerald-700 sm:col-span-2" role="status">{gradeMessage}</p>}
+            <div className="flex items-end"><Button type="submit" disabled={savingGrade || !studentId || !subjectId || !periodId}>{savingGrade ? 'Enregistrement…' : 'Enregistrer le brouillon'}</Button></div>
+          </form>
+        </CardContent>
+      </Card>}
+
       <Card className="rounded-2xl">
         <CardHeader><CardTitle className="text-base">Notes à saisir et à valider</CardTitle></CardHeader>
         {actionError && <p className="mx-6 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{actionError}</p>}
         <CardContent className="px-0">
+          <div className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
+            <label className="grid gap-1 text-xs font-semibold">Classe<select value={notesClassFilter} onChange={(event) => { setNotesClassFilter(event.target.value); setNotesSearch(''); setNotePage(0) }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une classe</option>{classes.filter((classe) => role !== 'PROFESSEUR' || assignments.some((item) => item.classe === classe.id)).map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}</select></label>
+            <label className="grid gap-1 text-xs font-semibold">Rechercher un élève par nom ou matricule<Input disabled={!notesClassFilter} value={notesSearch} onChange={(event) => { setNotesSearch(event.target.value); setNotePage(0) }} placeholder="Nom, prénom ou matricule" /></label>
+          </div>
           <div className="overflow-x-auto">
             <table className="mobile-card-table w-full min-w-[640px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -869,7 +982,7 @@ export function GradesScreen({ notes, users, etudiants, matieres, periods, role,
                 </tr>
               </thead>
               <tbody>
-                {notes.slice(0, 30).map((n) => {
+                {visibleNotes.map((n) => {
                   const et = etudiants.find((e) => e.id === n.etudiant)
                   const mat = matieres.find((m) => m.id === n.matiere)
                   const per = periods.find((p) => p.id === n.exam_period)
@@ -897,10 +1010,11 @@ export function GradesScreen({ notes, users, etudiants, matieres, periods, role,
                     </tr>
                   )
                 })}
-                {notes.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucune note.</td></tr>}
+                {visibleNotes.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-muted-foreground">{notesClassFilter ? 'Aucune note correspondante.' : 'Choisissez une classe pour consulter les notes.'}</td></tr>}
               </tbody>
             </table>
           </div>
+          {filteredNotes.length > 30 && <div className="flex items-center justify-between px-4 py-3"><p className="text-xs text-muted-foreground">{filteredNotes.length} notes · page {notePage + 1} / {notePageCount}</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={notePage === 0} onClick={() => setNotePage((page) => Math.max(0, page - 1))}>Précédent</Button><Button size="sm" variant="outline" disabled={notePage >= notePageCount - 1} onClick={() => setNotePage((page) => Math.min(notePageCount - 1, page + 1))}>Suivant</Button></div></div>}
         </CardContent>
       </Card>
     </div>
@@ -1097,10 +1211,11 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
 
 type ScannerControls = { stop: () => void }
 
-export function AttendanceScreen({ absences, users, etudiants, onReload, canScan = false }: {
+export function AttendanceScreen({ absences, users, etudiants, classes, onReload, canScan = false }: {
   absences: any[]
   users: User[]
   etudiants: Etudiant[]
+  classes: Classe[]
   onReload: () => void
   canScan?: boolean
 }) {
@@ -1109,6 +1224,13 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
   const videoRef = useRef<HTMLVideoElement>(null)
   const scannerRef = useRef<ScannerControls | null>(null)
   const [manualCode, setManualCode] = useState('')
+  const [scanClass, setScanClass] = useState('')
+  const [attendanceSearch, setAttendanceSearch] = useState('')
+  const [manualStudentQuery, setManualStudentQuery] = useState('')
+  const [manualStudentId, setManualStudentId] = useState('')
+  const [manualStatus, setManualStatus] = useState<'ABSENT' | 'LATE'>('ABSENT')
+  const [manualAttendanceError, setManualAttendanceError] = useState('')
+  const [manualAttendanceSaving, setManualAttendanceSaving] = useState(false)
   const [scanDate, setScanDate] = useState(today)
   const [startTime, setStartTime] = useState('08:00')
   const [endTime, setEndTime] = useState('10:00')
@@ -1117,6 +1239,34 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
   const [scanMessage, setScanMessage] = useState('')
   const [riskAlerts, setRiskAlerts] = useState<AttendanceRiskAlert[]>([])
   const [riskAlertsError, setRiskAlertsError] = useState('')
+  const filteredAbsences = scanClass ? absences.filter((absence) => {
+    const student = etudiants.find((item) => item.id === absence.etudiant)
+    if (!student || student.classe !== Number(scanClass)) return false
+    return !attendanceSearch.trim() || matchesStudentQuery(student, attendanceSearch)
+  }) : []
+  const [attendancePage, setAttendancePage] = useState(0)
+  const attendancePageCount = Math.max(1, Math.ceil(filteredAbsences.length / 30))
+  const visibleAbsences = filteredAbsences.slice(attendancePage * 30, attendancePage * 30 + 30)
+  const manualCandidates = manualStudentQuery.trim() && scanClass
+    ? etudiants.filter((student) => student.actif && student.classe === Number(scanClass) && matchesStudentQuery(student, manualStudentQuery)).slice(0, 8)
+    : []
+
+  const registerManualAttendance = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!manualStudentId || !scanClass) return
+    setManualAttendanceSaving(true)
+    setManualAttendanceError('')
+    try {
+      await api.post('/absences/', { etudiant: Number(manualStudentId), date_absence: scanDate, heure_debut: startTime, heure_fin: endTime, statut: manualStatus })
+      setManualStudentId('')
+      setManualStudentQuery('')
+      onReload()
+    } catch (error) {
+      setManualAttendanceError(error instanceof Error ? error.message : 'Impossible d’enregistrer ce pointage.')
+    } finally {
+      setManualAttendanceSaving(false)
+    }
+  }
 
   const loadRiskAlerts = useCallback(async () => {
     setRiskAlertsError('')
@@ -1145,9 +1295,14 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
   const registerScan = async (code: string) => {
     setScanError('')
     setScanMessage('')
+    if (!scanClass) {
+      setScanError('Choisissez une classe avant le pointage.')
+      return
+    }
     try {
       const record = await api.post<{ etudiant: number }>('/absences/scan/', {
         matricule: code.trim(),
+        classe: Number(scanClass),
         date_absence: scanDate,
         heure_debut: startTime,
         heure_fin: endTime,
@@ -1224,6 +1379,7 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
             <CardTitle className="flex items-center gap-2 text-base"><ScanLine className="size-5 text-primary" /> Pointer un élève par QR code</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <label className="grid max-w-sm gap-1 text-xs font-medium text-muted-foreground">Classe à pointer<select required value={scanClass} onChange={(event) => { setScanClass(event.target.value); setManualCode('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm text-foreground"><option value="">Choisir une classe</option>{classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}</select></label>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="grid gap-1 text-xs font-medium text-muted-foreground">Date du cours<Input type="date" value={scanDate} onChange={(event) => setScanDate(event.target.value)} /></label>
               <label className="grid gap-1 text-xs font-medium text-muted-foreground">Début<Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
@@ -1239,6 +1395,21 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
                 <Button type="submit" variant="outline" disabled={!manualCode.trim()}>Pointer</Button>
               </form>
             </div>
+            <form onSubmit={registerManualAttendance} className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_180px_auto]">
+              <div className="grid gap-2">
+                <label className="grid gap-1 text-xs font-semibold">Rechercher un ?l?ve de la classe par nom ou matricule
+                  <Input value={manualStudentQuery} onChange={(event) => { setManualStudentQuery(event.target.value); setManualStudentId('') }} disabled={!scanClass} placeholder="Nom, prenom ou matricule" />
+                </label>
+                {manualStudentQuery.trim() && <div className="max-h-32 overflow-y-auto rounded-lg border border-border">
+                  {manualCandidates.map((student) => <button key={student.id} type="button" onClick={() => setManualStudentId(String(student.id))} className={`flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-muted ${manualStudentId === String(student.id) ? 'bg-primary/10' : ''}`}><span>{student.first_name} {student.last_name}</span><span className="text-muted-foreground">{student.matricule}</span></button>)}
+                  {manualCandidates.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun eleve trouve dans cette classe.</p>}
+                </div>}
+                {manualStudentId && <p className="text-xs text-muted-foreground">?l?ve choisi : {etudiants.find((student) => student.id === Number(manualStudentId))?.full_name}</p>}
+              </div>
+              <label className="grid content-start gap-1 text-xs font-semibold">Statut<select value={manualStatus} onChange={(event) => setManualStatus(event.target.value as 'ABSENT' | 'LATE')} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="ABSENT">Absent</option><option value="LATE">En retard</option></select></label>
+              <div className="flex items-end"><Button type="submit" disabled={!manualStudentId || manualAttendanceSaving}>{manualAttendanceSaving ? 'Enregistrement?' : 'Enregistrer'}</Button></div>
+              {manualAttendanceError && <p className="text-sm text-destructive sm:col-span-3" role="alert">{manualAttendanceError}</p>}
+            </form>
             {scanMessage && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">{scanMessage}</p>}
             {scanError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{scanError}</p>}
             <p className="text-xs text-muted-foreground">La caméra est utilisée uniquement pour décoder le QR dans ce navigateur. Le serveur vérifie votre rôle et l’affectation de classe avant d’enregistrer la présence.</p>
@@ -1251,15 +1422,19 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Absents</p><p className="mt-1 text-2xl font-semibold text-rose-600">{absences.filter((a) => a.statut === 'ABSENT').length}</p></CardContent></Card>
       </div>
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-base">Pointages récents</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Pointages par classe</CardTitle></CardHeader>
         <CardContent className="px-0">
+          <div className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
+            <label className="grid gap-1 text-xs font-medium text-muted-foreground">Classe<select value={scanClass} onChange={(event) => { setScanClass(event.target.value); setAttendancePage(0) }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm text-foreground"><option value="">Choisir une classe</option>{classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}</select></label>
+            <label className="grid gap-1 text-xs font-medium text-muted-foreground">Rechercher par nom ou matricule<Input disabled={!scanClass} value={attendanceSearch} onChange={(event) => { setAttendanceSearch(event.target.value); setAttendancePage(0) }} placeholder="Nom, prénom ou matricule" /></label>
+          </div>
           <div className="overflow-x-auto">
             <table className="mobile-card-table w-full min-w-[640px] text-left text-sm">
               <thead className="border-y border-border bg-muted/30 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 <tr><th className="px-6 py-3 font-semibold">Date</th><th className="px-4 py-3 font-semibold">Élève</th><th className="px-4 py-3 font-semibold">Statut</th><th className="px-4 py-3 font-semibold">Créneau</th><th className="px-6 py-3 font-semibold">Source</th></tr>
               </thead>
               <tbody>
-                {absences.slice(0, 30).map((a) => {
+                {visibleAbsences.map((a) => {
                   const et = etudiants.find((e) => e.id === a.etudiant)
                   return (
                     <tr key={a.id} className="border-b border-border/60 hover:bg-muted/25">
@@ -1275,10 +1450,11 @@ export function AttendanceScreen({ absences, users, etudiants, onReload, canScan
                     </tr>
                   )
                 })}
-                {absences.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucun pointage.</td></tr>}
+                {visibleAbsences.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">{scanClass ? 'Aucun pointage correspondant dans cette classe.' : 'Choisissez une classe pour consulter les pointages.'}</td></tr>}
               </tbody>
             </table>
           </div>
+          {filteredAbsences.length > 30 && <div className="flex items-center justify-between px-4 py-3"><p className="text-xs text-muted-foreground">{filteredAbsences.length} pointages · page {attendancePage + 1} / {attendancePageCount}</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={attendancePage === 0} onClick={() => setAttendancePage((page) => Math.max(0, page - 1))}>Précédent</Button><Button size="sm" variant="outline" disabled={attendancePage >= attendancePageCount - 1} onClick={() => setAttendancePage((page) => Math.min(attendancePageCount - 1, page + 1))}>Suivant</Button></div></div>}
         </CardContent>
       </Card>
     </div>

@@ -4,11 +4,6 @@ from django.db import models
 class Matiere(models.Model):
     nom = models.CharField(max_length=100)
     code = models.CharField(max_length=20, unique=True)
-    description = models.TextField(blank=True)
-    coefficient = models.PositiveIntegerField(
-        default=1,
-        help_text="Coefficient de la matière (utilisé pour le calcul des moyennes)",
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -18,7 +13,7 @@ class Matiere(models.Model):
         from classes.models import MatiereCoefficient
 
         if classe is None:
-            return Decimal(str(self.coefficient))
+            return Decimal('1')
 
         class_coefficient = MatiereCoefficient.objects.filter(
             matiere=self,
@@ -47,7 +42,7 @@ class Matiere(models.Model):
             if fallback:
                 return fallback.coefficient
 
-        return Decimal(str(self.coefficient))
+        return Decimal('1')
 
     def __str__(self):
         return self.nom

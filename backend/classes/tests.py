@@ -92,7 +92,7 @@ class ClasseBusinessRuleTests(APITestCase):
                 self.assertEqual(response.status_code, 403)
 
     def test_matiere_coefficient_is_resolved_by_class_stream(self):
-        matiere = Matiere.objects.create(code='MATH', nom='Mathématiques', coefficient=1)
+        matiere = Matiere.objects.create(code='MATH', nom='Mathématiques')
         classe_s = Classe.objects.create(nom='Première S', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.SCIENTIFIQUE, capacite=30)
         classe_ose = Classe.objects.create(nom='Première OSE', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.SOCIO_ECONOMIQUE, capacite=30)
         classe_l = Classe.objects.create(nom='Première L', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.LITTERAIRE, capacite=30)
@@ -106,7 +106,7 @@ class ClasseBusinessRuleTests(APITestCase):
         self.assertEqual(matiere.get_coefficient_for_class(classe_l), Decimal('2.00'))
 
     def test_class_coefficient_overrides_stream_coefficient(self):
-        matiere = Matiere.objects.create(code='ANGL', nom='Anglais', coefficient=1)
+        matiere = Matiere.objects.create(code='ANGL', nom='Anglais')
         premiere_s = Classe.objects.create(
             nom='Première S',
             niveau=Classe.Niveau.SECONDAIRE_GENERAL,
@@ -144,7 +144,7 @@ class ClasseBusinessRuleTests(APITestCase):
         self.assertEqual(matiere.get_coefficient_for_class(terminale_s), Decimal('4.00'))
 
     def test_matiere_coefficient_api_accepts_multiple_classes_in_same_stream(self):
-        matiere = Matiere.objects.create(code='HIST', nom='Histoire', coefficient=1)
+        matiere = Matiere.objects.create(code='HIST', nom='Histoire')
         first_class = Classe.objects.create(
             nom='Première S',
             niveau=Classe.Niveau.SECONDAIRE_GENERAL,
@@ -207,7 +207,7 @@ class ClasseBusinessRuleTests(APITestCase):
             status=CustomUser.Status.ACTIVE,
         )
         classe = Classe.objects.create(nom='Première S', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.SCIENTIFIQUE, capacite=30)
-        physique = Matiere.objects.create(code='PHY', nom='Physique', coefficient=4)
+        physique = Matiere.objects.create(code='PHY', nom='Physique')
 
         assignment = TeacherAssignment.objects.create(
             professeur=teacher,
@@ -231,8 +231,8 @@ class ClasseBusinessRuleTests(APITestCase):
             academic_year='2024-2025',
             capacite=30,
         )
-        physique = Matiere.objects.create(code='PHY', nom='Physique', coefficient=4)
-        maths = Matiere.objects.create(code='MATH', nom='Mathématiques', coefficient=5)
+        physique = Matiere.objects.create(code='PHY', nom='Physique')
+        maths = Matiere.objects.create(code='MATH', nom='Mathématiques')
         teacher = CustomUser.objects.create_user(
             username='math-teacher-cover',
             email='math-teacher-cover@lycee.com',
@@ -269,8 +269,8 @@ class ClasseBusinessRuleTests(APITestCase):
             academic_year='2024-2025',
             capacite=30,
         )
-        physique = Matiere.objects.create(code='PHY', nom='Physique', coefficient=4)
-        maths = Matiere.objects.create(code='MATH', nom='Mathématiques', coefficient=5)
+        physique = Matiere.objects.create(code='PHY', nom='Physique')
+        maths = Matiere.objects.create(code='MATH', nom='Mathématiques')
         matching_teacher = CustomUser.objects.create_user(
             username='physicist-main',
             email='physicist-main@lycee.com',
@@ -343,7 +343,7 @@ class ClasseBusinessRuleTests(APITestCase):
             academic_year='2024-2025',
             capacite=30,
         )
-        Matiere.objects.create(code='CHM', nom='Chimie', coefficient=4)
+        Matiere.objects.create(code='CHM', nom='Chimie')
 
         response = self.client.get(reverse('classe-coverage-alerts'))
 

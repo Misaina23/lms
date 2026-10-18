@@ -228,7 +228,7 @@ class CustomUserViewSetTests(APITestCase):
 
     def test_public_registration_requires_matiere_for_teacher_and_creates_coverage_assignment_on_approval(self):
         self.client.credentials()
-        matiere = Matiere.objects.create(nom='Physique', code='PHY', coefficient=1)
+        matiere = Matiere.objects.create(nom='Physique', code='PHY')
         classe = Classe.objects.create(
             nom='Terminale A',
             niveau=Classe.Niveau.SECONDAIRE_GENERAL,

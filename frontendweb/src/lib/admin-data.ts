@@ -47,6 +47,10 @@ export type AdminData = {
   officePasses: StudentOfficePass[]
 }
 
+function emptyPage<T>(): PaginatedResponse<T> {
+  return { count: 0, next: null, previous: null, results: [] }
+}
+
 export function useAdminData() {
   const [data, setData] = useState<AdminData>({
     users: [], allUsers: [], classes: [], matieres: [], etudiants: [], notes: [],
@@ -74,25 +78,50 @@ export function useAdminData() {
     }
 
     try {
-      const [u, c, m, e, n, a, en, o, p, bi, bc, br, bs, ts, al, no, op] = await Promise.all([
-        api.get<PaginatedResponse<User>>('/users/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<Classe>>('/classes/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<Matiere>>('/matieres/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<Etudiant>>('/etudiants/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<Note>>('/notes/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<Absence>>('/absences/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<Enrollment>>('/enrollments/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<StudentOrientation>>('/orientations/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<ExamPeriod>>('/exam-periods/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<BudgetItem>>('/budget/items/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<BudgetCategory>>('/budget/categories/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<BudgetReport>>('/budget/reports/').catch(() => ({ results: [] })),
-        api.get<BudgetStats>('/budget/items/stats/?academic_year=2024-2025').catch(() => null),
-        api.get<PaginatedResponse<TimetableSlot>>('/timetable/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<AuditLog>>('/audit/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<Notification>>('/notifications/').catch(() => ({ results: [] })),
-        api.get<PaginatedResponse<StudentOfficePass>>('/office-passes/').catch(() => ({ results: [] })),
+      const loadAll = async <T,>(path: string): Promise<PaginatedResponse<T>> => {
+        const results: T[] = []
+        let page = 1
+        let next: string | null = `${path}?page=${page}&page_size=500`
+        let count = 0
+        while (next) {
+          const response: PaginatedResponse<T> = await api.get<PaginatedResponse<T>>(next)
+          results.push(...response.results)
+          count = response.count
+          page += 1
+          next = response.next ? `${path}?page=${page}&page_size=500` : null
+        }
+        return { count, next: null, previous: null, results }
+      }
+      const optional = async <T,>(label: string, request: Promise<T>, fallback: T): Promise<T> => {
+        try { return await request } catch (loadError) {
+          failures.push(`${label}: ${loadError instanceof Error ? loadError.message : 'échec du chargement'}`)
+          return fallback
+        }
+      }
+      const failures: string[] = []
+      const [u, c, m, e, n, a, en, o, p, bi, bc, br, ts, al, no, op] = await Promise.all([
+        optional('Personnel', loadAll<User>('/users/'), emptyPage<User>()),
+        optional('Classes', loadAll<Classe>('/classes/'), emptyPage<Classe>()),
+        optional('Matières', loadAll<Matiere>('/matieres/'), emptyPage<Matiere>()),
+        optional('Élèves', loadAll<Etudiant>('/etudiants/'), emptyPage<Etudiant>()),
+        optional('Notes', loadAll<Note>('/notes/'), emptyPage<Note>()),
+        optional('Absences', loadAll<Absence>('/absences/'), emptyPage<Absence>()),
+        optional('Inscriptions', loadAll<Enrollment>('/enrollments/'), emptyPage<Enrollment>()),
+        currentUser.role === 'ADMIN' ? optional('Orientations', loadAll<StudentOrientation>('/orientations/'), emptyPage<StudentOrientation>()) : Promise.resolve(emptyPage<StudentOrientation>()),
+        optional('Périodes', loadAll<ExamPeriod>('/exam-periods/'), emptyPage<ExamPeriod>()),
+        currentUser.role === 'ADMIN' ? optional('Budget', loadAll<BudgetItem>('/budget/items/'), emptyPage<BudgetItem>()) : Promise.resolve(emptyPage<BudgetItem>()),
+        currentUser.role === 'ADMIN' ? optional('Catégories budgétaires', loadAll<BudgetCategory>('/budget/categories/'), emptyPage<BudgetCategory>()) : Promise.resolve(emptyPage<BudgetCategory>()),
+        currentUser.role === 'ADMIN' ? optional('Rapports budgétaires', loadAll<BudgetReport>('/budget/reports/'), emptyPage<BudgetReport>()) : Promise.resolve(emptyPage<BudgetReport>()),
+        optional('Emploi du temps', loadAll<TimetableSlot>('/timetable/'), emptyPage<TimetableSlot>()),
+        currentUser.role === 'ADMIN' ? optional('Journal d’audit', loadAll<AuditLog>('/audit/'), emptyPage<AuditLog>()) : Promise.resolve(emptyPage<AuditLog>()),
+        optional('Notifications', loadAll<Notification>('/notifications/'), emptyPage<Notification>()),
+        currentUser.role === 'PROFESSEUR' ? Promise.resolve(emptyPage<StudentOfficePass>()) : optional('Convocations', loadAll<StudentOfficePass>('/office-passes/'), emptyPage<StudentOfficePass>()),
       ])
+      const budgetYears = [...new Set(bi.results.map((item) => item.academic_year).filter(Boolean))].sort()
+      const now = new Date()
+      const defaultStartYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
+      const statsYear = budgetYears[budgetYears.length - 1] || `${defaultStartYear}-${defaultStartYear + 1}`
+      const bs = currentUser.role === 'ADMIN' ? await optional('Statistiques budgétaires', api.get<BudgetStats>(`/budget/items/stats/?academic_year=${encodeURIComponent(statsYear)}`), null) : null
       setData({
         users: u.results || [],
         allUsers: u.results || [],
@@ -113,6 +142,7 @@ export function useAdminData() {
         notifications: no.results || [],
         officePasses: op.results || [],
       })
+      setError(failures.length ? failures.join(' · ') : null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement')
     } finally {
@@ -127,17 +157,16 @@ export function useAdminData() {
 
 export function useFilteredStudents(etudiants: Etudiant[], query: string) {
   return useMemo(
-    () =>
-      etudiants.filter((etudiant) => {
-        const q = query.toLowerCase()
-        return (
-          etudiant.first_name?.toLowerCase().includes(q) ||
-          etudiant.last_name?.toLowerCase().includes(q) ||
-          etudiant.matricule?.toLowerCase().includes(q)
-        )
-      }),
+    () => etudiants.filter((etudiant) => !query.trim() || matchesStudentQuery(etudiant, query)),
     [etudiants, query]
   )
+}
+
+export function matchesStudentQuery(student: Pick<Etudiant, 'first_name' | 'last_name' | 'matricule'>, query: string) {
+  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
+  const fields = [student.first_name, student.last_name, student.matricule, `${student.first_name} ${student.last_name}`].map(normalize)
+  const terms = normalize(query).trim().split(/\s+/).filter(Boolean)
+  return terms.length > 0 && terms.every((term) => fields.some((field) => field.includes(term)))
 }
 
 export function initials(name: string) {

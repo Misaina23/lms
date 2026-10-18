@@ -35,7 +35,7 @@ class NoteViewSet(viewsets.ModelViewSet):
             q_objects = Q()
             for classe_id, matiere_id in classe_matiere_pairs:
                 q_objects |= Q(etudiant__classe_id=classe_id, matiere_id=matiere_id)
-            return Note.objects.filter(q_objects)
+            return Note.objects.filter(q_objects) if classe_matiere_pairs else Note.objects.none()
         return Note.objects.none()
 
     def perform_create(self, serializer):

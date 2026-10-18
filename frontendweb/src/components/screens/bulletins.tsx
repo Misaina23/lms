@@ -15,6 +15,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import type { Etudiant, Note, Matiere, ExamPeriod, Classe } from '@/lib/api'
+import { matchesStudentQuery } from '@/lib/admin-data'
 
 export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], periods = [], classes = [] }: {
   etudiants: Etudiant[]
@@ -36,18 +37,14 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
 
   const selectedPeriod = periods.find((period) => period.id === Number(selectedPeriodId))
 
-  const filteredEtudiants = useMemo(() => {
+  const filteredCandidates = useMemo(() => {
     return etudiants.filter(etudiant => {
       if (!selectedClassId || etudiant.classe !== Number(selectedClassId)) return false
       if (!searchQuery) return false
-      const q = searchQuery.toLowerCase()
-      return (
-        etudiant.first_name?.toLowerCase().includes(q) ||
-        etudiant.last_name?.toLowerCase().includes(q) ||
-        etudiant.matricule?.toLowerCase().includes(q)
-      )
+      return matchesStudentQuery(etudiant, searchQuery)
     })
   }, [etudiants, searchQuery, selectedClassId])
+  const filteredEtudiants = filteredCandidates.slice(0, 8)
 
   const studentNotes = useMemo(() => {
     if (!selectedStudentId || !selectedPeriodId) return []
@@ -161,7 +158,8 @@ export function BulletinsScreen({ etudiants = [], notes = [], matieres = [], per
                   </button>
                 )
               })}
-              {filteredEtudiants.length === 0 && (
+              {filteredCandidates.length > 8 && <p className="mb-3 text-xs text-muted-foreground">Affinez la recherche pour réduire les résultats.</p>}
+              {filteredCandidates.length === 0 && (
                 <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
                   <GraduationCap className="size-10 text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">Aucun élève trouvé</p>

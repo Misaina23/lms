@@ -31,7 +31,7 @@ class MatiereViewSetTests(APITestCase):
 
     def test_create_matiere(self):
         url = reverse('matiere-list')
-        data = {'nom': 'Physique', 'code': 'PHYS', 'description': 'Cours de physique'}
+        data = {'nom': 'Physique', 'code': 'PHYS'}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Matiere.objects.count(), 2)

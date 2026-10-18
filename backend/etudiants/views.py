@@ -994,56 +994,75 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly], url_path='confirm-payment')
     def confirm_payment(self, request, pk=None):
-        enrollment = self.get_object()
-        old_status = enrollment.payment_status
-        enrollment.payment_status = Enrollment.PaymentStatus.PAID
-        enrollment.frais_verses = request.data.get('frais_verses', enrollment.frais_verses or enrollment.frais_total)
-        if request.data.get('devise'):
-            enrollment.devise = request.data['devise']
-        enrollment.save()
+        try:
+            amount = Decimal(str(request.data.get('amount', request.data.get('frais_verses', ''))))
+        except Exception:
+            return Response({'amount': 'Saisissez un montant valide.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not amount.is_finite() or amount <= 0:
+            return Response({'amount': 'Le montant doit etre superieur a zero.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create budget item for tuition revenue
-        from budget.models import BudgetItem, BudgetCategory, BudgetSummary
-        tuition_category = BudgetCategory.objects.filter(name='Scolarité élèves', category_type='REVENUE').first()
-        if tuition_category and enrollment.frais_verses:
+        with transaction.atomic():
+            enrollment = Enrollment.objects.select_for_update().select_related('student__user').get(pk=pk)
+            total = enrollment.frais_total
+            already_paid = enrollment.frais_verses or Decimal('0')
+            if total is None:
+                return Response({'amount': 'Configurez les frais totaux avant encaissement.'}, status=status.HTTP_400_BAD_REQUEST)
+            if already_paid >= total:
+                return Response({'amount': 'Cette inscription est deja reglee.'}, status=status.HTTP_400_BAD_REQUEST)
+            if already_paid + amount > total:
+                return Response({'amount': f'Montant superieur au reste a payer ({total - already_paid}).'}, status=status.HTTP_400_BAD_REQUEST)
+
+            old_status = enrollment.payment_status
+            enrollment.frais_verses = already_paid + amount
+            enrollment.payment_status = Enrollment.PaymentStatus.PAID if enrollment.frais_verses >= total else Enrollment.PaymentStatus.PARTIAL
+            if request.data.get('devise'):
+                enrollment.devise = request.data['devise']
+            enrollment.save()
+
+            from budget.models import BudgetItem, BudgetCategory, BudgetSummary
+            category, _ = BudgetCategory.objects.get_or_create(
+                name='Scolarit\u00e9 \u00e9l\u00e8ves',
+                defaults={'category_type': BudgetCategory.CategoryType.REVENUE, 'is_system': True},
+            )
+            if category.category_type != BudgetCategory.CategoryType.REVENUE:
+                raise ValueError('Scolarite eleves must be a revenue category.')
             BudgetItem.objects.create(
                 item_type=BudgetItem.ItemType.REVENUE,
-                category=tuition_category,
+                category=category,
                 academic_year=enrollment.academic_year,
                 date=datetime.date.today(),
-                amount=enrollment.frais_verses,
+                amount=amount,
                 devise=enrollment.devise,
-                description=f"Paiement scolarité - {enrollment.student.user.get_full_name()} - {enrollment.receipt_number}",
-                designation="Scolarité élève",
-                reference_number=enrollment.receipt_number,
+                description=f"Paiement scolarite - {enrollment.student.user.get_full_name()} - {enrollment.receipt_number}",
+                designation='Scolarite eleve',
+                reference_number=f"{enrollment.receipt_number}-{enrollment.budget_items.count() + 1}",
                 revenue_source=BudgetItem.RevenueSource.TUITION,
                 related_enrollment=enrollment,
                 created_by=request.user,
                 is_validated=True,
                 validated_by=request.user,
             )
-            # Update budget summary
             summary, _ = BudgetSummary.objects.get_or_create(academic_year=enrollment.academic_year)
             summary.recalculate()
 
-        AuditLog.objects.create(
-            actor=request.user,
-            entity_type='Enrollment',
-            entity_id=str(enrollment.id),
-            action=AuditLog.Action.STATUS_CHANGE,
-            old_value={'payment_status': old_status},
-            new_value={'payment_status': enrollment.payment_status},
-            reason='Payment confirmed',
-        )
-        Notification.objects.create(
-            recipient=enrollment.student.user,
-            channel=Notification.Channel.SMS,
-            notification_type='PAYMENT_CONFIRMED',
-            title='Paiement confirmé',
-            message=f"Le paiement de {enrollment.student.user.get_full_name()} a été confirmé. Reçu: {enrollment.receipt_number}",
-            payload={'enrollment_id': enrollment.id, 'receipt_number': enrollment.receipt_number},
-        )
-        return Response({'status': 'payment confirmed', 'receipt_number': enrollment.receipt_number})
+            AuditLog.objects.create(
+                actor=request.user,
+                entity_type='Enrollment',
+                entity_id=str(enrollment.id),
+                action=AuditLog.Action.STATUS_CHANGE,
+                old_value={'payment_status': old_status, 'frais_verses': str(already_paid)},
+                new_value={'payment_status': enrollment.payment_status, 'frais_verses': str(enrollment.frais_verses), 'encaisse': str(amount)},
+                reason='Payment recorded',
+            )
+            Notification.objects.create(
+                recipient=enrollment.student.user,
+                channel=Notification.Channel.SMS,
+                notification_type='PAYMENT_CONFIRMED',
+                title='Paiement enregistre',
+                message=f"Payment of {amount} {enrollment.devise} recorded. Remaining balance: {total - enrollment.frais_verses}. Receipt: {enrollment.receipt_number}",
+                payload={'enrollment_id': str(enrollment.id), 'receipt_number': enrollment.receipt_number, 'amount': str(amount), 'remaining': str(total - enrollment.frais_verses)},
+            )
+        return Response({'status': enrollment.payment_status, 'receipt_number': enrollment.receipt_number, 'frais_verses': str(enrollment.frais_verses), 'reste_a_payer': str(total - enrollment.frais_verses)})
 
 
 class CertificateRequestViewSet(viewsets.ModelViewSet):

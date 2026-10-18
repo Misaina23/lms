@@ -32,7 +32,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Erreur réseau' }));
-      throw new Error(error.detail || `Erreur ${response.status}`);
+      const fieldMessage = Object.values(error as Record<string, unknown>).flatMap((value) => Array.isArray(value) ? value : [value]).find((value) => typeof value === 'string')
+      throw new Error((typeof error.detail === 'string' ? error.detail : undefined) || (typeof fieldMessage === 'string' ? fieldMessage : undefined) || `Erreur ${response.status}`);
     }
 
     if (response.status === 204) return {} as T;
@@ -57,7 +58,8 @@ async function download(path: string): Promise<Blob> {
     })
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Erreur réseau' }))
-      throw new Error(error.detail || `Erreur ${response.status}`)
+      const fieldMessage = Object.values(error as Record<string, unknown>).flatMap((value) => Array.isArray(value) ? value : [value]).find((value) => typeof value === 'string')
+      throw new Error((typeof error.detail === 'string' ? error.detail : undefined) || (typeof fieldMessage === 'string' ? fieldMessage : undefined) || `Erreur ${response.status}`)
     }
     return response.blob()
   } catch (error) {
@@ -114,8 +116,6 @@ export type Matiere = {
   id: number;
   nom: string;
   code: string;
-  description: string;
-  coefficient: number;
   created_at: string;
   updated_at: string;
 };

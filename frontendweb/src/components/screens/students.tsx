@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { api, type Etudiant, type Classe, type CertificateRequest, type PaginatedResponse, type StudentClassHistory, type StudentTransferRequest } from '@/lib/api'
-import { useFilteredStudents, initials } from '@/lib/admin-data'
+import { useFilteredStudents, initials, matchesStudentQuery } from '@/lib/admin-data'
 
 export function StudentsScreen({ etudiants, classes, onReload, canManage = true, canReviewTransfers = false, canManageCertificates = false, showGrades = true }: {
   etudiants: Etudiant[]
@@ -65,9 +65,8 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
   const filtered = useFilteredStudents(etudiants, query)
   const certificateCandidates = etudiants.filter((student) => {
     if (!student.actif || student.statut !== 'ENROLLED' || student.classe !== Number(certificateClass)) return false
-    const search = certificateStudentSearch.trim().toLocaleLowerCase()
-    return !search || [student.first_name, student.last_name, student.matricule]
-      .some((value) => value?.toLocaleLowerCase().includes(search))
+    const search = certificateStudentSearch.trim()
+    return !search || matchesStudentQuery(student, search)
   })
   const pageSize = 5
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))

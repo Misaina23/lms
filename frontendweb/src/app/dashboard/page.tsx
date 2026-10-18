@@ -72,7 +72,7 @@ function StatCard({ label, value, detail, trend, icon: Icon, accent }: { label: 
       <CardContent className="p-5">
         <div className="mb-5 flex items-start justify-between">
           <div className={`flex size-10 items-center justify-center rounded-xl ${accent}`}><Icon className="size-5" /></div>
-          <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300"><ArrowUpRight className="size-3" />{trend}</span>
+          {trend && <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">{trend}</span>}
         </div>
         <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
@@ -105,7 +105,7 @@ export default function Home() {
   const [displayName, setDisplayName] = useState('Personnel')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  const { data, isLoading, reload } = useAdminData()
+  const { data, isLoading, error: dataError, reload } = useAdminData()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -160,19 +160,19 @@ export default function Home() {
       case 'overview': return <OverviewScreen data={data} />
       case 'students': return <StudentsScreen etudiants={data.etudiants} classes={data.classes as any} onReload={reload} canManage={role === 'ADMIN' || role === 'SECRETARIAT'} canReviewTransfers={role === 'ADMIN'} canManageCertificates={role === 'ADMIN'} showGrades={role === 'ADMIN'} />
       case 'enrollments': return <EnrollmentRegistryScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} />
-      case 'payments': return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} />
+      case 'payments': return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} canManagePayments={role === 'ADMIN'} onReload={reload} />
       case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} onReload={reload} />
       case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
       case 'coverage': return <CoverageScreen classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'matieres': return <MatieresScreen matieres={data.matieres} classes={data.classes as any} onReload={reload} />
-      case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} onReload={reload} canScan={role === 'ADMIN' || role === 'PROFESSEUR'} />
-      case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} matieres={data.matieres} periods={data.periods} role={role} onReload={reload} />
+      case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} classes={data.classes} onReload={reload} canScan={role === 'ADMIN' || role === 'PROFESSEUR'} />
+      case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} classes={data.classes} matieres={data.matieres} periods={data.periods} role={role} userId={userId} onReload={reload} />
       case 'periods': return <ExamPeriodsScreen periods={data.periods} onReload={reload} />
       case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
       case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} canGenerate={role === 'ADMIN'} onReload={reload} />
       case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} classes={data.classes as any} notes={data.notes} matieres={data.matieres} periods={data.periods} />
       case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes} matieres={data.matieres} periods={data.periods} />
-      case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} />
+      case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} onReload={reload} />
       case 'chat': return <ChatScreen users={data.users} />
       case 'notifications': return <NotificationsScreen notifications={data.notifications} classes={data.classes} role={role} recipientId={userId} onReload={reload} />
       case 'office': return <OfficePassesScreen students={data.etudiants} classes={data.classes as any} records={data.officePasses} role={role} onReload={reload} />
@@ -242,7 +242,8 @@ export default function Home() {
             </header>
 
             <div className="mx-auto max-w-[1500px] px-3 pb-24 pt-4 sm:p-8">
-              {renderScreen()}
+        {dataError && <div className="mx-4 mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">Certaines données ne sont pas disponibles : {dataError}</div>}
+        {renderScreen()}
             </div>
           </section>
         </div>
@@ -320,10 +321,10 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
       </div>
 
       <div className="mobile-stat-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Élèves actifs" value={elevesActifs.toString()} detail={`${data.users.filter((u) => u.role === 'ELEVE').length} élèves inscrits`} trend="4,8 %" icon={GraduationCap} accent="bg-primary/10 text-primary" />
-        <StatCard label="Enseignants" value={enseignantsActifs.toString()} detail="Personnel actif" trend="2,1 %" icon={Users} accent="bg-sky-500/10 text-sky-700 dark:text-sky-300" />
-        <StatCard label="Classes" value={data.classes.length.toString()} detail={`${data.matieres.length} matières`} trend="0,0 %" icon={BookOpen} accent="bg-amber-500/10 text-amber-700 dark:text-amber-300" />
-        <StatCard label="Encaissé" value={new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalEncaisse) + ' Ar'} detail={`sur ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalDu)} Ar attendus`} trend="7,2 %" icon={CheckCircle2} accent="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" />
+        <StatCard label="Élèves actifs" value={elevesActifs.toString()} detail={`${data.users.filter((u) => u.role === 'ELEVE').length} élèves inscrits`} trend="" icon={GraduationCap} accent="bg-primary/10 text-primary" />
+        <StatCard label="Enseignants" value={enseignantsActifs.toString()} detail="Personnel actif" trend="" icon={Users} accent="bg-sky-500/10 text-sky-700 dark:text-sky-300" />
+        <StatCard label="Classes" value={data.classes.length.toString()} detail={`${data.matieres.length} matières`} trend="" icon={BookOpen} accent="bg-amber-500/10 text-amber-700 dark:text-amber-300" />
+        <StatCard label="Encaissé" value={new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalEncaisse) + ' Ar'} detail={`sur ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalDu)} Ar attendus`} trend="" icon={CheckCircle2} accent="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" />
       </div>
 
       <div className="mt-2 grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">

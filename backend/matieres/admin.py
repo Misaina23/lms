@@ -4,7 +4,7 @@ from .models import Matiere, ExamPeriod
 
 @admin.register(Matiere)
 class MatiereAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'code', 'coefficient', 'created_at']
+    list_display = ['nom', 'code', 'created_at']
     search_fields = ['nom', 'code']
     ordering = ['nom']
 

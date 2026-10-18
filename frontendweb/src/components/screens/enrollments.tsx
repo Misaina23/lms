@@ -3,8 +3,9 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Search, UsersRound } from 'lucide-react'
-import type { Etudiant, Enrollment, Classe } from '@/lib/api'
+import { api, type Etudiant, type Enrollment, type Classe } from '@/lib/api'
 import { initials, formatCurrency } from '@/lib/admin-data'
 
 export function EnrollmentRegistryScreen({ enrollments, etudiants, classes }: {
@@ -71,13 +72,19 @@ export function EnrollmentRegistryScreen({ enrollments, etudiants, classes }: {
   )
 }
 
-export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
+export function EnrollmentsScreen({ enrollments, etudiants, classes, canManagePayments = false, onReload }: {
   enrollments: Enrollment[]
   etudiants: Etudiant[]
   classes: Classe[]
+  canManagePayments?: boolean
+  onReload: () => void
 }) {
   const [filter, setFilter] = useState<'ALL' | 'PAID' | 'PARTIAL' | 'UNPAID'>('ALL')
   const [page, setPage] = useState(0)
+  const [paymentEnrollment, setPaymentEnrollment] = useState<Enrollment | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentError, setPaymentError] = useState('')
+  const [paymentSaving, setPaymentSaving] = useState(false)
   const filtered = useMemo(
     () => enrollments.filter((e) => filter === 'ALL' || e.payment_status === filter),
     [enrollments, filter]
@@ -108,6 +115,23 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
       UNPAID: 'bg-rose-500/10 text-rose-700',
     }
     return map[s] || 'bg-muted text-muted-foreground'
+  }
+
+  const recordPayment = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!paymentEnrollment) return
+    setPaymentSaving(true)
+    setPaymentError('')
+    try {
+      await api.post(`/enrollments/${paymentEnrollment.id}/confirm-payment/`, { amount: paymentAmount })
+      setPaymentEnrollment(null)
+      setPaymentAmount('')
+      onReload()
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : 'Impossible d’enregistrer ce paiement.')
+    } finally {
+      setPaymentSaving(false)
+    }
   }
 
   return (
@@ -146,6 +170,7 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
                   <th className="px-3 py-3 sm:px-4 font-semibold text-right">Total</th>
                   <th className="px-3 py-3 sm:px-4 font-semibold text-right">Versé</th>
                   <th className="px-3 py-3 sm:px-6 text-right font-semibold">Reste</th>
+                  {canManagePayments && <th className="px-3 py-3 sm:px-4 font-semibold">Action</th>}
                 </tr>
               </thead>
               <tbody>
@@ -177,11 +202,12 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
                       <td data-label="Total" className="px-3 py-3 sm:px-4 sm:py-4 text-right">{formatCurrency(en.frais_total, en.devise)}</td>
                       <td data-label="Versé" className="px-3 py-3 sm:px-4 sm:py-4 text-right">{formatCurrency(en.frais_verses, en.devise)}</td>
                       <td data-label="Reste" className="px-3 py-3 sm:px-6 sm:py-4 text-right font-semibold text-rose-600">{formatCurrency(reste, en.devise)}</td>
+                      {canManagePayments && <td data-label="Action" className="px-3 py-3 sm:px-4 sm:py-4">{reste > 0 && <Button size="sm" variant="outline" onClick={() => { setPaymentEnrollment(en); setPaymentAmount(String(reste)); setPaymentError('') }}>Encaisser</Button>}</td>}
                     </tr>
                   )
                 })}
                 {pageItems.length === 0 && (
-                  <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucun dossier.</td></tr>
+                  <tr><td colSpan={canManagePayments ? 9 : 8} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucun dossier.</td></tr>
                 )}
               </tbody>
             </table>
@@ -195,6 +221,14 @@ export function EnrollmentsScreen({ enrollments, etudiants, classes }: {
           </div>
         </CardContent>
       </Card>
+      {paymentEnrollment && <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4" role="dialog" aria-modal="true" aria-label="Enregistrer un paiement">
+        <form onSubmit={recordPayment} className="w-full max-w-md space-y-4 rounded-2xl bg-background p-5 shadow-xl">
+          <div><h3 className="font-semibold">Enregistrer un paiement</h3><p className="mt-1 text-sm text-muted-foreground">{etudiants.find((item) => item.id === paymentEnrollment.student)?.full_name || paymentEnrollment.receipt_number}</p><p className="text-sm text-muted-foreground">Reste à payer : {formatCurrency(paymentEnrollment.reste_a_payer, paymentEnrollment.devise)}</p></div>
+          <label className="grid gap-1.5 text-xs font-semibold">Montant reçu ({paymentEnrollment.devise})<Input required type="number" min="0.01" max={paymentEnrollment.reste_a_payer ?? undefined} step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} /></label>
+          {paymentError && <p className="text-sm text-destructive" role="alert">{paymentError}</p>}
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setPaymentEnrollment(null)}>Annuler</Button><Button type="submit" disabled={paymentSaving}>{paymentSaving ? 'Enregistrement…' : 'Confirmer'}</Button></div>
+        </form>
+      </div>}
     </div>
   )
 }

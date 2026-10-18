@@ -63,6 +63,13 @@ class AbsenceViewSet(viewsets.ModelViewSet):
         if etudiant is None:
             return Response({'matricule': 'Aucun élève actif ne correspond à ce QR code.'}, status=status.HTTP_404_NOT_FOUND)
 
+        selected_class = request.data.get('classe')
+        if selected_class and str(etudiant.classe_id) != str(selected_class):
+            return Response(
+                {'classe': 'Le matricule ou QR code ne correspond pas à la classe choisie.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if request.user.role == 'PROFESSEUR':
             assigned = TeacherAssignment.objects.filter(
                 professeur=request.user,

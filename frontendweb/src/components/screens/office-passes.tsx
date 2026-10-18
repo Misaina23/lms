@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api, type Etudiant, type StudentOfficePass, type Classe } from '@/lib/api'
+import { matchesStudentQuery } from '@/lib/admin-data'
 
 const kinds: Record<StudentOfficePass['kind'], string> = {
   CONVOCATION: 'Convocation au bureau',
@@ -66,7 +67,8 @@ export function OfficePassesScreen({ students, classes, records, role, onReload 
   }
 
   const student = printing?.student_detail
-  const matchingStudents = students.filter((item) => item.actif && item.classe === Number(studentClass) && studentClass && `${item.first_name} ${item.last_name} ${item.matricule}`.toLocaleLowerCase().includes(studentSearch.trim().toLocaleLowerCase()))
+  const matchingStudentCandidates = students.filter((item) => item.actif && item.classe === Number(studentClass) && studentClass && matchesStudentQuery(item, studentSearch))
+  const matchingStudents = matchingStudentCandidates.slice(0, 8)
 
   return (
     <div className="space-y-6">
@@ -96,6 +98,7 @@ export function OfficePassesScreen({ students, classes, records, role, onReload 
                     <span>{item.first_name} {item.last_name}</span><span className="text-muted-foreground">{item.matricule}</span>
                   </button>)}
                   {matchingStudents.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève trouvé dans cette classe.</p>}
+                  {matchingStudentCandidates.length > 8 && <p className="px-3 py-2 text-xs text-muted-foreground">Affinez la recherche pour réduire les résultats.</p>}
                 </div>}
                 {studentId && <p className="text-xs text-muted-foreground">Élève sélectionné : {students.find((item) => item.id === Number(studentId))?.first_name} {students.find((item) => item.id === Number(studentId))?.last_name} · {students.find((item) => item.id === Number(studentId))?.matricule}</p>}
               </div>

@@ -16,8 +16,22 @@ class AbsenceSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get('request')
+        student = attrs.get('etudiant', getattr(self.instance, 'etudiant', None))
+        absence_date = attrs.get('date_absence', getattr(self.instance, 'date_absence', None))
+        start_time = attrs.get('heure_debut', getattr(self.instance, 'heure_debut', None))
+        end_time = attrs.get('heure_fin', getattr(self.instance, 'heure_fin', None))
+        if student and absence_date and start_time and end_time:
+            duplicates = Absence.objects.filter(
+                etudiant=student,
+                date_absence=absence_date,
+                heure_debut=start_time,
+                heure_fin=end_time,
+            )
+            if self.instance:
+                duplicates = duplicates.exclude(pk=self.instance.pk)
+            if duplicates.exists():
+                raise serializers.ValidationError('Un pointage existe déjà pour cet élève et ce créneau.')
         if request and request.user.role == 'PROFESSEUR':
-            student = attrs.get('etudiant', getattr(self.instance, 'etudiant', None))
             from classes.models import TeacherAssignment
             if not student or not student.classe_id or not TeacherAssignment.objects.filter(
                 professeur=request.user,
