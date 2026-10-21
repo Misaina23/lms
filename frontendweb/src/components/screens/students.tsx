@@ -8,10 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { api, type Etudiant, type Classe, type CertificateRequest, type PaginatedResponse, type StudentClassHistory, type StudentTransferRequest } from '@/lib/api'
-import { useFilteredStudents, initials, matchesStudentQuery } from '@/lib/admin-data'
+import { initials, useStudentDirectory, useStudentSearch } from '@/lib/admin-data'
 
-export function StudentsScreen({ etudiants, classes, onReload, canManage = true, canReviewTransfers = false, canManageCertificates = false, showGrades = true }: {
-  etudiants: Etudiant[]
+export function StudentsScreen({ classes, onReload, canManage = true, canReviewTransfers = false, canManageCertificates = false, showGrades = true }: {
   classes: Classe[]
   onReload: () => void
   canManage?: boolean
@@ -20,6 +19,7 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
   showGrades?: boolean
 }) {
   const [query, setQuery] = useState('')
+  const [directoryClass, setDirectoryClass] = useState('')
   const [page, setPage] = useState(0)
   const [showAddForm, setShowAddForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -62,16 +62,11 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
     date_inscription: new Date().toISOString().slice(0, 10),
     academic_year: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
   })
-  const filtered = useFilteredStudents(etudiants, query)
-  const certificateCandidates = etudiants.filter((student) => {
-    if (!student.actif || student.statut !== 'ENROLLED' || student.classe !== Number(certificateClass)) return false
-    const search = certificateStudentSearch.trim()
-    return !search || matchesStudentQuery(student, search)
-  })
-  const pageSize = 5
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const pageSize = 20
+  const { results: pageItems, count: studentCount, isLoading: directoryLoading, error: directoryError } = useStudentDirectory(directoryClass, query, page, pageSize)
+  const { results: certificateCandidates, count: certificateCandidateCount, isSearching: isSearchingCertificateStudent, error: certificateSearchError } = useStudentSearch(certificateClass, certificateStudentSearch, 'actif=true&statut=ENROLLED')
+  const totalPages = Math.max(1, Math.ceil(studentCount / pageSize))
   const safePage = Math.min(page, totalPages - 1)
-  const pageItems = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize)
   const refreshTransferRequests = useCallback(async () => {
     if (!canManage) return
     setTransferRequestsLoading(true)
@@ -333,14 +328,19 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-extrabold tracking-tight text-foreground">Élèves</h2>
-          <p className="text-sm text-muted-foreground">{etudiants.length} élèves inscrits · {classes.length} classes</p>
+            <p className="text-sm text-muted-foreground">{studentCount} élève(s) dans la classe sélectionnée · {classes.length} classes</p>
         </div>
         <div className="flex items-center gap-2">
+          <select value={directoryClass} onChange={(event) => { setDirectoryClass(event.target.value); setPage(0); setQuery('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm" aria-label="Filtrer les élèves par classe">
+            <option value="">Choisir une classe</option>
+            {classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}
+          </select>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => { setQuery(e.target.value); setPage(0) }}
+              disabled={!directoryClass}
               placeholder="Rechercher un élève..."
               className="h-10 w-56 pl-9"
             />
@@ -489,13 +489,15 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
                       <span className="text-xs text-muted-foreground">{student.matricule}</span>
                     </button>
                   ))}
-                  {certificateCandidates.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève inscrit correspondant dans cette classe.</p>}
-                  {certificateCandidates.length > 8 && <p className="px-3 py-2 text-xs text-muted-foreground">Affinez la recherche pour réduire les résultats.</p>}
+                  {isSearchingCertificateStudent && <p className="px-3 py-2 text-sm text-muted-foreground">Recherche en cours…</p>}
+                  {certificateSearchError && <p className="px-3 py-2 text-sm text-destructive" role="alert">{certificateSearchError}</p>}
+                  {!isSearchingCertificateStudent && !certificateSearchError && certificateCandidates.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève inscrit correspondant dans cette classe.</p>}
+                  {certificateCandidateCount > certificateCandidates.length && <p className="px-3 py-2 text-xs text-muted-foreground">{certificateCandidateCount} résultat(s) : affinez la recherche.</p>}
                 </div>
               )}
               {certificateStudent && (
                 <p className="text-sm text-primary md:col-span-2 xl:col-span-2">
-                  Élève sélectionné : {etudiants.find((student) => student.id === Number(certificateStudent))?.full_name}
+                  Élève sélectionné : {certificateCandidates.find((student) => student.id === Number(certificateStudent))?.full_name || 'Élève choisi'}
                 </p>
               )}
             </form>
@@ -558,7 +560,8 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle className="text-base">Liste des élèves</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">{filtered.length} résultats</p>
+            <p className="mt-1 text-xs text-muted-foreground">{studentCount} résultats{directoryLoading ? ' · chargement…' : ''}</p>
+            {directoryError && <p className="mt-2 text-sm text-destructive" role="alert">{directoryError}</p>}
           </div>
         </CardHeader>
         <CardContent className="px-0">
@@ -615,7 +618,7 @@ export function StudentsScreen({ etudiants, classes, onReload, canManage = true,
                   )
                 })}
                 {pageItems.length === 0 && (
-                  <tr><td colSpan={showGrades ? 5 : 4} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucun élève trouvé.</td></tr>
+                  <tr><td colSpan={showGrades ? 5 : 4} className="px-6 py-8 text-center text-sm text-muted-foreground">{directoryClass ? 'Aucun élève trouvé.' : 'Choisissez une classe pour afficher les élèves.'}</td></tr>
                 )}
               </tbody>
             </table>
