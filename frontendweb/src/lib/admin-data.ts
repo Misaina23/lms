@@ -220,19 +220,12 @@ export function useStudentDirectory(classId: string | number | null | undefined,
 
   useEffect(() => {
     let cancelled = false
-    if (!classId) {
-      setResults([])
-      setCount(0)
-      setIsLoading(false)
-      setError(null)
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     const timeout = window.setTimeout(async () => {
-      const params = new URLSearchParams({ classe: String(classId), page: String(page + 1), page_size: String(pageSize) })
-      if (term) params.set('q', term)
+      const params = new URLSearchParams({ page: String(page + 1), page_size: String(pageSize) })
+      if (classId) params.set('classe', String(classId))
+      if (term && classId) params.set('q', term)
       try {
         const response = await api.get<PaginatedResponse<Etudiant>>(`/etudiants/?${params.toString()}`)
         if (cancelled) return

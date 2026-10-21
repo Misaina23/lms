@@ -328,11 +328,11 @@ export function StudentsScreen({ classes, onReload, canManage = true, canReviewT
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-extrabold tracking-tight text-foreground">Élèves</h2>
-            <p className="text-sm text-muted-foreground">{studentCount} élève(s) dans la classe sélectionnée · {classes.length} classes</p>
+            <p className="text-sm text-muted-foreground">{studentCount} élève(s){directoryClass ? ' dans la classe sélectionnée' : ' au total'} · {classes.length} classes</p>
         </div>
         <div className="flex items-center gap-2">
           <select value={directoryClass} onChange={(event) => { setDirectoryClass(event.target.value); setPage(0); setQuery('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm" aria-label="Filtrer les élèves par classe">
-            <option value="">Choisir une classe</option>
+            <option value="">Toutes les classes</option>
             {classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}
           </select>
           <div className="relative">
@@ -341,7 +341,7 @@ export function StudentsScreen({ classes, onReload, canManage = true, canReviewT
               value={query}
               onChange={(e) => { setQuery(e.target.value); setPage(0) }}
               disabled={!directoryClass}
-              placeholder="Rechercher un élève..."
+              placeholder={directoryClass ? 'Rechercher un élève...' : 'Choisissez une classe pour rechercher'}
               className="h-10 w-56 pl-9"
             />
           </div>
@@ -617,8 +617,9 @@ export function StudentsScreen({ classes, onReload, canManage = true, canReviewT
                     </tr>
                   )
                 })}
-                {pageItems.length === 0 && (
-                  <tr><td colSpan={showGrades ? 5 : 4} className="px-6 py-8 text-center text-sm text-muted-foreground">{directoryClass ? 'Aucun élève trouvé.' : 'Choisissez une classe pour afficher les élèves.'}</td></tr>
+                {directoryLoading && pageItems.length === 0 && <tr><td colSpan={showGrades ? 5 : 4} className="px-6 py-8 text-center text-sm text-muted-foreground">Chargement des élèves…</td></tr>}
+                {!directoryLoading && pageItems.length === 0 && (
+                  <tr><td colSpan={showGrades ? 5 : 4} className="px-6 py-8 text-center text-sm text-muted-foreground">{query.trim() ? 'Aucun élève trouvé.' : 'Aucun élève enregistré.'}</td></tr>
                 )}
               </tbody>
             </table>
