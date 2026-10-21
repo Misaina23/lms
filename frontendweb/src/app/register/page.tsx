@@ -23,6 +23,8 @@ export default function TeacherRegistrationPage() {
     password: '',
   })
   const [matieres, setMatieres] = useState<Array<{ id: number; nom: string; code: string }>>([])
+  const [matieresLoading, setMatieresLoading] = useState(true)
+  const [matieresError, setMatieresError] = useState('')
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -31,10 +33,13 @@ export default function TeacherRegistrationPage() {
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const response = await api.get<{ matieres: Array<{ id: number; nom: string; code: string }> }>('/registration-options/')
+        const response = await api.get<{ matieres: Array<{ id: number; nom: string; code: string }> }>('/register/options/')
         setMatieres(response.matieres || [])
-      } catch {
+      } catch (loadError) {
         setMatieres([])
+        setMatieresError(loadError instanceof Error ? loadError.message : 'Impossible de charger les matières.')
+      } finally {
+        setMatieresLoading(false)
       }
     }
     fetchOptions()
@@ -50,6 +55,10 @@ export default function TeacherRegistrationPage() {
 
     if (form.role === 'PROFESSEUR' && !form.matiere) {
       setError('Veuillez préciser la matière enseignée pour ce professeur.')
+      return
+    }
+    if (form.role === 'PROFESSEUR' && !matieres.some((matiere) => matiere.id === Number(form.matiere))) {
+      setError('Veuillez choisir une matière existante dans la liste.')
       return
     }
 
@@ -134,11 +143,13 @@ export default function TeacherRegistrationPage() {
                 {form.role === 'PROFESSEUR' && (
                   <label className="grid gap-1.5 text-xs font-semibold">Matière enseignée
                     <select className="h-10 rounded-xl border border-input px-3 text-sm font-normal" value={form.matiere} onChange={(event) => update('matiere', event.target.value)} required>
-                      <option value="">Choisir une matière</option>
+                      <option value="">{matieresLoading ? 'Chargement des matières…' : 'Choisir une matière'}</option>
                       {matieres.map((matiere) => (
                         <option key={matiere.id} value={matiere.id}>{matiere.nom} ({matiere.code})</option>
                       ))}
                     </select>
+                    {matieresError && <span className="font-normal text-destructive" role="alert">{matieresError}</span>}
+                    {!matieresLoading && !matieresError && matieres.length === 0 && <span className="font-normal text-destructive" role="alert">Aucune matière n’est encore enregistrée. Contactez l’administration.</span>}
                   </label>
                 )}
                 <label className="grid gap-1.5 text-xs font-semibold">Mot de passe
@@ -157,7 +168,7 @@ export default function TeacherRegistrationPage() {
                 {error && <p className="sm:col-span-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
                 <div className="sm:col-span-2 mt-2 flex flex-col-reverse items-stretch justify-between gap-3 border-t border-border pt-5 sm:flex-row sm:items-center">
                   <p className="text-xs text-muted-foreground">Vous avez déjà un compte ? <Link href="/login" className="font-semibold text-primary">Se connecter</Link></p>
-                  <Button type="submit" disabled={loading}>{loading ? 'Envoi…' : 'Envoyer la demande'}</Button>
+                  <Button type="submit" disabled={loading || (form.role === 'PROFESSEUR' && (matieresLoading || matieres.length === 0 || Boolean(matieresError)))}>{loading ? 'Envoi…' : 'Envoyer la demande'}</Button>
                 </div>
               </form>
             )}

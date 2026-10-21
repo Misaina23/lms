@@ -213,8 +213,13 @@ class CustomUserViewSetTests(APITestCase):
 
     def test_registration_options_exposes_only_public_signup_roles(self):
         self.client.credentials()
+        matiere = Matiere.objects.create(nom='Physique', code='PHY')
         response = self.client.get(reverse('registration-options'))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['matieres'],
+            [{'id': matiere.id, 'nom': matiere.nom, 'code': matiere.code}],
+        )
         self.assertEqual(
             response.data['roles'],
             [
