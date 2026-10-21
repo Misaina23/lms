@@ -33,15 +33,19 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [showDirectForm, setShowDirectForm] = useState(false)
   const [contactId, setContactId] = useState('')
+  const [contactSearch, setContactSearch] = useState('')
+  const [contacts, setContacts] = useState<User[]>(users)
+  const [contactsLoading, setContactsLoading] = useState(false)
+  const [contactsError, setContactsError] = useState('')
   const [startingChat, setStartingChat] = useState(false)
   const [error, setError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const userMap = useMemo(() => {
     const map: Record<number, User> = {}
-    users.forEach(u => { map[u.id] = u })
+    contacts.forEach(u => { map[u.id] = u })
     return map
-  }, [users])
+  }, [contacts])
 
   const fetchGroups = async () => {
     setLoading(true)
@@ -75,6 +79,27 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
       }
     }
     fetchGroups()
+    const fetchContacts = async () => {
+      setContactsLoading(true)
+      setContactsError('')
+      try {
+        const allContacts: User[] = []
+        let page = 1
+        let hasNextPage = true
+        while (hasNextPage) {
+          const response = await api.get<{ results: User[]; next: string | null }>(`/users/?page=${page}&page_size=500`)
+          allContacts.push(...response.results)
+          hasNextPage = Boolean(response.next)
+          page += 1
+        }
+        setContacts(allContacts)
+      } catch (fetchError) {
+        setContactsError(fetchError instanceof Error ? fetchError.message : 'Impossible de charger les comptes du personnel.')
+      } finally {
+        setContactsLoading(false)
+      }
+    }
+    void fetchContacts()
   }, [])
 
   useEffect(() => {
@@ -114,6 +139,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
       const group = await api.post<ChatGroup>('/chat-groups/direct/', { recipient: Number(contactId) })
       setShowDirectForm(false)
       setContactId('')
+      setContactSearch('')
       await fetchGroups()
       setSelectedGroup(group)
     } catch (chatError) {
@@ -131,10 +157,15 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
       GROUP_TYPE_LABELS[group.group_type]?.toLowerCase().includes(q)
     )
   })
+  const availableContacts = contacts.filter((user) =>
+    user.status === 'ACTIVE'
+    && user.id !== currentUserId
+    && (!contactSearch.trim() || `${user.first_name} ${user.last_name} ${user.role}`.toLocaleLowerCase().includes(contactSearch.trim().toLocaleLowerCase()))
+  )
 
   if (selectedGroup) {
     return (
-      <div className="flex h-[calc(100vh-8rem)] gap-4">
+      <div className="flex h-[calc(100dvh-11rem)] min-h-[28rem] gap-4">
         <div className="hidden md:flex md:w-64 flex-col gap-2">
           <Button variant="outline" onClick={() => setSelectedGroup(null)} className="justify-start">
             ← Retour aux groupes
@@ -160,7 +191,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
           <CardHeader className="border-b border-border">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedGroup(null)}>
-                <ChevronRight className="size-4" />
+                <ChevronRight className="size-4 rotate-180" />
               </Button>
               <div className="flex-1">
                 <CardTitle className="text-base">{selectedGroup.name}</CardTitle>
@@ -171,6 +202,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-3" ref={scrollRef}>
+            {error && <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">{error}</p>}
             {messages.map(message => {
               const sender = userMap[message.sender || 0]
               const isOwn = message.sender === currentUserId
@@ -198,7 +230,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
               </div>
             )}
           </CardContent>
-          <div className="border-t border-border p-3">
+          <div className="border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="flex gap-2">
               <Input
                 value={draft}
@@ -235,14 +267,37 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
               <Button size="sm" variant="outline" onClick={() => setShowDirectForm((value) => !value)} className="gap-1"><UserPlus className="size-4" /> Nouveau</Button>
             </div>
             {showDirectForm && (
-              <form onSubmit={startDirectChat} className="mt-3 flex gap-2">
-                <select required value={contactId} onChange={(event) => setContactId(event.target.value)} className="h-9 min-w-0 flex-1 rounded-xl border border-border bg-card px-2 text-xs" aria-label="Choisir un membre du personnel">
-                  <option value="">Choisir un collègue</option>
-                  {users.filter((user) => user.status === 'ACTIVE' && user.id !== currentUserId).map((user) => (
-                    <option key={user.id} value={user.id}>{user.first_name} {user.last_name} · {user.role}</option>
-                  ))}
-                </select>
-                <Button type="submit" size="sm" disabled={!contactId || startingChat}>{startingChat ? <Loader2 className="size-4 animate-spin" /> : 'Créer'}</Button>
+              <form onSubmit={startDirectChat} className="mt-3 grid gap-2">
+                <label className="grid gap-1 text-xs font-semibold">
+                  Rechercher un compte du personnel
+                  <Input value={contactSearch} onChange={(event) => { setContactSearch(event.target.value); setContactId('') }} placeholder="Nom ou fonction" />
+                </label>
+                {contactsLoading ? (
+                  <p className="flex items-center gap-2 py-2 text-xs text-muted-foreground"><Loader2 className="size-4 animate-spin" />Chargement des comptes actifs…</p>
+                ) : contactsError ? (
+                  <p className="text-xs text-destructive" role="alert">{contactsError}</p>
+                ) : availableContacts.length > 0 ? (
+                  <div className="max-h-48 overflow-y-auto rounded-xl border border-border" role="listbox" aria-label="Comptes du personnel disponibles">
+                    {availableContacts.slice(0, 12).map((user) => (
+                      <button
+                        type="button"
+                        key={user.id}
+                        aria-selected={contactId === String(user.id)}
+                        onClick={() => setContactId(String(user.id))}
+                        className={`flex w-full items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5 text-left last:border-0 hover:bg-muted/50 ${contactId === String(user.id) ? 'bg-primary/10' : ''}`}
+                      >
+                        <span className="min-w-0 truncate text-sm font-medium">{user.first_name} {user.last_name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{user.role}</span>
+                      </button>
+                    ))}
+                    {availableContacts.length > 12 && <p className="px-3 py-2 text-xs text-muted-foreground">Affinez la recherche pour voir les {availableContacts.length} résultats.</p>}
+                  </div>
+                ) : (
+                  <p className="py-2 text-xs text-muted-foreground">{contacts.length === 0 ? 'Aucun autre compte actif du personnel n’est disponible.' : 'Aucun collègue ne correspond à cette recherche.'}</p>
+                )}
+                <Button type="submit" className="w-full sm:w-auto sm:justify-self-end" disabled={!contactId || startingChat || contactsLoading}>
+                  {startingChat ? <><Loader2 className="mr-2 size-4 animate-spin" />Création…</> : 'Démarrer la conversation'}
+                </Button>
               </form>
             )}
             {error && <p className="mt-2 text-xs text-destructive" role="alert">{error}</p>}
@@ -256,7 +311,7 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
               />
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="max-h-[calc(100dvh-20rem)] space-y-2 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -264,7 +319,8 @@ export function ChatScreen({ users = [] }: { users: User[] }) {
             ) : filteredGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <MessageCircle className="size-10 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Aucun groupe</p>
+                <p className="text-sm text-muted-foreground">{searchQuery ? 'Aucun groupe correspondant.' : 'Aucune conversation pour le moment.'}</p>
+                {!searchQuery && <p className="mt-1 text-xs text-muted-foreground">Appuyez sur « Nouveau » pour choisir un collègue et lui écrire.</p>}
               </div>
             ) : (
               filteredGroups.map(group => (
