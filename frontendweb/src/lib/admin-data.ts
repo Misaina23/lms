@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { api, type PaginatedResponse, type User, type Etudiant, type Note, type Classe, type Matiere, type Enrollment, type StudentOrientation, type ExamPeriod, type Absence, type BudgetItem, type BudgetCategory, type BudgetReport, type BudgetStats, type TimetableSlot, type AuditLog, type Notification, type StudentOfficePass, type TeacherUnavailabilityReport } from '@/lib/api'
 import { getStoredUser, isValidPortalRole } from '@/lib/auth'
 
@@ -156,6 +156,13 @@ export function useAdminData() {
   useEffect(() => { reload() }, [])
 
   return { data, isLoading, error, reload, setData }
+}
+
+export function useFilteredStudents(etudiants: Etudiant[], query: string) {
+  return useMemo(
+    () => etudiants.filter((etudiant) => !query.trim() || matchesStudentQuery(etudiant, query)),
+    [etudiants, query]
+  )
 }
 
 export function useStudentSearch(classId: string | number | null | undefined, query: string, filters = '') {
