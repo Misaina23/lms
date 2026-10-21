@@ -867,6 +867,21 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
   const availablePeriods = periods.filter((period) => !period.is_locked && classAssignmentYears.includes(period.academic_year))
   const availableAssignments = assignments.filter((item) => item.classe === Number(classId) && (!periodId || item.academic_year === periods.find((period) => period.id === Number(periodId))?.academic_year))
   const availableSubjects = [...new Set(availableAssignments.map((item) => item.matiere))]
+  const missingGradeRequirement = !classId
+    ? 'Choisissez une classe.'
+    : assignmentsLoading
+      ? 'Chargement de vos classes…'
+      : !availablePeriods.length
+        ? 'Aucune période ouverte n’est disponible pour cette classe.'
+        : !periodId
+          ? 'Choisissez une période.'
+          : !subjectId
+            ? 'Choisissez une matière.'
+            : !studentId
+              ? 'Recherchez puis sélectionnez un élève dans la liste.'
+              : !score1
+                ? 'Saisissez la première note.'
+                : null
   const { results: matchingStudents, count: matchingStudentCount, isSearching: isSearchingStudent, error: studentSearchError } = useStudentSearch(classId, studentQuery, 'actif=true&statut=ENROLLED')
   const filteredNotes = notes.filter((note) => {
     const student = note.etudiant_detail
@@ -877,7 +892,10 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
 
   const saveGrade = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!studentId || !classId || !subjectId || !periodId) return
+    if (!studentId || !classId || !subjectId || !periodId) {
+      setGradeError('Complétez la classe, la période, la matière et sélectionnez un élève avant d’enregistrer.')
+      return
+    }
     setSavingGrade(true)
     setGradeError('')
     setGradeMessage('')
@@ -939,10 +957,22 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
               </select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold">Matière
-              <select required value={subjectId} onChange={(event) => setSubjectId(event.target.value)} disabled={!classId} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une matière</option>{matieres.filter((item) => availableSubjects.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>
+              <select required value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setGradeError('') }} disabled={!classId} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une matière</option>{matieres.filter((item) => availableSubjects.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold">Période
-              <select required value={periodId} onChange={(event) => { setPeriodId(event.target.value); setSubjectId(''); setScore2('') }} disabled={!classId || assignmentsLoading || availablePeriods.length === 0} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">{assignmentsLoading ? 'Chargement des affectations…' : availablePeriods.length ? 'Choisir une période' : 'Aucune période ouverte'}</option>{availablePeriods.map((period) => <option key={period.id} value={period.id}>{period.label} · {period.academic_year}</option>)}</select>
+              <select required value={periodId} onChange={(event) => {
+                const nextPeriodId = event.target.value
+                const nextPeriod = periods.find((period) => period.id === Number(nextPeriodId))
+                const subjectRemainsAvailable = assignments.some((assignment) =>
+                  assignment.classe === Number(classId)
+                  && assignment.matiere === Number(subjectId)
+                  && (!nextPeriod || assignment.academic_year === nextPeriod.academic_year)
+                )
+                setPeriodId(nextPeriodId)
+                if (!subjectRemainsAvailable) setSubjectId('')
+                setScore2('')
+                setGradeError('')
+              }} disabled={!classId || assignmentsLoading || availablePeriods.length === 0} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">{assignmentsLoading ? 'Chargement des affectations…' : availablePeriods.length ? 'Choisir une période' : 'Aucune période ouverte'}</option>{availablePeriods.map((period) => <option key={period.id} value={period.id}>{period.label} · {period.academic_year}</option>)}</select>
             </label>
             {classId && !assignmentsLoading && availablePeriods.length === 0 && <p className="text-sm text-amber-700 sm:col-span-2 lg:col-span-3" role="status">Aucune période ouverte n’est configurée pour l’année de vos affectations dans cette classe. Demandez à l’administration de configurer l’année et ses périodes.</p>}
             <label className="grid gap-1.5 text-xs font-semibold">Rechercher un élève par nom ou matricule
@@ -961,7 +991,10 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
             <label className="grid gap-1.5 text-xs font-semibold">Date d’évaluation<Input required type="date" value={evaluationDate} onChange={(event) => setEvaluationDate(event.target.value)} /></label>
             {gradeError && <p className="text-sm text-destructive sm:col-span-2" role="alert">{gradeError}</p>}
             {gradeMessage && <p className="text-sm text-emerald-700 sm:col-span-2" role="status">{gradeMessage}</p>}
-            <div className="flex items-end"><Button type="submit" disabled={savingGrade || !studentId || !subjectId || !periodId}>{savingGrade ? 'Enregistrement…' : 'Enregistrer le brouillon'}</Button></div>
+            <div className="flex flex-col items-start justify-end gap-2">
+              <Button type="submit" disabled={savingGrade}>{savingGrade ? 'Enregistrement…' : 'Enregistrer la note'}</Button>
+              {!gradeError && missingGradeRequirement && <p className="text-xs text-muted-foreground" role="status">{missingGradeRequirement}</p>}
+            </div>
           </form>
         </CardContent>
       </Card>}
