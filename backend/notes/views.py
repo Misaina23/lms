@@ -20,22 +20,14 @@ class NoteViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        notes = Note.objects.select_related('etudiant', 'etudiant__classe')
         if user.role == 'ADMIN':
-            return Note.objects.all()
+            return notes
         elif user.role == 'SURVEILLANT':
             # Surveillants can see all grades (read-only)
-            return Note.objects.all()
+            return notes
         elif user.role == 'PROFESSEUR':
-            # Teachers can only see grades for their assigned classes/subjects
-            from classes.models import TeacherAssignment
-            assignments = TeacherAssignment.objects.filter(
-                professeur=user
-            ).values_list('classe_id', 'matiere_id')
-            classe_matiere_pairs = list(assignments)
-            q_objects = Q()
-            for classe_id, matiere_id in classe_matiere_pairs:
-                q_objects |= Q(etudiant__classe_id=classe_id, matiere_id=matiere_id)
-            return Note.objects.filter(q_objects) if classe_matiere_pairs else Note.objects.none()
+            return notes.filter(professeur=user)
         return Note.objects.none()
 
     def perform_create(self, serializer):

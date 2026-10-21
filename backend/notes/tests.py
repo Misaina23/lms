@@ -69,6 +69,79 @@ class NoteViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertGreaterEqual(len(response.data['results']), 1)
 
+    def test_teacher_lists_only_their_own_notes_and_admin_lists_all_teachers(self):
+        another_teacher = CustomUser.objects.create_user(
+            username='another-prof',
+            email='another-prof@lycee.com',
+            password='profpass',
+            first_name='Paul',
+            last_name='Rabe',
+            matricule='PRF002',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        other_student = Etudiant.objects.create(
+            matricule='ELV003',
+            first_name='Lina',
+            last_name='Rakoto',
+            classe=self.classe,
+            date_inscription='2024-09-01',
+            actif=True,
+        )
+        other_note = Note.objects.create(
+            etudiant=other_student,
+            matiere=self.matiere,
+            professeur=another_teacher,
+            exam_period=self.exam_period,
+            score_1=12.00,
+            coefficient=1.00,
+            date_evaluation='2024-10-02',
+        )
+        TeacherAssignment.objects.create(
+            professeur=self.professeur,
+            classe=self.classe,
+            matiere=self.matiere,
+            academic_year=self.exam_period.academic_year,
+        )
+        TeacherAssignment.objects.create(
+            professeur=another_teacher,
+            classe=self.classe,
+            matiere=self.matiere,
+            academic_year=self.exam_period.academic_year,
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')
+        teacher_response = self.client.get(reverse('note-list'))
+
+        self.assertEqual(teacher_response.status_code, 200)
+        self.assertEqual(
+            [note['id'] for note in teacher_response.data['results']],
+            [self.note.id],
+        )
+        self.assertEqual(
+            teacher_response.data['results'][0]['etudiant_detail']['id'],
+            self.etudiant.id,
+        )
+        self.assertEqual(
+            self.client.get(reverse('note-detail', args=[other_note.id])).status_code,
+            404,
+        )
+        transfer_response = self.client.patch(
+            reverse('note-detail', args=[self.note.id]),
+            {'professeur': another_teacher.id},
+        )
+        self.assertEqual(transfer_response.status_code, 400)
+        self.note.refresh_from_db()
+        self.assertEqual(self.note.professeur_id, self.professeur.id)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.admin_user.auth_token.key}')
+        admin_response = self.client.get(reverse('note-list'))
+
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertEqual(
+            {note['id'] for note in admin_response.data['results']},
+            {self.note.id, other_note.id},
+        )
+
     def test_create_note(self):
         url = reverse('note-list')
         second_period = ExamPeriod.objects.create(

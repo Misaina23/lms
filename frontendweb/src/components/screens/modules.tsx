@@ -885,8 +885,10 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
   const { results: matchingStudents, count: matchingStudentCount, isSearching: isSearchingStudent, error: studentSearchError } = useStudentSearch(classId, studentQuery, 'actif=true&statut=ENROLLED')
   const filteredNotes = notes.filter((note) => {
     const student = note.etudiant_detail
-    return Boolean(notesClassFilter && student.classe === Number(notesClassFilter) && (!notesSearch.trim() || matchesStudentQuery(student, notesSearch)))
+    return (!notesClassFilter || student.classe === Number(notesClassFilter))
+      && (!notesSearch.trim() || matchesStudentQuery(student, notesSearch))
   })
+  const showTeacherColumn = role === 'ADMIN'
   const notePageCount = Math.max(1, Math.ceil(filteredNotes.length / 30))
   const visibleNotes = filteredNotes.slice(notePage * 30, notePage * 30 + 30)
 
@@ -1004,8 +1006,8 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
         {actionError && <p className="mx-6 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{actionError}</p>}
         <CardContent className="px-0">
           <div className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
-            <label className="grid gap-1 text-xs font-semibold">Classe<select value={notesClassFilter} onChange={(event) => { setNotesClassFilter(event.target.value); setNotesSearch(''); setNotePage(0) }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une classe</option>{classes.filter((classe) => role !== 'PROFESSEUR' || assignments.some((item) => item.classe === classe.id)).map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}</select></label>
-            <label className="grid gap-1 text-xs font-semibold">Rechercher un élève par nom ou matricule<Input disabled={!notesClassFilter} value={notesSearch} onChange={(event) => { setNotesSearch(event.target.value); setNotePage(0) }} placeholder="Nom, prénom ou matricule" /></label>
+            <label className="grid gap-1 text-xs font-semibold">Classe<select value={notesClassFilter} onChange={(event) => { setNotesClassFilter(event.target.value); setNotesSearch(''); setNotePage(0) }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">{role === 'ADMIN' ? 'Toutes les classes' : 'Toutes mes classes'}</option>{classes.filter((classe) => role !== 'PROFESSEUR' || assignments.some((item) => item.classe === classe.id)).map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}</select></label>
+            <label className="grid gap-1 text-xs font-semibold">Rechercher un élève par nom ou matricule<Input value={notesSearch} onChange={(event) => { setNotesSearch(event.target.value); setNotePage(0) }} placeholder="Nom, prénom ou matricule" /></label>
           </div>
           <div className="overflow-x-auto">
             <table className="mobile-card-table w-full min-w-[640px] text-left text-sm">
@@ -1016,6 +1018,7 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
                   <th className="px-3 py-3 sm:px-4 font-semibold">Période</th>
                   <th className="px-3 py-3 sm:px-4 font-semibold">Note</th>
                   <th className="px-3 py-3 sm:px-4 font-semibold">Coef.</th>
+                  {showTeacherColumn && <th className="px-3 py-3 sm:px-4 font-semibold">Enseignant</th>}
                   <th className="px-3 py-3 sm:px-6 font-semibold">Statut</th>
                 </tr>
               </thead>
@@ -1023,6 +1026,7 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
                 {visibleNotes.map((n) => {
                   const mat = matieres.find((m) => m.id === n.matiere)
                   const per = periods.find((p) => p.id === n.exam_period)
+                  const teacher = users.find((user) => user.id === n.professeur)
                   return (
                     <tr key={n.id} className="border-b border-border/60 hover:bg-muted/25">
                       <td data-label="Élève" className="px-3 py-3 sm:px-6 sm:py-4">{n.etudiant_detail.first_name} {n.etudiant_detail.last_name}</td>
@@ -1030,6 +1034,7 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
                       <td data-label="Période" className="px-3 py-3 sm:px-4 sm:py-4">{per?.label || '—'}</td>
                       <td data-label="Note" className="px-3 py-3 sm:px-4 sm:py-4 font-semibold">{n.note}/20</td>
                       <td data-label="Coefficient" className="px-3 py-3 sm:px-4 sm:py-4">{n.coefficient}</td>
+                      {showTeacherColumn && <td data-label="Enseignant" className="px-3 py-3 sm:px-4 sm:py-4">{teacher ? `${teacher.first_name} ${teacher.last_name}`.trim() : '—'}</td>}
                       <td data-label="Statut et actions" className="px-3 py-3 sm:px-6 sm:py-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${n.status === 'APPROVED' || n.status === 'LOCKED' ? 'bg-emerald-500/10 text-emerald-700' : n.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-700' : 'bg-amber-500/10 text-amber-700'}`}>{n.status}</span>
@@ -1047,7 +1052,7 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
                     </tr>
                   )
                 })}
-                {visibleNotes.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-muted-foreground">{notesClassFilter ? 'Aucune note correspondante.' : 'Choisissez une classe pour consulter les notes.'}</td></tr>}
+                {visibleNotes.length === 0 && <tr><td colSpan={showTeacherColumn ? 7 : 6} className="px-6 py-8 text-center text-sm text-muted-foreground">Aucune note correspondante.</td></tr>}
               </tbody>
             </table>
           </div>

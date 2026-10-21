@@ -1,15 +1,23 @@
 from rest_framework import serializers
+from etudiants.models import Etudiant
 from .models import Note
+
+
+class StudentSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Etudiant
+        fields = ['id', 'matricule', 'first_name', 'last_name', 'classe']
 
 
 class NoteSerializer(serializers.ModelSerializer):
     note = serializers.SerializerMethodField()
     coefficient = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
+    etudiant_detail = StudentSummarySerializer(source='etudiant', read_only=True)
 
     class Meta:
         model = Note
         fields = [
-            'id', 'etudiant', 'matiere', 'professeur', 'exam_period',
+            'id', 'etudiant', 'etudiant_detail', 'matiere', 'professeur', 'exam_period',
             'score_1', 'score_2', 'note', 'coefficient', 'date_evaluation',
             'commentaire', 'status', 'updated_by', 'updated_at',
         ]
@@ -23,6 +31,8 @@ class NoteSerializer(serializers.ModelSerializer):
 
         request = self.context.get('request')
         if request and request.user.role == 'PROFESSEUR':
+            if self.instance and attrs.get('professeur', self.instance.professeur) != request.user:
+                raise serializers.ValidationError({'professeur': 'Vous ne pouvez pas transférer une note à un autre enseignant.'})
             if self.instance and self.instance.status not in (Note.Status.DRAFT, Note.Status.REJECTED):
                 raise serializers.ValidationError('Cette note a déjà été transmise et ne peut plus être modifiée.')
             student = attrs.get('etudiant', getattr(self.instance, 'etudiant', None))
