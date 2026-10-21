@@ -7,8 +7,8 @@ from users.models import CustomUser
 from classes.models import Classe, TeacherAssignment
 from etudiants.models import Etudiant
 from matieres.models import Matiere
-from .models import Absence
-from etudiants.models import Notification
+from .models import Absence, TeacherUnavailabilityReport
+from etudiants.models import AuditLog, Notification
 
 
 class AbsenceViewSetTests(APITestCase):
@@ -75,6 +75,101 @@ class AbsenceViewSetTests(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Absence.objects.count(), 2)
+
+    def test_teacher_reports_unavailability_and_notifies_active_administrators(self):
+        subject = Matiere.objects.create(nom='Mathématiques', code='MATH-U')
+        assignment = TeacherAssignment.objects.create(
+            professeur=self.professeur,
+            classe=self.classe,
+            matiere=subject,
+            academic_year='2026-2027',
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')
+
+        response = self.client.post(reverse('teacher-unavailability-report-list'), {
+            'assignment': assignment.id,
+            'date': (timezone.localdate() + timedelta(days=1)).isoformat(),
+            'start_time': '08:00',
+            'end_time': '10:00',
+            'reason': 'Empêchement médical',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        report = TeacherUnavailabilityReport.objects.get()
+        self.assertEqual(report.status, TeacherUnavailabilityReport.Status.PENDING)
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.admin_user,
+                notification_type='TEACHER_UNAVAILABILITY',
+            ).count(),
+            1,
+        )
+        self.assertTrue(AuditLog.objects.filter(
+            entity_type='TeacherUnavailabilityReport',
+            entity_id=str(report.id),
+            action=AuditLog.Action.CREATE,
+        ).exists())
+
+    def test_teacher_cannot_report_another_teachers_assignment(self):
+        subject = Matiere.objects.create(nom='Mathématiques', code='MATH-U2')
+        other_teacher = CustomUser.objects.create_user(
+            username='other-prof',
+            email='other-prof@lycee.com',
+            password='profpass',
+            first_name='Paul',
+            last_name='Autre',
+            matricule='PRF002',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        assignment = TeacherAssignment.objects.create(
+            professeur=other_teacher,
+            classe=self.classe,
+            matiere=subject,
+            academic_year='2026-2027',
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')
+
+        response = self.client.post(reverse('teacher-unavailability-report-list'), {
+            'assignment': assignment.id,
+            'date': (timezone.localdate() + timedelta(days=1)).isoformat(),
+            'start_time': '08:00',
+            'end_time': '10:00',
+            'reason': 'Empêchement',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(TeacherUnavailabilityReport.objects.exists())
+
+    def test_only_admin_can_update_teacher_unavailability_status(self):
+        subject = Matiere.objects.create(nom='Mathématiques', code='MATH-U3')
+        assignment = TeacherAssignment.objects.create(
+            professeur=self.professeur,
+            classe=self.classe,
+            matiere=subject,
+            academic_year='2026-2027',
+        )
+        report = TeacherUnavailabilityReport.objects.create(
+            assignment=assignment,
+            date=timezone.localdate() + timedelta(days=1),
+            start_time='08:00',
+            end_time='10:00',
+            reason='Empêchement',
+        )
+        response = self.client.post(
+            reverse('teacher-unavailability-report-update-status', args=[report.id]),
+            {'status': TeacherUnavailabilityReport.Status.RESOLVED, 'admin_response': 'Remplaçant prévu.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        report.refresh_from_db()
+        self.assertEqual(report.status, TeacherUnavailabilityReport.Status.RESOLVED)
+        self.assertEqual(report.admin_response, 'Remplaçant prévu.')
+        self.assertTrue(AuditLog.objects.filter(
+            entity_type='TeacherUnavailabilityReport',
+            entity_id=str(report.id),
+            action=AuditLog.Action.STATUS_CHANGE,
+        ).exists())
 
     def test_retrieve_absence(self):
         url = reverse('absence-detail', args=[self.absence.id])

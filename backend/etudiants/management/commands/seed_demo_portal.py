@@ -165,7 +165,7 @@ class Command(BaseCommand):
     def _assign_math_teacher(self, teacher, classes, academic_year):
         math, _ = Matiere.objects.get_or_create(
             code='MATH',
-            defaults={'nom': 'Mathématiques', 'coefficient': 5},
+            defaults={'nom': 'Mathématiques'},
         )
         for classe in classes.values():
             TeacherAssignment.objects.get_or_create(

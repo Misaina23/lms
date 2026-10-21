@@ -111,7 +111,6 @@ export default function TeacherRegistrationPage() {
                 <label className="grid gap-1.5 text-xs font-semibold">Rôle demandé
                   <select className="h-10 rounded-xl border border-input px-3 text-sm font-normal" value={form.role} onChange={(event) => update('role', event.target.value)}>
                     <option value="PROFESSEUR">Professeur</option>
-                    <option value="ADMIN">Administrateur</option>
                     <option value="SURVEILLANT">Surveillant</option>
                   </select>
                 </label>
@@ -124,7 +123,7 @@ export default function TeacherRegistrationPage() {
                 <label className="grid gap-1.5 text-xs font-semibold">Téléphone <span className="font-normal text-muted-foreground">Facultatif</span>
                   <Input autoComplete="tel" value={form.phone} onChange={(event) => update('phone', event.target.value)} />
                 </label>
-                {(form.role === 'PROFESSEUR' || form.role === 'ADMIN') && (
+                {form.role === 'PROFESSEUR' && (
                   <label className="grid gap-1.5 text-xs font-semibold">Statut professionnel
                     <select className="h-10 rounded-xl border border-input px-3 text-sm font-normal" value={form.teacher_type} onChange={(event) => update('teacher_type', event.target.value)}>
                       <option value="FONCTIONNAIRE">Fonctionnaire</option>

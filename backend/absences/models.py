@@ -1,6 +1,7 @@
 from django.db import models
 from users.models import CustomUser
 from etudiants.models import Etudiant
+from classes.models import TeacherAssignment
 import uuid
 
 
@@ -39,3 +40,34 @@ class Absence(models.Model):
 
     class Meta:
         ordering = ['-date_absence', '-created_at']
+
+
+class TeacherUnavailabilityReport(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'En attente'
+        ACKNOWLEDGED = 'ACKNOWLEDGED', 'Pris en compte'
+        RESOLVED = 'RESOLVED', 'Traité'
+
+    assignment = models.ForeignKey(
+        TeacherAssignment,
+        on_delete=models.PROTECT,
+        related_name='unavailability_reports',
+    )
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    reason = models.TextField()
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    admin_response = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-start_time', '-created_at']
+
+    def __str__(self):
+        return f"{self.assignment.professeur} — {self.assignment.classe} — {self.date}"

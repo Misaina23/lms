@@ -172,6 +172,12 @@ class TeacherAssignmentViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['professeur', 'classe', 'matiere', 'academic_year', 'is_main_teacher', 'is_substitute']
 
+    def get_queryset(self):
+        assignments = super().get_queryset()
+        if self.request.user.role == CustomUser.Role.ADMIN:
+            return assignments
+        return assignments.filter(professeur=self.request.user)
+
     def perform_create(self, serializer):
         assignment = serializer.save()
         self._create_salary_budget_item(assignment)

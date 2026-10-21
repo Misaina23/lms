@@ -162,7 +162,7 @@ DEFAULT_CHARSET = 'utf-8'
 DEFAULT_CONTENT_TYPE = 'text/html'
 
 LANGUAGE_CODE = 'fr-fr'
-TIME_ZONE = 'Africa/Niamey'
+TIME_ZONE = 'Indian/Antananarivo'
 USE_I18N = True
 USE_TZ = True
 

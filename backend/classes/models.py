@@ -158,11 +158,11 @@ class SchoolConfig(models.Model):
         choices=EvaluationPeriodType.choices,
         default=EvaluationPeriodType.TRIMESTRE,
     )
-    school_name = models.CharField(max_length=200, default='Lycée Horizon')
+    school_name = models.CharField(max_length=200, default='Lycée Midongy Sud')
     school_address = models.CharField(max_length=300, blank=True)
     school_phone = models.CharField(max_length=30, blank=True)
     school_email = models.EmailField(blank=True)
-    devise = models.CharField(max_length=3, default='XOF')
+    devise = models.CharField(max_length=3, default='MGA')
     frais_inscription_defaut = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     ecolage_annuel_defaut = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     tolerance_retard_minutes = models.PositiveIntegerField(default=10)

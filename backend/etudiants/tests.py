@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from io import StringIO
 
 from django.core.exceptions import ValidationError
@@ -222,6 +223,41 @@ class AdmissionAndCertificateWorkflowTests(APITestCase):
 
     def setUp(self):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.admin_user.auth_token.key}')
+
+    def test_payment_recording_works_for_student_dossiers_without_user_accounts(self):
+        student = Etudiant.objects.create(
+            matricule='PAY-001',
+            first_name='Miora',
+            last_name='Rakoto',
+            classe=self.classe,
+            date_inscription='2026-09-01',
+        )
+        enrollment = Enrollment.objects.create(
+            student=student,
+            classe=self.classe,
+            academic_year='2026-2027',
+            frais_total='100000.00',
+            frais_verses='0.00',
+        )
+
+        response = self.client.post(
+            reverse('enrollment-confirm-payment', args=[enrollment.id]),
+            {'amount': '25000'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], Enrollment.PaymentStatus.PARTIAL)
+        enrollment.refresh_from_db()
+        self.assertEqual(enrollment.frais_verses, Decimal('25000.00'))
+        self.assertTrue(BudgetItem.objects.filter(
+            related_enrollment=enrollment,
+            description__contains='Miora Rakoto',
+        ).exists())
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.admin_user,
+            notification_type='PAYMENT_RECORDED',
+        ).exists())
 
     def test_bulk_import_and_export_students_for_class(self):
         response = self.client.post(reverse('etudiant-import'), {

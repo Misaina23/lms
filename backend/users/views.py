@@ -25,7 +25,6 @@ PORTAL_ACCESS_ROLES = {
     CustomUser.Role.SECRETARIAT,
 }
 PUBLIC_SIGNUP_ROLES = {
-    CustomUser.Role.ADMIN,
     CustomUser.Role.PROFESSEUR,
     CustomUser.Role.SURVEILLANT,
 }
@@ -142,7 +141,6 @@ def registration_options(request):
         'matieres': MatiereSerializer(matieres, many=True).data,
         'roles': [
             {'value': CustomUser.Role.PROFESSEUR, 'label': 'Professeur'},
-            {'value': CustomUser.Role.ADMIN, 'label': 'Administrateur'},
             {'value': CustomUser.Role.SURVEILLANT, 'label': 'Surveillant'},
         ],
         'teacher_types': [

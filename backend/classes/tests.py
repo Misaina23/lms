@@ -91,6 +91,39 @@ class ClasseBusinessRuleTests(APITestCase):
                 response = self.client.get(reverse(url_name))
                 self.assertEqual(response.status_code, 403)
 
+    def test_teacher_assignment_list_is_limited_to_the_signed_in_teacher(self):
+        subject = Matiere.objects.create(code='ASSIGN-1', nom='Mathématiques')
+        other_teacher = CustomUser.objects.create_user(
+            username='other-assignment-teacher',
+            email='other-assignment-teacher@lycee.com',
+            password='TeacherPassword123!',
+            first_name='Other',
+            last_name='Teacher',
+            matricule='COVTCH2',
+            role=CustomUser.Role.PROFESSEUR,
+        )
+        own_assignment = TeacherAssignment.objects.create(
+            professeur=self.teacher_user,
+            classe=Classe.objects.create(nom='6eme A', niveau=Classe.Niveau.SECONDAIRE_GENERAL, capacite=30),
+            matiere=subject,
+            academic_year='2026-2027',
+        )
+        TeacherAssignment.objects.create(
+            professeur=other_teacher,
+            classe=Classe.objects.create(nom='6eme B', niveau=Classe.Niveau.SECONDAIRE_GENERAL, capacite=30),
+            matiere=subject,
+            academic_year='2026-2027',
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.teacher_token.key}')
+        response = self.client.get(reverse('teacher-assignment-list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item['id'] for item in response.data['results']],
+            [own_assignment.id],
+        )
+
     def test_matiere_coefficient_is_resolved_by_class_stream(self):
         matiere = Matiere.objects.create(code='MATH', nom='Mathématiques')
         classe_s = Classe.objects.create(nom='Première S', niveau=Classe.Niveau.SECONDAIRE_GENERAL, stream=Classe.Stream.SCIENTIFIQUE, capacite=30)

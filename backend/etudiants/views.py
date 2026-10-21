@@ -681,14 +681,41 @@ class EtudiantViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role in ('ADMIN', 'SECRETARIAT', 'SURVEILLANT'):
-            return Etudiant.objects.all()
+            queryset = Etudiant.objects.select_related('classe').all()
         elif user.role == 'PROFESSEUR':
             # Teachers can only see students in their classes
             classe_ids = TeacherAssignment.objects.filter(
                 professeur=user
             ).values_list('classe_id', flat=True)
-            return Etudiant.objects.filter(classe_id__in=classe_ids)
-        return Etudiant.objects.none()
+            queryset = Etudiant.objects.select_related('classe').filter(classe_id__in=classe_ids)
+        else:
+            return Etudiant.objects.none()
+
+        search = self.request.query_params.get('q', '').strip()
+        if search:
+            for term in search.split():
+                queryset = queryset.filter(
+                    Q(first_name__icontains=term)
+                    | Q(last_name__icontains=term)
+                    | Q(matricule__icontains=term)
+                )
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        if request.query_params.get('q', '').strip() and not request.query_params.get('classe'):
+            return Response(
+                {'classe': 'Choisissez une classe avant de rechercher un élève.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().list(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        students = self.get_queryset()
+        return Response({
+            'total': students.count(),
+            'actifs': students.filter(actif=True).count(),
+        })
 
     def get_permissions(self):
         if self.action == 'register':
@@ -1002,7 +1029,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             return Response({'amount': 'Le montant doit etre superieur a zero.'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            enrollment = Enrollment.objects.select_for_update().select_related('student__user').get(pk=pk)
+            enrollment = Enrollment.objects.select_for_update().select_related('student').get(pk=pk)
             total = enrollment.frais_total
             already_paid = enrollment.frais_verses or Decimal('0')
             if total is None:
@@ -1033,7 +1060,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
                 date=datetime.date.today(),
                 amount=amount,
                 devise=enrollment.devise,
-                description=f"Paiement scolarite - {enrollment.student.user.get_full_name()} - {enrollment.receipt_number}",
+                description=f"Paiement scolarité - {enrollment.student.get_full_name()} - {enrollment.receipt_number}",
                 designation='Scolarite eleve',
                 reference_number=f"{enrollment.receipt_number}-{enrollment.budget_items.count() + 1}",
                 revenue_source=BudgetItem.RevenueSource.TUITION,
@@ -1055,11 +1082,11 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
                 reason='Payment recorded',
             )
             Notification.objects.create(
-                recipient=enrollment.student.user,
-                channel=Notification.Channel.SMS,
-                notification_type='PAYMENT_CONFIRMED',
-                title='Paiement enregistre',
-                message=f"Payment of {amount} {enrollment.devise} recorded. Remaining balance: {total - enrollment.frais_verses}. Receipt: {enrollment.receipt_number}",
+                recipient=request.user,
+                channel=Notification.Channel.PUSH,
+                notification_type='PAYMENT_RECORDED',
+                title='Paiement élève enregistré',
+                message=f"Paiement de {amount} {enrollment.devise} enregistré pour {enrollment.student.get_full_name()}. Reste à payer : {total - enrollment.frais_verses}. Reçu : {enrollment.receipt_number}",
                 payload={'enrollment_id': str(enrollment.id), 'receipt_number': enrollment.receipt_number, 'amount': str(amount), 'remaining': str(total - enrollment.frais_verses)},
             )
         return Response({'status': enrollment.payment_status, 'receipt_number': enrollment.receipt_number, 'frais_verses': str(enrollment.frais_verses), 'reste_a_payer': str(total - enrollment.frais_verses)})
@@ -1313,11 +1340,11 @@ class StudentOrientationViewSet(viewsets.ModelViewSet):
             reason=request.data.get('reason', ''),
         )
         Notification.objects.create(
-            recipient=orientation.student.user,
-            channel=Notification.Channel.EMAIL,
+            recipient=request.user,
+            channel=Notification.Channel.PUSH,
             notification_type='ORIENTATION_CONFIRMED',
             title='Orientation confirmée',
-            message=f"L'orientation de {orientation.student.user.get_full_name()} vers la filière {orientation.get_final_stream_display()} a été confirmée.",
+            message=f"L'orientation de {orientation.student.get_full_name()} vers la filière {orientation.get_final_stream_display()} a été confirmée.",
             payload={'orientation_id': orientation.id, 'final_stream': orientation.final_stream},
         )
         return Response({'status': 'orientation confirmed', 'final_stream': orientation.final_stream})

@@ -93,7 +93,7 @@ const roleScreenKeys: Record<string, ScreenKey[]> = {
   ADMIN: navigation.map(({ key }) => key),
   PROFESSEUR: ['grades', 'attendance', 'timetable', 'chat', 'notifications'],
   SURVEILLANT: ['students', 'attendance', 'timetable', 'chat', 'notifications', 'office'],
-  SECRETARIAT: ['students', 'enrollments', 'attendance', 'timetable', 'chat', 'notifications', 'office'],
+  SECRETARIAT: ['students', 'enrollments', 'timetable', 'chat', 'notifications', 'office'],
 }
 
 export default function Home() {
@@ -158,24 +158,24 @@ export default function Home() {
     }
     switch (active) {
       case 'overview': return <OverviewScreen data={data} />
-      case 'students': return <StudentsScreen etudiants={data.etudiants} classes={data.classes as any} onReload={reload} canManage={role === 'ADMIN' || role === 'SECRETARIAT'} canReviewTransfers={role === 'ADMIN'} canManageCertificates={role === 'ADMIN'} showGrades={role === 'ADMIN'} />
-      case 'enrollments': return <EnrollmentRegistryScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} />
-      case 'payments': return <EnrollmentsScreen enrollments={data.enrollments} etudiants={data.etudiants} classes={data.classes as any} canManagePayments={role === 'ADMIN'} onReload={reload} />
-      case 'classes': return <ClassesScreen classes={data.classes as any} etudiants={data.etudiants} onReload={reload} />
-      case 'teachers': return <TeachersScreen users={data.users} etudiants={data.etudiants} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
+      case 'students': return <StudentsScreen classes={data.classes as any} onReload={reload} canManage={role === 'ADMIN' || role === 'SECRETARIAT'} canReviewTransfers={role === 'ADMIN'} canManageCertificates={role === 'ADMIN'} showGrades={role === 'ADMIN'} />
+      case 'enrollments': return <EnrollmentRegistryScreen enrollments={data.enrollments} classes={data.classes as any} />
+      case 'payments': return <EnrollmentsScreen enrollments={data.enrollments} classes={data.classes as any} canManagePayments={role === 'ADMIN'} onReload={reload} />
+      case 'classes': return <ClassesScreen classes={data.classes as any} onReload={reload} />
+      case 'teachers': return <TeachersScreen users={data.users} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
       case 'coverage': return <CoverageScreen classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'matieres': return <MatieresScreen matieres={data.matieres} classes={data.classes as any} onReload={reload} />
-      case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} etudiants={data.etudiants} classes={data.classes} onReload={reload} canScan={role === 'ADMIN' || role === 'PROFESSEUR'} />
-      case 'grades': return <GradesScreen notes={data.notes} users={data.users} etudiants={data.etudiants} classes={data.classes} matieres={data.matieres} periods={data.periods} role={role} userId={userId} onReload={reload} />
+      case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} classes={data.classes} role={role} userId={userId} reports={data.unavailabilityReports} onReload={reload} canScan={role === 'ADMIN' || role === 'PROFESSEUR'} />
+      case 'grades': return <GradesScreen notes={data.notes} users={data.users} classes={data.classes} matieres={data.matieres} periods={data.periods} role={role} userId={userId} onReload={reload} />
       case 'periods': return <ExamPeriodsScreen periods={data.periods} onReload={reload} />
       case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
       case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} canGenerate={role === 'ADMIN'} onReload={reload} />
-      case 'bulletins': return <BulletinsScreen etudiants={data.etudiants} classes={data.classes as any} notes={data.notes} matieres={data.matieres} periods={data.periods} />
-      case 'reports': return <ReportsScreen users={data.users} etudiants={data.etudiants} classes={data.classes} matieres={data.matieres} periods={data.periods} />
+      case 'bulletins': return <BulletinsScreen classes={data.classes as any} notes={data.notes} matieres={data.matieres} periods={data.periods} />
+      case 'reports': return <ReportsScreen users={data.users} studentCount={data.studentStats.actifs} classes={data.classes} matieres={data.matieres} periods={data.periods} />
       case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} onReload={reload} />
       case 'chat': return <ChatScreen users={data.users} />
       case 'notifications': return <NotificationsScreen notifications={data.notifications} classes={data.classes} role={role} recipientId={userId} onReload={reload} />
-      case 'office': return <OfficePassesScreen students={data.etudiants} classes={data.classes as any} records={data.officePasses} role={role} onReload={reload} />
+      case 'office': return <OfficePassesScreen classes={data.classes as any} records={data.officePasses} role={role} onReload={reload} />
       case 'audit': return <AuditScreen logs={data.auditLogs} />
     }
   }
@@ -299,8 +299,7 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
     void loadAlerts()
   }, [])
 
-  const students = data.etudiants
-  const elevesActifs = students.filter((e) => e.actif).length
+  const elevesActifs = data.studentStats.actifs
   const enseignantsActifs = data.users.filter((u) => u.role === 'PROFESSEUR' && u.status === 'ACTIVE').length
   const totalEncaisse = data.enrollments.reduce((s, e) => s + Number(e.frais_verses || 0), 0)
   const totalDu = data.enrollments.reduce((s, e) => s + Number(e.frais_total || 0), 0)
@@ -321,7 +320,7 @@ function OverviewScreen({ data }: { data: ReturnType<typeof useAdminData>['data'
       </div>
 
       <div className="mobile-stat-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Élèves actifs" value={elevesActifs.toString()} detail={`${data.users.filter((u) => u.role === 'ELEVE').length} élèves inscrits`} trend="" icon={GraduationCap} accent="bg-primary/10 text-primary" />
+        <StatCard label="Élèves actifs" value={elevesActifs.toString()} detail={`${data.studentStats.total} dossiers élèves`} trend="" icon={GraduationCap} accent="bg-primary/10 text-primary" />
         <StatCard label="Enseignants" value={enseignantsActifs.toString()} detail="Personnel actif" trend="" icon={Users} accent="bg-sky-500/10 text-sky-700 dark:text-sky-300" />
         <StatCard label="Classes" value={data.classes.length.toString()} detail={`${data.matieres.length} matières`} trend="" icon={BookOpen} accent="bg-amber-500/10 text-amber-700 dark:text-amber-300" />
         <StatCard label="Encaissé" value={new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalEncaisse) + ' Ar'} detail={`sur ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(totalDu)} Ar attendus`} trend="" icon={CheckCircle2} accent="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" />

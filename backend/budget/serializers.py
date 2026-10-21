@@ -38,7 +38,7 @@ class BudgetItemSerializer(serializers.ModelSerializer):
         if obj.related_enrollment:
             return {
                 'id': obj.related_enrollment.id,
-                'student': obj.related_enrollment.student.user.get_full_name() if obj.related_enrollment.student else None,
+                'student': obj.related_enrollment.student.get_full_name() if obj.related_enrollment.student else None,
                 'receipt_number': obj.related_enrollment.receipt_number,
             }
         return None

@@ -34,16 +34,6 @@ class CustomUserSerializer(serializers.ModelSerializer):
         if self.instance is None and not attrs.get('password'):
             raise serializers.ValidationError({'password': 'Définissez un mot de passe initial pour ce compte.'})
 
-        role = attrs.get('role', getattr(self.instance, 'role', None))
-        photo = attrs.get('photo', getattr(self.instance, 'photo', None))
-        if role in {
-            CustomUser.Role.ADMIN,
-            CustomUser.Role.PROFESSEUR,
-            CustomUser.Role.SURVEILLANT,
-            CustomUser.Role.SECRETARIAT,
-        } and not photo:
-            raise serializers.ValidationError({'photo': 'La photo est obligatoire pour ce compte afin d’afficher le badge.'})
-
         return attrs
 
     def create(self, validated_data):

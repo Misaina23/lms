@@ -108,6 +108,7 @@ export type Classe = {
   stream: string | null;
   academic_year: string | null;
   capacite: number;
+  effectif?: number;
   created_at: string;
   updated_at: string;
 };
@@ -185,6 +186,7 @@ export type Etudiant = {
 export type Enrollment = {
   id: string;
   student: number;
+  student_detail: Etudiant;
   classe: number | null;
   academic_year: string;
   receipt_number: string;
@@ -256,6 +258,7 @@ export type CertificateRequest = {
 export type Note = {
   id: number;
   etudiant: number;
+  etudiant_detail: Pick<Etudiant, 'id' | 'matricule' | 'first_name' | 'last_name' | 'classe'>;
   matiere: number;
   professeur: number;
   exam_period: number | null;
@@ -273,6 +276,7 @@ export type Note = {
 export type Absence = {
   id: string;
   etudiant: number;
+  etudiant_detail: Pick<Etudiant, 'id' | 'matricule' | 'first_name' | 'last_name' | 'classe'>;
   professeur: number | null;
   date_absence: string;
   heure_debut: string;
@@ -294,6 +298,38 @@ export type AttendanceRiskAlert = {
   absence_days: number
   latest_absence: string
   severity: 'WARNING' | 'HIGH'
+}
+
+export type TeacherAssignment = {
+  id: number
+  professeur: number
+  classe: number
+  matiere: number
+  academic_year: string
+  professeur_detail: { id: number; matricule: string; name: string }
+  classe_detail: { id: number; nom: string; niveau: string }
+  matiere_detail: { id: number; nom: string; code: string }
+}
+
+export type TeacherUnavailabilityReport = {
+  id: number
+  assignment: number
+  assignment_detail: {
+    class_id: number
+    class_name: string
+    subject_id: number
+    subject_name: string
+    academic_year: string
+  }
+  teacher_name: string
+  date: string
+  start_time: string
+  end_time: string
+  reason: string
+  status: 'PENDING' | 'ACKNOWLEDGED' | 'RESOLVED'
+  admin_response: string
+  created_at: string
+  updated_at: string
 }
 
 export type StudentOrientation = {

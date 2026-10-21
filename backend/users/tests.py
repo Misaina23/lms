@@ -158,7 +158,7 @@ class CustomUserViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(CustomUser.objects.filter(email='marie@lycee.com').exists())
 
-    def test_account_holder_requires_photo_for_staff_roles(self):
+    def test_account_holder_can_be_created_without_a_photo(self):
         serializer = CustomUserSerializer(data={
             'username': 'photo-missing',
             'matricule': 'PRFPHOTO',
@@ -170,8 +170,7 @@ class CustomUserViewSetTests(APITestCase):
             'phone': '+261331234567',
         })
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('photo', serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
     def test_admin_can_suspend_staff_account(self):
         teacher = CustomUser.objects.create_user(
@@ -197,7 +196,7 @@ class CustomUserViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['email'], 'admin@lycee.com')
 
-    def test_public_registration_accepts_portal_roles(self):
+    def test_public_registration_rejects_admin_accounts(self):
         self.client.credentials()
         response = self.client.post(reverse('register'), {
             'username': 'selfadmin',
@@ -209,11 +208,10 @@ class CustomUserViewSetTests(APITestCase):
             'role': CustomUser.Role.ADMIN,
             'photo': create_valid_photo('admin.png'),
         })
-        self.assertEqual(response.status_code, 201)
-        self.assertTrue(CustomUser.objects.filter(email='selfadmin@lycee.com').exists())
-        self.assertEqual(CustomUser.objects.get(email='selfadmin@lycee.com').status, CustomUser.Status.PENDING_VERIFICATION)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(CustomUser.objects.filter(email='selfadmin@lycee.com').exists())
 
-    def test_registration_options_exposes_all_portal_signup_roles(self):
+    def test_registration_options_exposes_only_public_signup_roles(self):
         self.client.credentials()
         response = self.client.get(reverse('registration-options'))
         self.assertEqual(response.status_code, 200)
@@ -221,7 +219,6 @@ class CustomUserViewSetTests(APITestCase):
             response.data['roles'],
             [
                 {'value': CustomUser.Role.PROFESSEUR, 'label': 'Professeur'},
-                {'value': CustomUser.Role.ADMIN, 'label': 'Administrateur'},
                 {'value': CustomUser.Role.SURVEILLANT, 'label': 'Surveillant'},
             ],
         )
@@ -247,7 +244,6 @@ class CustomUserViewSetTests(APITestCase):
             'role': CustomUser.Role.PROFESSEUR,
             'teacher_type': CustomUser.TeacherType.FONCTIONNAIRE,
             'matiere': matiere.id,
-            'photo': create_valid_photo('teacher-subject.png'),
         })
 
         self.assertEqual(response.status_code, 201)

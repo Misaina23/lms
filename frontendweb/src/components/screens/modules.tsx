@@ -5,12 +5,11 @@ import { Search, CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, UserPlus, C
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { api, type User, type Classe, type Matiere, type MatiereCoefficient, type Etudiant, type Note, type ExamPeriod, type SchoolConfig, type PaginatedResponse, type AttendanceRiskAlert } from '@/lib/api'
-import { initials, matchesStudentQuery } from '@/lib/admin-data'
+import { api, type User, type Classe, type Matiere, type MatiereCoefficient, type Note, type ExamPeriod, type SchoolConfig, type PaginatedResponse, type AttendanceRiskAlert, type TeacherAssignment, type TeacherUnavailabilityReport } from '@/lib/api'
+import { initials, matchesStudentQuery, useStudentSearch } from '@/lib/admin-data'
 
-export function TeachersScreen({ users, etudiants, notes, matieres, periods, onReload }: {
+export function TeachersScreen({ users, notes, matieres, periods, onReload }: {
   users: User[]
-  etudiants: any[]
   notes: any[]
   matieres: Matiere[]
   periods: any[]
@@ -260,7 +259,7 @@ export function TeachersScreen({ users, etudiants, notes, matieres, periods, onR
   )
 }
 
-export function ClassesScreen({ classes, etudiants, onReload }: { classes: any[]; etudiants: any[]; onReload: () => void }) {
+export function ClassesScreen({ classes, onReload }: { classes: Classe[]; onReload: () => void }) {
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingClass, setEditingClass] = useState<any>(null)
@@ -322,7 +321,7 @@ export function ClassesScreen({ classes, etudiants, onReload }: { classes: any[]
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-extrabold tracking-tight text-foreground">Classes & Matières</h2>
-          <p className="text-sm text-muted-foreground">{classes.length} classes · {etudiants.filter((e) => e.actif).length} élèves actifs</p>
+          <p className="text-sm text-muted-foreground">{classes.length} classes · {classes.reduce((total, classe) => total + (classe.effectif || 0), 0)} élèves actifs</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -384,7 +383,7 @@ export function ClassesScreen({ classes, etudiants, onReload }: { classes: any[]
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((classe: any) => {
-          const effectif = etudiants.filter((e) => e.classe === classe.id && e.actif).length
+          const effectif = classe.effectif || 0
           const fillRate = classe.capacite ? Math.round((effectif / classe.capacite) * 100) : 0
           return (
             <Card key={classe.id} className="border-border/70 bg-card/80 shadow-sm rounded-2xl">
@@ -811,10 +810,9 @@ export function CoverageScreen({ classes, matieres, users }: { classes: any[]; m
   )
 }
 
-export function GradesScreen({ notes, users, etudiants, classes, matieres, periods, role, userId, onReload }: {
+export function GradesScreen({ notes, users, classes, matieres, periods, role, userId, onReload }: {
   notes: Note[]
   users: User[]
-  etudiants: Etudiant[]
   classes: Classe[]
   matieres: Matiere[]
   periods: ExamPeriod[]
@@ -864,11 +862,10 @@ export function GradesScreen({ notes, users, etudiants, classes, matieres, perio
 
   const availableAssignments = assignments.filter((item) => item.classe === Number(classId) && (!periodId || item.academic_year === periods.find((period) => period.id === Number(periodId))?.academic_year))
   const availableSubjects = [...new Set(availableAssignments.map((item) => item.matiere))]
-  const matchingStudentCandidates = studentQuery.trim() ? etudiants.filter((student) => student.actif && student.statut === 'ENROLLED' && student.classe === Number(classId) && matchesStudentQuery(student, studentQuery)) : []
-  const matchingStudents = matchingStudentCandidates.slice(0, 8)
+  const { results: matchingStudents, count: matchingStudentCount, isSearching: isSearchingStudent, error: studentSearchError } = useStudentSearch(classId, studentQuery, 'actif=true&statut=ENROLLED')
   const filteredNotes = notes.filter((note) => {
-    const student = etudiants.find((item) => item.id === note.etudiant)
-    return Boolean(student && notesClassFilter && student.classe === Number(notesClassFilter) && (!notesSearch.trim() || matchesStudentQuery(student, notesSearch)))
+    const student = note.etudiant_detail
+    return Boolean(notesClassFilter && student.classe === Number(notesClassFilter) && (!notesSearch.trim() || matchesStudentQuery(student, notesSearch)))
   })
   const notePageCount = Math.max(1, Math.ceil(filteredNotes.length / 30))
   const visibleNotes = filteredNotes.slice(notePage * 30, notePage * 30 + 30)
@@ -947,8 +944,10 @@ export function GradesScreen({ notes, users, etudiants, classes, matieres, perio
             </label>
             <div className="max-h-36 overflow-y-auto rounded-lg border border-border">
               {matchingStudents.map((student) => <button type="button" key={student.id} onClick={() => setStudentId(String(student.id))} className={`flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-muted ${studentId === String(student.id) ? 'bg-primary/10' : ''}`}><span>{student.first_name} {student.last_name}</span><span className="text-muted-foreground">{student.matricule}</span></button>)}
-              {classId && studentQuery.trim() && matchingStudents.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève correspondant dans cette classe.</p>}
-              {matchingStudentCandidates.length > 8 && <p className="px-3 py-2 text-xs text-muted-foreground">Affinez la recherche pour réduire les résultats.</p>}
+              {isSearchingStudent && <p className="px-3 py-2 text-sm text-muted-foreground">Recherche en cours…</p>}
+              {studentSearchError && <p className="px-3 py-2 text-sm text-destructive" role="alert">{studentSearchError}</p>}
+              {classId && studentQuery.trim() && !isSearchingStudent && !studentSearchError && matchingStudents.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun élève correspondant dans cette classe.</p>}
+              {matchingStudentCount > matchingStudents.length && <p className="px-3 py-2 text-xs text-muted-foreground">{matchingStudentCount} résultat(s) : affinez la recherche.</p>}
               {!studentQuery.trim() && <p className="px-3 py-2 text-sm text-muted-foreground">Saisissez un nom ou un matricule après avoir choisi la classe.</p>}
             </div>
             <label className="grid gap-1.5 text-xs font-semibold">Note 1 / 20<Input required type="number" min="0" max="20" step="0.01" value={score1} onChange={(event) => setScore1(event.target.value)} /></label>
@@ -983,12 +982,11 @@ export function GradesScreen({ notes, users, etudiants, classes, matieres, perio
               </thead>
               <tbody>
                 {visibleNotes.map((n) => {
-                  const et = etudiants.find((e) => e.id === n.etudiant)
                   const mat = matieres.find((m) => m.id === n.matiere)
                   const per = periods.find((p) => p.id === n.exam_period)
                   return (
                     <tr key={n.id} className="border-b border-border/60 hover:bg-muted/25">
-                      <td data-label="Élève" className="px-3 py-3 sm:px-6 sm:py-4">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
+                      <td data-label="Élève" className="px-3 py-3 sm:px-6 sm:py-4">{n.etudiant_detail.first_name} {n.etudiant_detail.last_name}</td>
                       <td data-label="Matière" className="px-3 py-3 sm:px-4 sm:py-4">{mat?.code || '—'}</td>
                       <td data-label="Période" className="px-3 py-3 sm:px-4 sm:py-4">{per?.label || '—'}</td>
                       <td data-label="Note" className="px-3 py-3 sm:px-4 sm:py-4 font-semibold">{n.note}/20</td>
@@ -1211,15 +1209,17 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
 
 type ScannerControls = { stop: () => void }
 
-export function AttendanceScreen({ absences, users, etudiants, classes, onReload, canScan = false }: {
+export function AttendanceScreen({ absences, users, classes, role, userId, reports, onReload, canScan = false }: {
   absences: any[]
   users: User[]
-  etudiants: Etudiant[]
   classes: Classe[]
+  role: string | null
+  userId: number | null
+  reports: TeacherUnavailabilityReport[]
   onReload: () => void
   canScan?: boolean
 }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Indian/Antananarivo' }).format(new Date())
   const today_abs = absences.filter((a) => a.date_absence === today)
   const videoRef = useRef<HTMLVideoElement>(null)
   const scannerRef = useRef<ScannerControls | null>(null)
@@ -1239,17 +1239,26 @@ export function AttendanceScreen({ absences, users, etudiants, classes, onReload
   const [scanMessage, setScanMessage] = useState('')
   const [riskAlerts, setRiskAlerts] = useState<AttendanceRiskAlert[]>([])
   const [riskAlertsError, setRiskAlertsError] = useState('')
+  const [assignments, setAssignments] = useState<TeacherAssignment[]>([])
+  const [reportError, setReportError] = useState('')
+  const [reportSuccess, setReportSuccess] = useState('')
+  const [reportSaving, setReportSaving] = useState(false)
+  const [reportAssignment, setReportAssignment] = useState('')
+  const [reportDate, setReportDate] = useState(today)
+  const [reportStart, setReportStart] = useState('08:00')
+  const [reportEnd, setReportEnd] = useState('10:00')
+  const [reportReason, setReportReason] = useState('')
+  const [adminResponses, setAdminResponses] = useState<Record<number, string>>({})
+  const [updatingReportId, setUpdatingReportId] = useState<number | null>(null)
   const filteredAbsences = scanClass ? absences.filter((absence) => {
-    const student = etudiants.find((item) => item.id === absence.etudiant)
+    const student = absence.etudiant_detail
     if (!student || student.classe !== Number(scanClass)) return false
     return !attendanceSearch.trim() || matchesStudentQuery(student, attendanceSearch)
   }) : []
   const [attendancePage, setAttendancePage] = useState(0)
   const attendancePageCount = Math.max(1, Math.ceil(filteredAbsences.length / 30))
   const visibleAbsences = filteredAbsences.slice(attendancePage * 30, attendancePage * 30 + 30)
-  const manualCandidates = manualStudentQuery.trim() && scanClass
-    ? etudiants.filter((student) => student.actif && student.classe === Number(scanClass) && matchesStudentQuery(student, manualStudentQuery)).slice(0, 8)
-    : []
+  const { results: manualCandidates, count: manualCandidateCount, isSearching: isSearchingManual, error: manualSearchError } = useStudentSearch(scanClass, manualStudentQuery, 'actif=true&statut=ENROLLED')
 
   const registerManualAttendance = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1282,6 +1291,58 @@ export function AttendanceScreen({ absences, users, etudiants, classes, onReload
     void loadRiskAlerts()
   }, [loadRiskAlerts])
 
+  useEffect(() => {
+    if (role !== 'PROFESSEUR') return
+    let cancelled = false
+    api.get<PaginatedResponse<TeacherAssignment>>(`/teacher-assignments/?professeur=${userId}&page_size=500`)
+      .then((response) => {
+        if (!cancelled) setAssignments(response.results)
+      })
+      .catch((error) => {
+        if (!cancelled) setReportError(error instanceof Error ? error.message : 'Impossible de charger vos affectations.')
+      })
+    return () => { cancelled = true }
+  }, [role, userId])
+
+  const submitUnavailabilityReport = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setReportError('')
+    setReportSuccess('')
+    setReportSaving(true)
+    try {
+      await api.post('/teacher-unavailability-reports/', {
+        assignment: Number(reportAssignment),
+        date: reportDate,
+        start_time: reportStart,
+        end_time: reportEnd,
+        reason: reportReason.trim(),
+      })
+      setReportReason('')
+      setReportSuccess('Votre signalement a été transmis directement à l’administration.')
+      onReload()
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Impossible de transmettre le signalement.')
+    } finally {
+      setReportSaving(false)
+    }
+  }
+
+  const updateUnavailabilityReport = async (report: TeacherUnavailabilityReport, status: 'ACKNOWLEDGED' | 'RESOLVED') => {
+    setReportError('')
+    try {
+      setUpdatingReportId(report.id)
+      await api.post(`/teacher-unavailability-reports/${report.id}/update-status/`, {
+        status,
+        admin_response: (adminResponses[report.id] || '').trim(),
+      })
+      onReload()
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Impossible de mettre à jour le signalement.')
+    } finally {
+      setUpdatingReportId(null)
+    }
+  }
+
   const stopCamera = () => {
     scannerRef.current?.stop()
     scannerRef.current = null
@@ -1300,14 +1361,14 @@ export function AttendanceScreen({ absences, users, etudiants, classes, onReload
       return
     }
     try {
-      const record = await api.post<{ etudiant: number }>('/absences/scan/', {
+      const record = await api.post<{ etudiant: number; etudiant_detail: { first_name: string; last_name: string } }>('/absences/scan/', {
         matricule: code.trim(),
         classe: Number(scanClass),
         date_absence: scanDate,
         heure_debut: startTime,
         heure_fin: endTime,
       })
-      const student = etudiants.find((item) => item.id === record.etudiant)
+      const student = record.etudiant_detail
       setScanMessage(`${student ? `${student.first_name} ${student.last_name}` : code} : présence enregistrée.`)
       setManualCode('')
       onReload()
@@ -1349,6 +1410,64 @@ export function AttendanceScreen({ absences, users, etudiants, classes, onReload
         <h2 className="text-lg font-extrabold tracking-tight text-foreground">Pointage & Assiduité</h2>
         <p className="text-sm text-muted-foreground">{absences.length} pointages · {today_abs.length} aujourd'hui</p>
       </div>
+      {(role === 'PROFESSEUR' || role === 'ADMIN') && (
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-base">Indisponibilité pour un cours</CardTitle>
+            <p className="text-sm text-muted-foreground">Les signalements sont transmis directement à l’administration, qui organise le suivi du cours.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {role === 'PROFESSEUR' && (
+              <form onSubmit={submitUnavailabilityReport} className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-xs font-semibold">Cours concerné
+                  <select required value={reportAssignment} onChange={(event) => setReportAssignment(event.target.value)} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
+                    <option value="">Choisir une classe et une matière</option>
+                    {assignments.map((assignment) => (
+                      <option key={assignment.id} value={assignment.id}>
+                        {assignment.classe_detail.nom} · {assignment.matiere_detail.nom} · {assignment.academic_year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-xs font-semibold">Date du cours<Input required type="date" min={today} value={reportDate} onChange={(event) => setReportDate(event.target.value)} /></label>
+                <label className="grid gap-1.5 text-xs font-semibold">Heure de début<Input required type="time" value={reportStart} onChange={(event) => setReportStart(event.target.value)} /></label>
+                <label className="grid gap-1.5 text-xs font-semibold">Heure de fin<Input required type="time" value={reportEnd} onChange={(event) => setReportEnd(event.target.value)} /></label>
+                <label className="grid gap-1.5 text-xs font-semibold sm:col-span-2">Motif<textarea required maxLength={2000} rows={3} value={reportReason} onChange={(event) => setReportReason(event.target.value)} className="rounded-xl border border-border bg-card p-3 text-sm" /></label>
+                {reportError && <p className="text-sm text-destructive sm:col-span-2" role="alert">{reportError}</p>}
+                {reportSuccess && <p className="text-sm text-emerald-700 sm:col-span-2" role="status">{reportSuccess}</p>}
+                <div className="sm:col-span-2"><Button type="submit" disabled={reportSaving || assignments.length === 0}>{reportSaving ? 'Transmission…' : 'Avertir l’administration'}</Button></div>
+              </form>
+            )}
+            {role === 'ADMIN' && reportError && <p className="text-sm text-destructive" role="alert">{reportError}</p>}
+            {reports.length === 0
+              ? <p className="text-sm text-muted-foreground">{role === 'ADMIN' ? 'Aucun signalement reçu.' : 'Vous n’avez pas encore signalé de cours.'}</p>
+              : <div className="space-y-3">
+                {reports.map((report) => (
+                  <article key={report.id} className="rounded-xl border border-border p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{report.assignment_detail.class_name} · {report.assignment_detail.subject_name}</p>
+                        <p className="text-sm text-muted-foreground">{report.teacher_name} · {report.date} · {report.start_time.slice(0, 5)}–{report.end_time.slice(0, 5)}</p>
+                        <p className="mt-2 text-sm">{report.reason}</p>
+                        {report.admin_response && <p className="mt-2 text-sm text-muted-foreground">Réponse : {report.admin_response}</p>}
+                      </div>
+                      <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">
+                        {report.status === 'PENDING' ? 'En attente' : report.status === 'ACKNOWLEDGED' ? 'Pris en compte' : 'Traité'}
+                      </span>
+                    </div>
+                    {role === 'ADMIN' && report.status !== 'RESOLVED' && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Input aria-label="Réponse à l’enseignant" placeholder="Réponse (facultative)" value={adminResponses[report.id] || ''} onChange={(event) => setAdminResponses((current) => ({ ...current, [report.id]: event.target.value }))} />
+                        <Button size="sm" variant="outline" disabled={updatingReportId === report.id} onClick={() => void updateUnavailabilityReport(report, 'ACKNOWLEDGED')}>Pris en compte</Button>
+                        <Button size="sm" disabled={updatingReportId === report.id} onClick={() => void updateUnavailabilityReport(report, 'RESOLVED')}>Marquer traité</Button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>}
+          </CardContent>
+        </Card>
+      )}
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -1397,14 +1516,17 @@ export function AttendanceScreen({ absences, users, etudiants, classes, onReload
             </div>
             <form onSubmit={registerManualAttendance} className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_180px_auto]">
               <div className="grid gap-2">
-                <label className="grid gap-1 text-xs font-semibold">Rechercher un ?l?ve de la classe par nom ou matricule
+                <label className="grid gap-1 text-xs font-semibold">Rechercher un eleve de la classe par nom ou matricule
                   <Input value={manualStudentQuery} onChange={(event) => { setManualStudentQuery(event.target.value); setManualStudentId('') }} disabled={!scanClass} placeholder="Nom, prenom ou matricule" />
                 </label>
                 {manualStudentQuery.trim() && <div className="max-h-32 overflow-y-auto rounded-lg border border-border">
                   {manualCandidates.map((student) => <button key={student.id} type="button" onClick={() => setManualStudentId(String(student.id))} className={`flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-muted ${manualStudentId === String(student.id) ? 'bg-primary/10' : ''}`}><span>{student.first_name} {student.last_name}</span><span className="text-muted-foreground">{student.matricule}</span></button>)}
-                  {manualCandidates.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun eleve trouve dans cette classe.</p>}
+                  {isSearchingManual && <p className="px-3 py-2 text-sm text-muted-foreground">Recherche en cours…</p>}
+                  {manualSearchError && <p className="px-3 py-2 text-sm text-destructive" role="alert">{manualSearchError}</p>}
+                  {!isSearchingManual && !manualSearchError && manualCandidates.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Aucun eleve trouve dans cette classe.</p>}
+                  {manualCandidateCount > manualCandidates.length && <p className="px-3 py-2 text-xs text-muted-foreground">{manualCandidateCount} résultat(s) : affinez la recherche.</p>}
                 </div>}
-                {manualStudentId && <p className="text-xs text-muted-foreground">?l?ve choisi : {etudiants.find((student) => student.id === Number(manualStudentId))?.full_name}</p>}
+                {manualStudentId && <p className="text-xs text-muted-foreground">Eleve choisi : {manualCandidates.find((student) => student.id === Number(manualStudentId))?.full_name || manualCandidates.find((student) => student.id === Number(manualStudentId))?.matricule}</p>}
               </div>
               <label className="grid content-start gap-1 text-xs font-semibold">Statut<select value={manualStatus} onChange={(event) => setManualStatus(event.target.value as 'ABSENT' | 'LATE')} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="ABSENT">Absent</option><option value="LATE">En retard</option></select></label>
               <div className="flex items-end"><Button type="submit" disabled={!manualStudentId || manualAttendanceSaving}>{manualAttendanceSaving ? 'Enregistrement?' : 'Enregistrer'}</Button></div>
@@ -1435,11 +1557,10 @@ export function AttendanceScreen({ absences, users, etudiants, classes, onReload
               </thead>
               <tbody>
                 {visibleAbsences.map((a) => {
-                  const et = etudiants.find((e) => e.id === a.etudiant)
                   return (
                     <tr key={a.id} className="border-b border-border/60 hover:bg-muted/25">
                       <td data-label="Date" className="px-6 py-3">{a.date_absence}</td>
-                      <td data-label="Élève" className="px-4 py-3">{et ? `${et.first_name} ${et.last_name}` : '—'}</td>
+                      <td data-label="Élève" className="px-4 py-3">{a.etudiant_detail ? `${a.etudiant_detail.first_name} ${a.etudiant_detail.last_name}` : '—'}</td>
                       <td data-label="Statut" className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${a.statut === 'PRESENT' ? 'bg-emerald-500/10 text-emerald-700' : a.statut === 'LATE' ? 'bg-amber-500/10 text-amber-700' : 'bg-rose-500/10 text-rose-700'}`}>
                           {a.statut}
@@ -1504,9 +1625,9 @@ type GradeReport = {
   }[]
 }
 
-export function ReportsScreen({ users, etudiants, classes, matieres, periods }: {
+export function ReportsScreen({ users, studentCount, classes, matieres, periods }: {
   users: User[]
-  etudiants: Etudiant[]
+  studentCount: number
   classes: Classe[]
   matieres: Matiere[]
   periods: ExamPeriod[]
@@ -1571,7 +1692,7 @@ export function ReportsScreen({ users, etudiants, classes, matieres, periods }: 
     <div className="space-y-6">
       <h2 className="text-lg font-extrabold tracking-tight text-foreground">Rapports & Pilotage</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Élèves actifs</p><p className="mt-1 text-2xl font-semibold">{etudiants.filter((student) => student.actif).length}</p></CardContent></Card>
+        <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Élèves actifs</p><p className="mt-1 text-2xl font-semibold">{studentCount}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Enseignants actifs</p><p className="mt-1 text-2xl font-semibold">{users.filter((user) => user.role === 'PROFESSEUR' && user.status === 'ACTIVE').length}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Classes</p><p className="mt-1 text-2xl font-semibold">{classes.length}</p></CardContent></Card>
         <Card className="rounded-2xl"><CardContent className="p-5"><p className="text-xs uppercase text-muted-foreground">Matières</p><p className="mt-1 text-2xl font-semibold">{matieres.length}</p></CardContent></Card>
