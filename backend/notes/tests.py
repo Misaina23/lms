@@ -180,6 +180,35 @@ class NoteViewSetTests(APITestCase):
         })
         self.assertEqual(response.status_code, 400)
 
+    def test_teacher_can_submit_note_for_assignment_academic_year(self):
+        TeacherAssignment.objects.create(
+            professeur=self.professeur,
+            classe=self.classe,
+            matiere=self.matiere,
+            academic_year=self.exam_period.academic_year,
+        )
+        self.classe.academic_year = '2025-2026'
+        self.classe.save(update_fields=['academic_year'])
+        student = Etudiant.objects.create(
+            matricule='ELVPERIOD',
+            first_name='Jeanne',
+            last_name='Rasoa',
+            classe=self.classe,
+            date_inscription='2024-09-01',
+            actif=True,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')
+
+        response = self.client.post(reverse('note-list'), {
+            'etudiant': student.id,
+            'matiere': self.matiere.id,
+            'exam_period': self.exam_period.id,
+            'score_1': '16.00',
+            'date_evaluation': '2024-10-05',
+        })
+
+        self.assertEqual(response.status_code, 201, response.data)
+
     def test_retrieve_note(self):
         url = reverse('note-detail', args=[self.note.id])
         response = self.client.get(url)

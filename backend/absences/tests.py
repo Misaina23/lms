@@ -181,6 +181,7 @@ class AbsenceViewSetTests(APITestCase):
         url = reverse('absence-scan')
         payload = {
             'matricule': self.etudiant.matricule,
+            'classe': self.classe.id,
             'date_absence': '2026-10-06',
             'heure_debut': '10:00:00',
             'heure_fin': '12:00:00',
@@ -196,6 +197,7 @@ class AbsenceViewSetTests(APITestCase):
         url = reverse('absence-scan')
         payload = {
             'matricule': self.etudiant.matricule,
+            'classe': self.classe.id,
             'date_absence': '2026-10-06',
             'heure_debut': '10:00:00',
             'heure_fin': '12:00:00',
@@ -205,6 +207,36 @@ class AbsenceViewSetTests(APITestCase):
         duplicate_response = self.client.post(url, payload)
 
         self.assertEqual(duplicate_response.status_code, 409)
+
+    def test_scan_requires_the_selected_class_to_match_student(self):
+        other_class = Classe.objects.create(
+            nom='6eme B',
+            niveau=Classe.Niveau.SECONDAIRE_GENERAL,
+            capacite=40,
+        )
+        response = self.client.post(reverse('absence-scan'), {
+            'matricule': self.etudiant.matricule,
+            'classe': other_class.id,
+            'date_absence': '2026-10-06',
+            'heure_debut': '11:00:00',
+            'heure_fin': '12:00:00',
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('classe', response.data)
+        self.assertEqual(Absence.objects.count(), 1)
+
+    def test_scan_requires_a_selected_class(self):
+        response = self.client.post(reverse('absence-scan'), {
+            'matricule': self.etudiant.matricule,
+            'date_absence': '2026-10-06',
+            'heure_debut': '11:00:00',
+            'heure_fin': '12:00:00',
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('classe', response.data)
+        self.assertEqual(Absence.objects.count(), 1)
 
     def test_secretariat_cannot_record_attendance_by_qr(self):
         secretary = CustomUser.objects.create_user(
@@ -238,6 +270,7 @@ class AbsenceViewSetTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.professeur).key}')
         payload = {
             'matricule': self.etudiant.matricule,
+            'classe': self.classe.id,
             'date_absence': '2026-10-06',
             'heure_debut': '13:00:00',
             'heure_fin': '14:00:00',

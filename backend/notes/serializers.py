@@ -31,8 +31,6 @@ class NoteSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'exam_period': 'Sélectionnez une période scolaire.'})
             if period.is_locked:
                 raise serializers.ValidationError({'exam_period': 'Cette période est verrouillée.'})
-            if student and student.classe_id and student.classe.academic_year != period.academic_year:
-                raise serializers.ValidationError({'exam_period': 'La période ne correspond pas à l’année de la classe.'})
             from classes.models import TeacherAssignment
             if not TeacherAssignment.objects.filter(
                 professeur=request.user,

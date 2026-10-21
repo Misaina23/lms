@@ -105,7 +105,7 @@ export default function Home() {
   const [displayName, setDisplayName] = useState('Personnel')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  const { data, isLoading, error: dataError, reload } = useAdminData()
+  const { data, isLoading, error: dataError, reload, setData } = useAdminData()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -165,7 +165,7 @@ export default function Home() {
       case 'teachers': return <TeachersScreen users={data.users} notes={data.notes} matieres={data.matieres} periods={data.periods} onReload={reload} />
       case 'coverage': return <CoverageScreen classes={data.classes as any} matieres={data.matieres} users={data.users} />
       case 'matieres': return <MatieresScreen matieres={data.matieres} classes={data.classes as any} onReload={reload} />
-      case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} classes={data.classes} role={role} userId={userId} reports={data.unavailabilityReports} onReload={reload} canScan={role === 'ADMIN' || role === 'PROFESSEUR'} />
+      case 'attendance': return <AttendanceScreen absences={data.absences} users={data.users} classes={data.classes} role={role} userId={userId} reports={data.unavailabilityReports} onReload={reload} onAttendanceRecorded={(record) => setData((current) => ({ ...current, absences: [record, ...current.absences.filter((absence) => absence.id !== record.id)] }))} canScan={role === 'ADMIN' || role === 'PROFESSEUR'} />
       case 'grades': return <GradesScreen notes={data.notes} users={data.users} classes={data.classes} matieres={data.matieres} periods={data.periods} role={role} userId={userId} onReload={reload} />
       case 'periods': return <ExamPeriodsScreen periods={data.periods} onReload={reload} />
       case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />

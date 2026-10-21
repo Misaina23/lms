@@ -5,7 +5,7 @@ import { Search, CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, UserPlus, C
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { api, type User, type Classe, type Matiere, type MatiereCoefficient, type Note, type ExamPeriod, type SchoolConfig, type PaginatedResponse, type AttendanceRiskAlert, type TeacherAssignment, type TeacherUnavailabilityReport } from '@/lib/api'
+import { api, type User, type Classe, type Matiere, type MatiereCoefficient, type Note, type ExamPeriod, type SchoolConfig, type PaginatedResponse, type AttendanceRiskAlert, type TeacherAssignment, type TeacherUnavailabilityReport, type Absence } from '@/lib/api'
 import { initials, matchesStudentQuery, useStudentSearch } from '@/lib/admin-data'
 
 export function TeachersScreen({ users, notes, matieres, periods, onReload }: {
@@ -829,6 +829,7 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
   const [classId, setClassId] = useState('')
   const [subjectId, setSubjectId] = useState('')
   const [periodId, setPeriodId] = useState('')
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true)
   const [studentQuery, setStudentQuery] = useState('')
   const [studentId, setStudentId] = useState('')
   const [score1, setScore1] = useState('')
@@ -854,12 +855,16 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
         if (!cancelled) setAssignments(rows)
       } catch (error) {
         if (!cancelled) setGradeError(error instanceof Error ? error.message : 'Impossible de charger vos classes affectées.')
+      } finally {
+        if (!cancelled) setAssignmentsLoading(false)
       }
     }
     void loadAssignments()
     return () => { cancelled = true }
   }, [role, userId])
 
+  const classAssignmentYears = [...new Set(assignments.filter((item) => item.classe === Number(classId)).map((item) => item.academic_year))]
+  const availablePeriods = periods.filter((period) => !period.is_locked && classAssignmentYears.includes(period.academic_year))
   const availableAssignments = assignments.filter((item) => item.classe === Number(classId) && (!periodId || item.academic_year === periods.find((period) => period.id === Number(periodId))?.academic_year))
   const availableSubjects = [...new Set(availableAssignments.map((item) => item.matiere))]
   const { results: matchingStudents, count: matchingStudentCount, isSearching: isSearchingStudent, error: studentSearchError } = useStudentSearch(classId, studentQuery, 'actif=true&statut=ENROLLED')
@@ -929,16 +934,17 @@ export function GradesScreen({ notes, users, classes, matieres, periods, role, u
         <CardContent>
           <form onSubmit={saveGrade} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="grid gap-1.5 text-xs font-semibold">Classe
-              <select required value={classId} onChange={(event) => { setClassId(event.target.value); setSubjectId(''); setPeriodId(''); setStudentId(''); setStudentQuery('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal">
-                <option value="">Choisir une classe</option>{classes.filter((classe) => assignments.some((item) => item.classe === classe.id)).map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}
+              <select required value={classId} onChange={(event) => { setClassId(event.target.value); setSubjectId(''); setPeriodId(''); setStudentId(''); setStudentQuery(''); setScore1(''); setScore2('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal">
+                <option value="">{assignmentsLoading ? 'Chargement des classes…' : 'Choisir une classe'}</option>{classes.filter((classe) => assignments.some((item) => item.classe === classe.id)).map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold">Matière
               <select required value={subjectId} onChange={(event) => setSubjectId(event.target.value)} disabled={!classId} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une matière</option>{matieres.filter((item) => availableSubjects.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold">Période
-              <select required value={periodId} onChange={(event) => { setPeriodId(event.target.value); setSubjectId('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">Choisir une période</option>{periods.filter((period) => !period.is_locked && (!classId || period.academic_year === classes.find((classe) => classe.id === Number(classId))?.academic_year)).map((period) => <option key={period.id} value={period.id}>{period.label} · {period.academic_year}</option>)}</select>
+              <select required value={periodId} onChange={(event) => { setPeriodId(event.target.value); setSubjectId(''); setScore2('') }} disabled={!classId || assignmentsLoading || availablePeriods.length === 0} className="h-10 rounded-xl border border-border bg-card px-3 text-sm font-normal"><option value="">{assignmentsLoading ? 'Chargement des affectations…' : availablePeriods.length ? 'Choisir une période' : 'Aucune période ouverte'}</option>{availablePeriods.map((period) => <option key={period.id} value={period.id}>{period.label} · {period.academic_year}</option>)}</select>
             </label>
+            {classId && !assignmentsLoading && availablePeriods.length === 0 && <p className="text-sm text-amber-700 sm:col-span-2 lg:col-span-3" role="status">Aucune période ouverte n’est configurée pour l’année de vos affectations dans cette classe. Demandez à l’administration de configurer l’année et ses périodes.</p>}
             <label className="grid gap-1.5 text-xs font-semibold">Rechercher un élève par nom ou matricule
               <Input required disabled={!classId} value={studentQuery} onChange={(event) => { setStudentQuery(event.target.value); setStudentId('') }} placeholder="Nom, prénom ou matricule" />
             </label>
@@ -1033,22 +1039,34 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [evaluationPeriodType, setEvaluationPeriodType] = useState<SchoolConfig['evaluation_period_type']>('TRIMESTRE')
+  const [configuredPeriodType, setConfiguredPeriodType] = useState<SchoolConfig['evaluation_period_type'] | null>(null)
   const [schoolConfigId, setSchoolConfigId] = useState<number | null>(null)
   const [configError, setConfigError] = useState('')
+  const [configLoading, setConfigLoading] = useState(false)
   const [configSaving, setConfigSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
+    setConfigLoading(true)
     setConfigError('')
+    setSchoolConfigId(null)
     api.get<PaginatedResponse<SchoolConfig>>(`/school-config/?academic_year=${encodeURIComponent(form.academic_year)}`)
       .then((response) => {
         if (cancelled) return
         const config = response.results.find((item) => item.academic_year === form.academic_year)
         setSchoolConfigId(config?.id ?? null)
-        setEvaluationPeriodType(config?.evaluation_period_type ?? 'TRIMESTRE')
+        const periodType = config?.evaluation_period_type ?? 'TRIMESTRE'
+        setEvaluationPeriodType(periodType)
+        setConfiguredPeriodType(config?.evaluation_period_type ?? null)
       })
       .catch((loadError) => {
-        if (!cancelled) setConfigError(loadError instanceof Error ? loadError.message : 'Impossible de charger la configuration de l’année.')
+        if (!cancelled) {
+          setConfiguredPeriodType(null)
+          setConfigError(loadError instanceof Error ? loadError.message : 'Impossible de charger la configuration de l’année.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setConfigLoading(false)
       })
     return () => { cancelled = true }
   }, [form.academic_year])
@@ -1076,6 +1094,7 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
         ? await api.patch<SchoolConfig>(`/school-config/${schoolConfigId}/`, payload)
         : await api.post<SchoolConfig>('/school-config/', payload)
       setSchoolConfigId(config.id)
+      setConfiguredPeriodType(config.evaluation_period_type)
       onReload()
     } catch (saveError) {
       setConfigError(saveError instanceof Error ? saveError.message : 'Impossible d’enregistrer la configuration.')
@@ -1106,6 +1125,7 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
       setSaving(false)
     }
   }
+  const periodConfigurationSaved = schoolConfigId !== null && configuredPeriodType === evaluationPeriodType
 
   const toggleLock = async (period: ExamPeriod) => {
     setError('')
@@ -1138,8 +1158,9 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
                 <option value="TRIMESTRE">Trimestres</option>
               </select>
             </label>
-            <Button type="submit" disabled={configSaving}>{configSaving ? 'Enregistrement…' : 'Enregistrer la configuration'}</Button>
+            <Button type="submit" disabled={configLoading || configSaving}>{configSaving ? 'Enregistrement…' : 'Enregistrer la configuration'}</Button>
           </form>
+          {configLoading && <p className="mt-3 text-sm text-muted-foreground" role="status">Récupération de la configuration de l’année…</p>}
           {configError && <p className="mt-3 text-sm text-destructive" role="alert">{configError}</p>}
         </CardContent>
       </Card>
@@ -1179,8 +1200,9 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
               </>
             )}
             {error && <p className="text-sm text-destructive sm:col-span-2 lg:col-span-3" role="alert">{error}</p>}
+            {!configLoading && !configError && !periodConfigurationSaved && <p className="text-sm text-amber-700 sm:col-span-2 lg:col-span-3" role="status">Enregistrez l’organisation des évaluations de cette année avant d’ajouter ses périodes.</p>}
             <div className="sm:col-span-2 lg:col-span-3">
-              <Button type="submit" disabled={saving}>{saving ? 'Enregistrement…' : 'Ajouter la période'}</Button>
+              <Button type="submit" disabled={saving || configLoading || configSaving || Boolean(configError) || !periodConfigurationSaved}>{saving ? 'Enregistrement…' : 'Ajouter la période'}</Button>
             </div>
           </form>
         </CardContent>
@@ -1209,20 +1231,24 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
 
 type ScannerControls = { stop: () => void }
 
-export function AttendanceScreen({ absences, users, classes, role, userId, reports, onReload, canScan = false }: {
-  absences: any[]
+export function AttendanceScreen({ absences, users, classes, role, userId, reports, onReload, onAttendanceRecorded, canScan = false }: {
+  absences: Absence[]
   users: User[]
   classes: Classe[]
   role: string | null
   userId: number | null
   reports: TeacherUnavailabilityReport[]
   onReload: () => void
+  onAttendanceRecorded: (record: Absence) => void
   canScan?: boolean
 }) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Indian/Antananarivo' }).format(new Date())
   const today_abs = absences.filter((a) => a.date_absence === today)
   const videoRef = useRef<HTMLVideoElement>(null)
   const scannerRef = useRef<ScannerControls | null>(null)
+  const scanInProgressRef = useRef(false)
+  const lastDetectedCodeRef = useRef('')
+  const scanResetTimeoutRef = useRef<number | null>(null)
   const [manualCode, setManualCode] = useState('')
   const [scanClass, setScanClass] = useState('')
   const [attendanceSearch, setAttendanceSearch] = useState('')
@@ -1237,6 +1263,7 @@ export function AttendanceScreen({ absences, users, classes, role, userId, repor
   const [cameraActive, setCameraActive] = useState(false)
   const [scanError, setScanError] = useState('')
   const [scanMessage, setScanMessage] = useState('')
+  const [scanSaving, setScanSaving] = useState(false)
   const [riskAlerts, setRiskAlerts] = useState<AttendanceRiskAlert[]>([])
   const [riskAlertsError, setRiskAlertsError] = useState('')
   const [assignments, setAssignments] = useState<TeacherAssignment[]>([])
@@ -1266,10 +1293,10 @@ export function AttendanceScreen({ absences, users, classes, role, userId, repor
     setManualAttendanceSaving(true)
     setManualAttendanceError('')
     try {
-      await api.post('/absences/', { etudiant: Number(manualStudentId), date_absence: scanDate, heure_debut: startTime, heure_fin: endTime, statut: manualStatus })
+      const record = await api.post<Absence>('/absences/', { etudiant: Number(manualStudentId), date_absence: scanDate, heure_debut: startTime, heure_fin: endTime, statut: manualStatus })
       setManualStudentId('')
       setManualStudentQuery('')
-      onReload()
+      onAttendanceRecorded(record)
     } catch (error) {
       setManualAttendanceError(error instanceof Error ? error.message : 'Impossible d’enregistrer ce pointage.')
     } finally {
@@ -1346,11 +1373,17 @@ export function AttendanceScreen({ absences, users, classes, role, userId, repor
   const stopCamera = () => {
     scannerRef.current?.stop()
     scannerRef.current = null
+    lastDetectedCodeRef.current = ''
+    if (scanResetTimeoutRef.current !== null) {
+      window.clearTimeout(scanResetTimeoutRef.current)
+      scanResetTimeoutRef.current = null
+    }
     setCameraActive(false)
   }
 
   useEffect(() => () => {
     scannerRef.current?.stop()
+    if (scanResetTimeoutRef.current !== null) window.clearTimeout(scanResetTimeoutRef.current)
   }, [])
 
   const registerScan = async (code: string) => {
@@ -1360,8 +1393,11 @@ export function AttendanceScreen({ absences, users, classes, role, userId, repor
       setScanError('Choisissez une classe avant le pointage.')
       return
     }
+    if (scanInProgressRef.current) return
+    scanInProgressRef.current = true
+    setScanSaving(true)
     try {
-      const record = await api.post<{ etudiant: number; etudiant_detail: { first_name: string; last_name: string } }>('/absences/scan/', {
+      const record = await api.post<Absence>('/absences/scan/', {
         matricule: code.trim(),
         classe: Number(scanClass),
         date_absence: scanDate,
@@ -1371,36 +1407,63 @@ export function AttendanceScreen({ absences, users, classes, role, userId, repor
       const student = record.etudiant_detail
       setScanMessage(`${student ? `${student.first_name} ${student.last_name}` : code} : présence enregistrée.`)
       setManualCode('')
-      onReload()
+      onAttendanceRecorded(record)
     } catch (error) {
       setScanError(error instanceof Error ? error.message : 'Le pointage a échoué.')
+    } finally {
+      scanInProgressRef.current = false
+      setScanSaving(false)
     }
   }
 
   const startCamera = async () => {
     setScanError('')
+    if (!scanClass) {
+      setScanError('Choisissez une classe avant d’ouvrir la caméra.')
+      return
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
       setScanError('La caméra nécessite un navigateur compatible et une connexion HTTPS.')
       return
     }
     if (!videoRef.current) return
     try {
+      scannerRef.current?.stop()
       setCameraActive(true)
       const { BrowserQRCodeReader } = await import('@zxing/browser')
       const reader = new BrowserQRCodeReader()
-      const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result, _error, control) => {
+      const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
         const code = result?.getText().trim()
-        if (!code) return
-        control.stop()
-        scannerRef.current = null
-        setCameraActive(false)
+        if (!code) {
+          if (scanResetTimeoutRef.current === null && lastDetectedCodeRef.current) {
+            scanResetTimeoutRef.current = window.setTimeout(() => {
+              lastDetectedCodeRef.current = ''
+              scanResetTimeoutRef.current = null
+            }, 1200)
+          }
+          return
+        }
+        if (scanResetTimeoutRef.current !== null) {
+          window.clearTimeout(scanResetTimeoutRef.current)
+          scanResetTimeoutRef.current = null
+        }
+        if (scanInProgressRef.current || code === lastDetectedCodeRef.current) return
+        lastDetectedCodeRef.current = code
         setManualCode(code)
         void registerScan(code)
       })
       scannerRef.current = controls
     } catch (error) {
       stopCamera()
-      setScanError(error instanceof Error ? error.message : 'Impossible de démarrer la caméra.')
+      if (error instanceof Error && 'name' in error && error.name === 'NotAllowedError') {
+        setScanError('Autorisez l’accès à la caméra dans votre navigateur, puis réessayez.')
+      } else if (error instanceof Error && 'name' in error && error.name === 'NotFoundError') {
+        setScanError('Aucune caméra n’a été détectée sur cet appareil.')
+      } else if (error instanceof Error && 'name' in error && error.name === 'NotReadableError') {
+        setScanError('La caméra est déjà utilisée par une autre application.')
+      } else {
+        setScanError(error instanceof Error ? error.message : 'Impossible de démarrer la caméra.')
+      }
     }
   }
 
@@ -1498,7 +1561,7 @@ export function AttendanceScreen({ absences, users, classes, role, userId, repor
             <CardTitle className="flex items-center gap-2 text-base"><ScanLine className="size-5 text-primary" /> Pointer un élève par QR code</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <label className="grid max-w-sm gap-1 text-xs font-medium text-muted-foreground">Classe à pointer<select required value={scanClass} onChange={(event) => { setScanClass(event.target.value); setManualCode('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm text-foreground"><option value="">Choisir une classe</option>{classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}</select></label>
+            <label className="grid max-w-sm gap-1 text-xs font-medium text-muted-foreground">Classe à pointer<select required value={scanClass} onChange={(event) => { stopCamera(); setScanClass(event.target.value); setManualCode(''); setScanMessage(''); setScanError('') }} className="h-10 rounded-xl border border-border bg-card px-3 text-sm text-foreground"><option value="">Choisir une classe</option>{classes.map((classe) => <option key={classe.id} value={classe.id}>{classe.nom}</option>)}</select></label>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="grid gap-1 text-xs font-medium text-muted-foreground">Date du cours<Input type="date" value={scanDate} onChange={(event) => setScanDate(event.target.value)} /></label>
               <label className="grid gap-1 text-xs font-medium text-muted-foreground">Début<Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
@@ -1507,11 +1570,11 @@ export function AttendanceScreen({ absences, users, classes, role, userId, repor
             <video ref={videoRef} muted playsInline className={cameraActive ? 'mx-auto aspect-video w-full max-w-lg rounded-xl bg-black object-cover' : 'hidden'} aria-label="Caméra QR" />
             <div className="flex flex-wrap gap-2">
               {!cameraActive
-                ? <Button type="button" onClick={startCamera} className="gap-2"><Camera className="size-4" /> Ouvrir la caméra</Button>
+                ? <Button type="button" onClick={startCamera} disabled={!scanClass || scanSaving} className="gap-2"><Camera className="size-4" /> Ouvrir la caméra</Button>
                 : <Button type="button" variant="outline" onClick={stopCamera} className="gap-2"><CameraOff className="size-4" /> Arrêter</Button>}
               <form className="flex min-w-0 flex-1 gap-2" onSubmit={(event) => { event.preventDefault(); if (manualCode.trim()) void registerScan(manualCode) }}>
                 <Input value={manualCode} onChange={(event) => setManualCode(event.target.value)} placeholder="Matricule (secours caméra)" aria-label="Matricule de l’élève" />
-                <Button type="submit" variant="outline" disabled={!manualCode.trim()}>Pointer</Button>
+                <Button type="submit" variant="outline" disabled={!manualCode.trim() || !scanClass || scanSaving}>{scanSaving ? 'Pointage…' : 'Pointer'}</Button>
               </form>
             </div>
             <form onSubmit={registerManualAttendance} className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_180px_auto]">
