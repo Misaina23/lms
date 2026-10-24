@@ -79,6 +79,12 @@ class ExamPeriod(models.Model):
     )
     weight_note_1 = models.DecimalField(max_digits=3, decimal_places=2, default=0.3, help_text="Weight of first score (e.g., 0.3 = 30%)")
     weight_note_2 = models.DecimalField(max_digits=3, decimal_places=2, default=0.7, help_text="Weight of second score (e.g., 0.7 = 70%)")
+    bulletin_weight = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=1,
+        help_text="Weight of this period in the annual bulletin average",
+    )
     is_locked = models.BooleanField(default=False, help_text="If True, grades can't be modified without justification")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

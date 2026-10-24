@@ -1,8 +1,10 @@
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
+from django.test import SimpleTestCase
 from users.models import CustomUser
-from .models import Matiere
+from .models import ExamPeriod, Matiere
+from .serializers import ExamPeriodSerializer
 
 
 class MatiereViewSetTests(APITestCase):
@@ -41,3 +43,34 @@ class MatiereViewSetTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['code'], 'MATH')
+
+
+class ExamPeriodBulletinWeightTests(SimpleTestCase):
+    def setUp(self):
+        self.period = ExamPeriod(
+            code='26T3',
+            label='Trimestre 3',
+            period_type='T3',
+            academic_year='2026-2027',
+            start_date='2027-04-01',
+            end_date='2027-07-01',
+        )
+
+    def test_positive_bulletin_weight_is_valid(self):
+        serializer = ExamPeriodSerializer(
+            instance=self.period,
+            data={'bulletin_weight': '3.00'},
+            partial=True,
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_zero_bulletin_weight_is_rejected(self):
+        serializer = ExamPeriodSerializer(
+            instance=self.period,
+            data={'bulletin_weight': '0.00'},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('bulletin_weight', serializer.errors)

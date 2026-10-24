@@ -151,9 +151,19 @@ export type ExamPeriod = {
   number_of_notes: 1 | 2;
   weight_note_1: string;
   weight_note_2: string;
+  bulletin_weight: string;
   is_locked: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type Deliberation = {
+  id: number;
+  student: number;
+  exam_period: number;
+  average: string;
+  admission_threshold: string;
+  decision: 'ADMITTED' | 'REPEATER';
 };
 
 export type Etudiant = {

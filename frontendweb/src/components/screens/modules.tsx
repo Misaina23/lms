@@ -1073,9 +1073,12 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
     number_of_notes: '2',
     weight_note_1: '0.5',
     weight_note_2: '0.5',
+    bulletin_weight: '1',
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [weightDrafts, setWeightDrafts] = useState<Record<number, string>>({})
+  const [savingWeightId, setSavingWeightId] = useState<number | null>(null)
   const [evaluationPeriodType, setEvaluationPeriodType] = useState<SchoolConfig['evaluation_period_type']>('TRIMESTRE')
   const [configuredPeriodType, setConfiguredPeriodType] = useState<SchoolConfig['evaluation_period_type'] | null>(null)
   const [schoolConfigId, setSchoolConfigId] = useState<number | null>(null)
@@ -1154,6 +1157,7 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
         number_of_notes: Number(form.number_of_notes),
         weight_note_1: form.number_of_notes === '1' ? '1' : form.weight_note_1,
         weight_note_2: form.number_of_notes === '1' ? '0' : form.weight_note_2,
+        bulletin_weight: form.bulletin_weight,
       })
       onReload()
       setForm((current) => ({ ...current, start_date: '', end_date: '' }))
@@ -1175,12 +1179,35 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
     }
   }
 
+  const saveBulletinWeight = async (period: ExamPeriod) => {
+    const bulletin_weight = weightDrafts[period.id] ?? period.bulletin_weight
+    if (!Number.isFinite(Number(bulletin_weight)) || Number(bulletin_weight) <= 0) {
+      setError('Le coefficient du trimestre doit être supérieur à 0.')
+      return
+    }
+    setSavingWeightId(period.id)
+    setError('')
+    try {
+      await api.patch(`/exam-periods/${period.id}/`, { bulletin_weight })
+      setWeightDrafts((current) => {
+        const next = { ...current }
+        delete next[period.id]
+        return next
+      })
+      onReload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer le coefficient du trimestre.')
+    } finally {
+      setSavingWeightId(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Configuration pédagogique</p>
         <h2 className="mt-1 text-lg font-extrabold tracking-tight text-foreground">Années et périodes d’évaluation</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Choisissez l’organisation en bimestres ou trimestres pour chaque année scolaire, puis configurez les périodes et leur pondération.</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Choisissez l’organisation en bimestres ou trimestres pour chaque année scolaire, puis configurez les périodes et leur pondération. Des coefficients identiques (1, 1, 1) calculent la moyenne simple (T1 + T2 + T3) / 3 ; un coefficient 2 ou 3 en T3 permet de le pondérer davantage.</p>
       </div>
 
       <Card className="border-border/70 bg-card/80 rounded-2xl">
@@ -1237,6 +1264,9 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
                 </label>
               </>
             )}
+            <label className="grid gap-1.5 text-xs font-semibold">Coefficient du trimestre pour la moyenne annuelle
+              <Input required type="number" min="0.01" max="99.99" step="0.25" value={form.bulletin_weight} onChange={(event) => setForm({ ...form, bulletin_weight: event.target.value })} />
+            </label>
             {error && <p className="text-sm text-destructive sm:col-span-2 lg:col-span-3" role="alert">{error}</p>}
             {!configLoading && !configError && !periodConfigurationSaved && <p className="text-sm text-amber-700 sm:col-span-2 lg:col-span-3" role="status">Enregistrez l’organisation des évaluations de cette année avant d’ajouter ses périodes.</p>}
             <div className="sm:col-span-2 lg:col-span-3">
@@ -1255,9 +1285,26 @@ export function ExamPeriodsScreen({ periods, onReload }: { periods: ExamPeriod[]
                 <p className="font-semibold">{period.label} <span className="font-normal text-muted-foreground">· {period.academic_year}</span></p>
                 <p className="mt-1 text-xs text-muted-foreground">{period.start_date} — {period.end_date} · {period.number_of_notes === 1 ? '1 note' : '2 notes'} · coefficients {period.weight_note_1}/{period.weight_note_2}</p>
               </div>
-              <Button type="button" size="sm" variant={period.is_locked ? 'outline' : 'secondary'} onClick={() => toggleLock(period)}>
-                {period.is_locked ? 'Déverrouiller' : 'Verrouiller'}
-              </Button>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="grid gap-1 text-xs font-semibold">Coef. annuel
+                  <Input
+                    type="number"
+                    min="0.01"
+                    max="99.99"
+                    step="0.25"
+                    value={weightDrafts[period.id] ?? period.bulletin_weight}
+                    onChange={(event) => setWeightDrafts((current) => ({ ...current, [period.id]: event.target.value }))}
+                    className="h-9 w-28"
+                    aria-label={`Coefficient annuel de ${period.label}`}
+                  />
+                </label>
+                <Button type="button" size="sm" variant="outline" onClick={() => saveBulletinWeight(period)} disabled={savingWeightId === period.id}>
+                  {savingWeightId === period.id ? 'Enregistrement…' : 'Enregistrer coef.'}
+                </Button>
+                <Button type="button" size="sm" variant={period.is_locked ? 'outline' : 'secondary'} onClick={() => toggleLock(period)}>
+                  {period.is_locked ? 'Déverrouiller' : 'Verrouiller'}
+                </Button>
+              </div>
             </div>
           ))}
           {periods.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Aucune période configurée pour le moment.</p>}

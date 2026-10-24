@@ -124,7 +124,9 @@ export default function Home() {
     setRole(user.role)
     setUserId(user.id)
     setDisplayName(`${user.first_name} ${user.last_name}`.trim() || roleLabels[user.role])
-    setActive(user.role === 'ADMIN' ? 'overview' : roleScreenKeys[user.role][0])
+    const requestedScreen = new URLSearchParams(window.location.search).get('section')
+    const initialScreen = roleScreenKeys[user.role].find((key) => key === requestedScreen)
+    setActive(initialScreen ?? (user.role === 'ADMIN' ? 'overview' : roleScreenKeys[user.role][0]))
     setIsLoggedIn(true)
   }, [])
 
@@ -170,7 +172,7 @@ export default function Home() {
       case 'periods': return <ExamPeriodsScreen periods={data.periods} onReload={reload} />
       case 'registrations': return <RegistrationsScreen allUsers={data.allUsers} onReload={reload} />
       case 'timetable': return <TimetableScreen slots={data.timetableSlots} classes={data.classes as any} matieres={data.matieres} users={data.users} canGenerate={role === 'ADMIN'} onReload={reload} />
-      case 'bulletins': return <BulletinsScreen classes={data.classes as any} notes={data.notes} matieres={data.matieres} periods={data.periods} />
+      case 'bulletins': return <BulletinsScreen classes={data.classes as any} notes={data.notes} matieres={data.matieres} periods={data.periods} deliberations={data.deliberations} />
       case 'reports': return <ReportsScreen users={data.users} studentCount={data.studentStats.actifs} classes={data.classes} matieres={data.matieres} periods={data.periods} />
       case 'budget': return <BudgetScreen budgetItems={data.budgetItems} budgetCategories={data.budgetCategories} budgetReports={data.budgetReports} budgetStats={data.budgetStats} enrollments={data.enrollments} users={data.users} onReload={reload} />
       case 'chat': return <ChatScreen users={data.users} />

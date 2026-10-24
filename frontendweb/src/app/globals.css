@@ -101,7 +101,9 @@
   .print-office-pass,
   .print-office-pass *,
   .print-bulletin,
-  .print-bulletin * {
+  .print-bulletin *,
+  .print-bulletin-batch,
+  .print-bulletin-batch * {
     visibility: visible !important;
   }
 
@@ -115,15 +117,30 @@
   }
 
   .print-bulletin {
-    position: absolute;
-    inset: 0;
+    position: relative;
     width: 100%;
     border: 0 !important;
     box-shadow: none !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+
+  .print-bulletin-batch {
+    display: block !important;
+  }
+
+  .print-bulletin-page {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-bulletin-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
 }
+
+.print-bulletin-batch { display: none; }
 
 @layer base {
   * {

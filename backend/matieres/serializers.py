@@ -16,10 +16,15 @@ class ExamPeriodSerializer(serializers.ModelSerializer):
         model = ExamPeriod
         fields = [
             'id', 'code', 'label', 'period_type', 'academic_year', 'start_date', 'end_date',
-            'number_of_notes', 'weight_note_1', 'weight_note_2', 'is_locked',
+            'number_of_notes', 'weight_note_1', 'weight_note_2', 'bulletin_weight', 'is_locked',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_bulletin_weight(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Le coefficient du trimestre doit être supérieur à 0.')
+        return value
 
     def validate(self, attrs):
         start_date = attrs.get('start_date', getattr(self.instance, 'start_date', None))

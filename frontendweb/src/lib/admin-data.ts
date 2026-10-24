@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { api, type PaginatedResponse, type User, type Etudiant, type Note, type Classe, type Matiere, type Enrollment, type StudentOrientation, type ExamPeriod, type Absence, type BudgetItem, type BudgetCategory, type BudgetReport, type BudgetStats, type TimetableSlot, type AuditLog, type Notification, type StudentOfficePass, type TeacherUnavailabilityReport } from '@/lib/api'
+import { api, type PaginatedResponse, type User, type Etudiant, type Note, type Classe, type Matiere, type Enrollment, type StudentOrientation, type ExamPeriod, type Absence, type BudgetItem, type BudgetCategory, type BudgetReport, type BudgetStats, type TimetableSlot, type AuditLog, type Notification, type StudentOfficePass, type TeacherUnavailabilityReport, type Deliberation } from '@/lib/api'
 import { getStoredUser, isValidPortalRole } from '@/lib/auth'
 
 export type ScreenKey =
@@ -37,6 +37,7 @@ export type AdminData = {
   enrollments: Enrollment[]
   orientations: StudentOrientation[]
   periods: ExamPeriod[]
+  deliberations: Deliberation[]
   budgetItems: BudgetItem[]
   budgetCategories: BudgetCategory[]
   budgetReports: BudgetReport[]
@@ -55,7 +56,7 @@ function emptyPage<T>(): PaginatedResponse<T> {
 export function useAdminData() {
   const [data, setData] = useState<AdminData>({
     users: [], allUsers: [], classes: [], matieres: [], studentStats: { total: 0, actifs: 0 }, notes: [],
-    absences: [], enrollments: [], orientations: [], periods: [],
+    absences: [], enrollments: [], orientations: [], periods: [], deliberations: [],
     budgetItems: [], budgetCategories: [], budgetReports: [], budgetStats: null,
     timetableSlots: [], auditLogs: [], notifications: [], officePasses: [], unavailabilityReports: [],
   })
@@ -70,7 +71,7 @@ export function useAdminData() {
     if (!currentUser || !isValidPortalRole(currentUser.role)) {
       setData({
         users: [], allUsers: [], classes: [], matieres: [], studentStats: { total: 0, actifs: 0 }, notes: [],
-        absences: [], enrollments: [], orientations: [], periods: [],
+        absences: [], enrollments: [], orientations: [], periods: [], deliberations: [],
         budgetItems: [], budgetCategories: [], budgetReports: [], budgetStats: null,
         timetableSlots: [], auditLogs: [], notifications: [], officePasses: [], unavailabilityReports: [],
       })
@@ -100,7 +101,7 @@ export function useAdminData() {
         }
       }
       const failures: string[] = []
-      const [u, c, m, e, n, a, en, o, p, bi, bc, br, ts, al, no, op, ur] = await Promise.all([
+      const [u, c, m, e, n, a, en, o, p, d, bi, bc, br, ts, al, no, op, ur] = await Promise.all([
         optional('Personnel', loadAll<User>('/users/'), emptyPage<User>()),
         optional('Classes', loadAll<Classe>('/classes/'), emptyPage<Classe>()),
         optional('Matières', loadAll<Matiere>('/matieres/'), emptyPage<Matiere>()),
@@ -110,6 +111,7 @@ export function useAdminData() {
         optional('Inscriptions', loadAll<Enrollment>('/enrollments/'), emptyPage<Enrollment>()),
         currentUser.role === 'ADMIN' ? optional('Orientations', loadAll<StudentOrientation>('/orientations/'), emptyPage<StudentOrientation>()) : Promise.resolve(emptyPage<StudentOrientation>()),
         optional('Périodes', loadAll<ExamPeriod>('/exam-periods/'), emptyPage<ExamPeriod>()),
+        currentUser.role === 'ADMIN' ? optional('Délibérations', loadAll<Deliberation>('/deliberations/'), emptyPage<Deliberation>()) : Promise.resolve(emptyPage<Deliberation>()),
         currentUser.role === 'ADMIN' ? optional('Budget', loadAll<BudgetItem>('/budget/items/'), emptyPage<BudgetItem>()) : Promise.resolve(emptyPage<BudgetItem>()),
         currentUser.role === 'ADMIN' ? optional('Catégories budgétaires', loadAll<BudgetCategory>('/budget/categories/'), emptyPage<BudgetCategory>()) : Promise.resolve(emptyPage<BudgetCategory>()),
         currentUser.role === 'ADMIN' ? optional('Rapports budgétaires', loadAll<BudgetReport>('/budget/reports/'), emptyPage<BudgetReport>()) : Promise.resolve(emptyPage<BudgetReport>()),
@@ -135,6 +137,7 @@ export function useAdminData() {
         enrollments: en.results || [],
         orientations: o.results || [],
         periods: p.results || [],
+        deliberations: d.results || [],
         budgetItems: bi.results || [],
         budgetCategories: bc.results || [],
         budgetReports: br.results || [],
